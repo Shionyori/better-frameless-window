@@ -44,8 +44,9 @@ This is a ready-to-use Qt C++ project template for VS Code. It comes pre-configu
 ## How to Use
 
 1.  Open this project folder in VS Code.
-2.  VS Code will ask to select a CMake Kit. Choose the appropriate compiler for your platform (MSVC/GCC/Clang).
-3.  Select a Configure Preset in the status bar (e.g., `windows-debug`, `linux-debug`, or `macos-debug`).
-4.  Click "Build" in the status bar or press `F7`.
-5.  Select the corresponding Launch Configuration in the "Run and Debug" sidebar (e.g., `Qt: Windows Debug` or `Qt: Linux/macOS Debug`).
-6.  Press `F5` to start debugging. The Qt window should appear.
+2.  Change the `TARGET_NAME` variable in `CMakeLists.txt` to your actual project name.
+3.  Set the `QT_DIR` environment variable to point to your Qt installation, or create a `CMakeUserPresets.json` with CacheVariables to override it.
+4.  Open the Command Palette (Ctrl+Shift+P) and select "CMake: Select Configure Preset" to choose the appropriate preset for your platform (e.g., `windows-debug`, `linux-debug`, `macos-debug`).
+5.  Run "CMake: Configure" to generate the build files.
+6.  Run "CMake: Build" to compile the project.
+7.  Run "CMake: Debug" to start debugging. The Qt window should appear.
