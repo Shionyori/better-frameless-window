@@ -1,0 +1,22 @@
+# Build directories
+build/
+out/
+bin/
+lib/
+*.exe
+*.dll
+*.pdb
+*.ilk
+
+# CMake
+CMakeUserPresets.json
+compile_commands.json
+
+# VS Code - Keep settings/launch/tasks but ignore user specific
+.vscode/
+.history/
+.vs/
+
+# OS specific
+.DS_Store
+Thumbs.db
