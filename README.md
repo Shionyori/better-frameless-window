@@ -1,52 +1,29 @@
-# Qt VSCode Starter
+# better-frameless-window
 
-This is a ready-to-use Qt C++ project template for VS Code. It comes pre-configured with CMake build settings, debugging configurations, and code completion support, suitable for Windows, Linux, and macOS.
-
-## Prerequisites
-
-1.  **Install Qt**: Ensure Qt 6 is installed.
-    *   **Windows**: Recommended to use the MSVC version (e.g., `msvc2019_64` or `msvc2022_64`).
-    *   **Linux**: Install via apt (`sudo apt install qt6-base-dev`) or use the Qt Online Installer.
-    *   **macOS**: Install via Homebrew (`brew install qt`) or use the Qt Online Installer.
-
-2.  **Set Environment Variables**:
-    *   You need to set the `QT_DIR` environment variable to point to your specific Qt build kit location.
-    *   **Windows Example**: `D:\Qt\6.8.3\msvc2022_64`
-    *   **Linux/macOS Example**: `~/Qt/6.8.3/gcc_64` or `/usr/local/opt/qt` (Homebrew)
-    *   Alternatively, you can create a `CMakeUserPresets.json` file to override the `QT_DIR` value.
-
-3.  **Install VS Code Extensions**:
-    *   C/C++ (ms-vscode.cpptools)
-    *   CMake Tools (ms-vscode.cmake-tools)
-    *   Qt Configure (Optional, for UI design helper)
-
-## Features & Highlights
-
-*   **Zero-Config Qt Detection**:
-    *   **Solves "Qt not found"**: Simply set `QT_DIR` environment variable, or use `CMakeUserPresets.json`.
-    *   The intelligent `CMakeLists.txt` automatically appends `QT_DIR` to `CMAKE_PREFIX_PATH`, so you don't need to manually modify build scripts for different machines.
-
-*   **One-Click Debugging (Automatic DLL Deployment)**:
-    *   **Solves "Missing DLL" errors on Windows**: No more manually copying `Qt6Core.dll` or modifying system `%PATH%`.
-    *   **Automated `windeployqt`**: The `CMakeLists.txt` automatically runs `windeployqt` after build. It deploys the exact required Qt DLLs and plugins to your build folder, making the executable completely standalone and ready to debug.
-    *   **macOS Bundle**: Automatically runs `macdeployqt` to create a proper `.app` bundle with embedded Frameworks.
-
-*   **Multi-Platform Ready**:
-    *   Pre-configured **CMake Presets** for Windows (MSVC), Linux (GCC/Ninja), and macOS (Clang/Ninja).
-    *   Consistent build commands across all OSs.
-
-*   **VS Code Optimized**:
-    *   **`launch.json`**: Pre-configured debuggers (`cppvsdbg` for Windows, `cppdbg` for Unix).
-    *   **`extensions.json`**: Auto-recommends necessary plugins.
-    *   **`settings.json`**: Pre-configured CMake Tools environment.
-    *   **IntelliSense**: `c_cpp_properties.json` is configured to use CMake Tools provider for accurate code completion.
-
-## How to Use
-
-1.  Open this project folder in VS Code.
-2.  Change the `TARGET_NAME` variable in `CMakeLists.txt` to your actual project name.
-3.  Set the `QT_DIR` environment variable to point to your Qt installation, or create a `CMakeUserPresets.json` with CacheVariables to override it.
-4.  Open the Command Palette (Ctrl+Shift+P) and select "CMake: Select Configure Preset" to choose the appropriate preset for your platform (e.g., `windows-debug`, `linux-debug`, `macos-debug`).
-5.  Run "CMake: Configure" to generate the build files.
-6.  Run "CMake: Build" to compile the project.
-7.  Run "CMake: Debug" to start debugging. The Qt window should appear.
+# features to be realized:
+1. 去除原生窗口边框
+2. 自定义标题栏组件
+3. 标题栏拖拽移动窗口
+4. 窗口边缘调整大小
+5. 窗口四角调整大小
+6. 最小化按钮功能
+7. 最大化与还原按钮功能
+8. 关闭按钮功能
+9. 双击标题栏最大化与还原
+10. 右键标题栏系统菜单
+11. Windows 贴靠布局支持
+12. Windows 贴靠辅助支持
+13. DWM 原生阴影
+14. Windows 11 原生圆角
+15. 云母效果支持
+16. 亚克力模糊效果支持
+17. 深色与浅色模式自适应
+18. 窗口边框强调色设置
+19. 任务栏图标显示
+20. 任务栏缩略图预览
+21. Alt+Tab 切换支持
+22. Alt+Space 系统菜单快捷键支持
+23. HiDPI 高分屏适配
+24. 多显示器适配
+25. 全屏模式支持
+26. 窗口焦点管理

@@ -20,3 +20,7 @@ compile_commands.json
 # OS specific
 .DS_Store
 Thumbs.db
+
+# workfiles
+whattodo.md
+todolist.md

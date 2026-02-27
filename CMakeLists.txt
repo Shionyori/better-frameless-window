@@ -25,10 +25,12 @@ find_package(Qt6 REQUIRED COMPONENTS
 )
 
 # Add executable and specify source files
-qt_add_executable(${PROJECT_NAME}
+add_executable(${PROJECT_NAME}
     src/main.cpp
-    src/MainWindow.cpp
-    src/MainWindow.h
+    src/framelesswindow.cpp
+    src/framelesswindow.h
+    src/titlebar.cpp
+    src/titlebar.h
 )
 
 # Link Qt6 libraries to the executable
@@ -36,6 +38,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Core 
     Qt6::Gui 
     Qt6::Widgets
+    dwmapi
+    user32
 )
 
 # Deploy Qt dependencies using windeployqt (Windows) or macdeployqt (macOS)
