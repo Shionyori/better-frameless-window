@@ -7,9 +7,12 @@
 #include <QGuiApplication>
 #include <QLabel>
 #include <QLayout>
+#include <QMouseEvent>
+#include <QObject>
 #include <QPainter>
 #include <QPushButton>
 #include <QScreen>
+#include <QShowEvent>
 #include <QStyle>
 #include <QStyleOption>
 #include <QVBoxLayout>
@@ -41,8 +44,12 @@ void FramelessWindow::initWindow()
     setObjectName("FramelessWindow");
     setStyleSheet(R"(
         #FramelessWindow {
-            background-color: #f7f7f7;
-            border: 1px solid #d9d9d9;
+            background-color: #f3f4f6;
+            border: 1px solid #b9c0ca;
+        }
+        TitleBar {
+            background-color: #ffffff;
+            border-bottom: 1px solid #c7ced8;
         }
         #TitleBarLabel {
             color: #222;
@@ -81,10 +88,26 @@ void FramelessWindow::initLayout()
     m_layout->addWidget(m_titleBar);
     m_layout->addWidget(m_contentLabel, 1);
 
+    initMouseTracking();
+
     connect(m_titleBar, &TitleBar::minimizeRequested, this, &FramelessWindow::showMinimized);
     connect(m_titleBar, &TitleBar::maximizeRestoreRequested, this, &FramelessWindow::toggleMaximizeRestore);
     connect(m_titleBar, &TitleBar::closeRequested, this, &FramelessWindow::close);
-    connect(m_titleBar, &TitleBar::systemMoveRequested, this, &FramelessWindow::startSystemMove);
+    connect(m_titleBar, &TitleBar::systemMoveRequested, this, [this](const QPoint &globalPos) {
+        if (isMaximized() || windowHandle() == nullptr) {
+            startSystemMove();
+            return;
+        }
+
+        const QPoint localPos = mapFromGlobal(globalPos);
+        const Qt::Edges edges = edgesForLocalPos(localPos);
+        if (edges != Qt::Edges()) {
+            windowHandle()->startSystemResize(edges);
+            return;
+        }
+
+        startSystemMove();
+    });
     connect(m_titleBar, &TitleBar::systemMenuRequested, this, &FramelessWindow::showSystemMenu);
 
     updateMaximizeButtonState();
@@ -164,39 +187,90 @@ void FramelessWindow::changeEvent(QEvent *event)
     }
 }
 
+bool FramelessWindow::eventFilter(QObject *watched, QEvent *event)
+{
+    Q_UNUSED(watched)
+
+    if (event->type() == QEvent::MouseMove) {
+        auto *mouseEvent = static_cast<QMouseEvent *>(event);
+        updateCursorForPosition(mapFromGlobal(mouseEvent->globalPosition().toPoint()));
+    } else if (event->type() == QEvent::Leave) {
+        const QPoint localPos = mapFromGlobal(QCursor::pos());
+        updateCursorForPosition(localPos);
+    }
+
+    return QWidget::eventFilter(watched, event);
+}
+
+void FramelessWindow::initMouseTracking()
+{
+    setMouseTracking(true);
+    const auto widgets = findChildren<QWidget *>();
+    for (QWidget *widget : widgets) {
+        widget->setMouseTracking(true);
+        widget->installEventFilter(this);
+    }
+}
+
+void FramelessWindow::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
+    ensureNativeResizeStyle();
+}
+
+void FramelessWindow::mousePressEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton && windowHandle() != nullptr && !isMaximized()) {
+        const Qt::Edges edges = edgesForLocalPos(event->pos());
+        if (edges != Qt::Edges()) {
+            windowHandle()->startSystemResize(edges);
+            event->accept();
+            return;
+        }
+    }
+
+    QWidget::mousePressEvent(event);
+}
+
+void FramelessWindow::mouseMoveEvent(QMouseEvent *event)
+{
+    updateCursorForPosition(event->pos());
+    QWidget::mouseMoveEvent(event);
+}
+
+void FramelessWindow::leaveEvent(QEvent *event)
+{
+    unsetCursor();
+    QWidget::leaveEvent(event);
+}
+
 int FramelessWindow::hitTest(const QPoint &localPos) const
 {
 #ifdef Q_OS_WIN
-    const int border = resizeBorderThickness();
-    const QRect frameRect = rect();
-
-    const bool left = localPos.x() >= frameRect.left() && localPos.x() < frameRect.left() + border;
-    const bool right = localPos.x() <= frameRect.right() && localPos.x() > frameRect.right() - border;
-    const bool top = localPos.y() >= frameRect.top() && localPos.y() < frameRect.top() + border;
-    const bool bottom = localPos.y() <= frameRect.bottom() && localPos.y() > frameRect.bottom() - border;
-
-    if (!isMaximized()) {
-        if (top && left)
+    const Qt::Edges edges = edgesForLocalPos(localPos);
+    if (edges != Qt::Edges()) {
+        if (edges == (Qt::TopEdge | Qt::LeftEdge))
             return HTTOPLEFT;
-        if (top && right)
+        if (edges == (Qt::TopEdge | Qt::RightEdge))
             return HTTOPRIGHT;
-        if (bottom && left)
+        if (edges == (Qt::BottomEdge | Qt::LeftEdge))
             return HTBOTTOMLEFT;
-        if (bottom && right)
+        if (edges == (Qt::BottomEdge | Qt::RightEdge))
             return HTBOTTOMRIGHT;
-        if (left)
-            return HTLEFT;
-        if (right)
-            return HTRIGHT;
-        if (top)
+        if (edges == Qt::TopEdge)
             return HTTOP;
-        if (bottom)
+        if (edges == Qt::BottomEdge)
             return HTBOTTOM;
+        if (edges == Qt::LeftEdge)
+            return HTLEFT;
+        if (edges == Qt::RightEdge)
+            return HTRIGHT;
     }
 
     if (m_titleBar != nullptr && m_titleBar->geometry().contains(localPos)) {
-        QWidget *child = childAt(localPos);
-        if (qobject_cast<QPushButton *>(child) == nullptr) {
+        QWidget *hovered = childAt(localPos);
+        const bool onButton = qobject_cast<QPushButton *>(hovered) != nullptr;
+        if (!onButton) {
             return HTCAPTION;
         }
     }
@@ -207,9 +281,62 @@ int FramelessWindow::hitTest(const QPoint &localPos) const
 
 int FramelessWindow::resizeBorderThickness() const
 {
-    const qreal dpr = devicePixelRatioF();
-    const int logical = 7;
-    return qMax(5, qRound(logical * dpr));
+#ifdef Q_OS_WIN
+    const HWND hwnd = reinterpret_cast<HWND>(winId());
+    const UINT dpi = hwnd ? GetDpiForWindow(hwnd) : 96;
+    const int frame = GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi);
+    const int padded = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+    const int nativeBorder = frame + padded;
+    return qBound(4, nativeBorder, 6);
+#else
+    return 4;
+#endif
+}
+
+Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
+{
+    if (isMaximized()) {
+        return Qt::Edges();
+    }
+
+    const int border = resizeBorderThickness();
+    const int corner = border + 2;
+    const int x = localPos.x();
+    const int y = localPos.y();
+    const int w = width();
+    const int h = height();
+
+    if (x < 0 || y < 0 || x >= w || y >= h) {
+        return Qt::Edges();
+    }
+
+    QWidget *hovered = childAt(localPos);
+    const bool onButton = qobject_cast<QPushButton *>(hovered) != nullptr;
+    if (onButton) {
+        return Qt::Edges();
+    }
+
+    Qt::Edges edges;
+
+    if (x < corner && y < corner)
+        return Qt::TopEdge | Qt::LeftEdge;
+    if (x >= w - corner && y < corner)
+        return Qt::TopEdge | Qt::RightEdge;
+    if (x < corner && y >= h - corner)
+        return Qt::BottomEdge | Qt::LeftEdge;
+    if (x >= w - corner && y >= h - corner)
+        return Qt::BottomEdge | Qt::RightEdge;
+
+    if (x < border)
+        edges |= Qt::LeftEdge;
+    if (x >= w - border)
+        edges |= Qt::RightEdge;
+    if (y < border)
+        edges |= Qt::TopEdge;
+    if (y >= h - border)
+        edges |= Qt::BottomEdge;
+
+    return edges;
 }
 
 void FramelessWindow::toggleMaximizeRestore()
@@ -254,4 +381,47 @@ void FramelessWindow::updateMaximizeButtonState()
     }
 
     setWindowTitle(isMaximized() ? QStringLiteral("Better Frameless Window (Maximized)") : QStringLiteral("Better Frameless Window"));
+}
+
+void FramelessWindow::updateCursorForPosition(const QPoint &localPos)
+{
+    const Qt::CursorShape shape = cursorForEdges(edgesForLocalPos(localPos));
+    if (shape == Qt::ArrowCursor) {
+        unsetCursor();
+    } else {
+        setCursor(shape);
+    }
+}
+
+void FramelessWindow::ensureNativeResizeStyle()
+{
+#ifdef Q_OS_WIN
+    const HWND hwnd = reinterpret_cast<HWND>(winId());
+    LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
+    style |= WS_THICKFRAME | WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU;
+    SetWindowLongPtr(hwnd, GWL_STYLE, style);
+    SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+#endif
+}
+
+Qt::CursorShape FramelessWindow::cursorForEdges(Qt::Edges edges) const
+{
+    if (edges == (Qt::TopEdge | Qt::LeftEdge) || edges == (Qt::BottomEdge | Qt::RightEdge)) {
+        return Qt::SizeFDiagCursor;
+    }
+
+    if (edges == (Qt::TopEdge | Qt::RightEdge) || edges == (Qt::BottomEdge | Qt::LeftEdge)) {
+        return Qt::SizeBDiagCursor;
+    }
+
+    if (edges == Qt::TopEdge || edges == Qt::BottomEdge) {
+        return Qt::SizeVerCursor;
+    }
+
+    if (edges == Qt::LeftEdge || edges == Qt::RightEdge) {
+        return Qt::SizeHorCursor;
+    }
+
+    return Qt::ArrowCursor;
 }

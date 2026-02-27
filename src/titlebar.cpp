@@ -58,8 +58,13 @@ void TitleBar::mouseDoubleClickEvent(QMouseEvent *event)
 
 void TitleBar::mousePressEvent(QMouseEvent *event)
 {
+    if (childAt(event->pos()) != nullptr && qobject_cast<QPushButton *>(childAt(event->pos())) != nullptr) {
+        QWidget::mousePressEvent(event);
+        return;
+    }
+
     if (event->button() == Qt::LeftButton) {
-        emit systemMoveRequested();
+        emit systemMoveRequested(event->globalPos());
         event->accept();
         return;
     }

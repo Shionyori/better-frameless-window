@@ -18,7 +18,7 @@ signals:
     void minimizeRequested();
     void maximizeRestoreRequested();
     void closeRequested();
-    void systemMoveRequested();
+    void systemMoveRequested(const QPoint &globalPos);
     void systemMenuRequested(const QPoint &globalPos);
 
 protected:
