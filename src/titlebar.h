@@ -13,6 +13,7 @@ public:
     explicit TitleBar(QWidget *parent = nullptr);
 
     int heightHint() const;
+    void setMaximized(bool maximized);
 
 signals:
     void minimizeRequested();

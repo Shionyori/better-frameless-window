@@ -32,9 +32,11 @@ protected:
     void toggleMaximizeRestore();
     void startSystemMove();
     void showSystemMenu(const QPoint &globalPos);
+    void updateSystemMenuState(void *menuHandle) const;
     void updateMaximizeButtonState();
     void updateCursorForPosition(const QPoint &localPos);
     void ensureNativeResizeStyle();
+    void syncNativeWindowFrame();
     Qt::CursorShape cursorForEdges(Qt::Edges edges) const;
 
 private:

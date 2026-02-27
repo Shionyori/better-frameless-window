@@ -45,6 +45,14 @@ int TitleBar::heightHint() const
     return height();
 }
 
+void TitleBar::setMaximized(bool maximized)
+{
+    m_minimizeButton->setEnabled(true);
+    m_maximizeButton->setEnabled(true);
+    m_closeButton->setEnabled(true);
+    m_maximizeButton->setText(maximized ? "❐" : "□");
+}
+
 void TitleBar::mouseDoubleClickEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {

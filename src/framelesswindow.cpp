@@ -153,6 +153,15 @@ bool FramelessWindow::nativeEvent(const QByteArray &eventType, void *message, qi
         *result = 0;
         return true;
     }
+    case WM_NCRBUTTONUP: {
+        if (msg->wParam == HTCAPTION || msg->wParam == HTSYSMENU) {
+            const QPoint globalPos(GET_X_LPARAM(msg->lParam), GET_Y_LPARAM(msg->lParam));
+            showSystemMenu(globalPos);
+            *result = 0;
+            return true;
+        }
+        break;
+    }
     default:
         break;
     }
@@ -183,6 +192,7 @@ void FramelessWindow::changeEvent(QEvent *event)
 {
     QWidget::changeEvent(event);
     if (event->type() == QEvent::WindowStateChange) {
+        syncNativeWindowFrame();
         updateMaximizeButtonState();
     }
 }
@@ -216,6 +226,7 @@ void FramelessWindow::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
     ensureNativeResizeStyle();
+    syncNativeWindowFrame();
 }
 
 void FramelessWindow::mousePressEvent(QMouseEvent *event)
@@ -269,7 +280,13 @@ int FramelessWindow::hitTest(const QPoint &localPos) const
 
     if (m_titleBar != nullptr && m_titleBar->geometry().contains(localPos)) {
         QWidget *hovered = childAt(localPos);
-        const bool onButton = qobject_cast<QPushButton *>(hovered) != nullptr;
+        const auto *button = qobject_cast<QPushButton *>(hovered);
+        const bool onButton = button != nullptr;
+
+        if (onButton && button->objectName() == QStringLiteral("TitleBarMaximizeButton")) {
+            return HTMAXBUTTON;
+        }
+
         if (!onButton) {
             return HTCAPTION;
         }
@@ -341,11 +358,17 @@ Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
 
 void FramelessWindow::toggleMaximizeRestore()
 {
+#ifdef Q_OS_WIN
+    const HWND hwnd = reinterpret_cast<HWND>(winId());
+    const WPARAM command = isMaximized() ? SC_RESTORE : SC_MAXIMIZE;
+    PostMessage(hwnd, WM_SYSCOMMAND, command, 0);
+#else
     if (isMaximized()) {
         showNormal();
     } else {
         showMaximized();
     }
+#endif
 }
 
 void FramelessWindow::startSystemMove()
@@ -364,13 +387,48 @@ void FramelessWindow::showSystemMenu(const QPoint &globalPos)
         return;
     }
 
-    UINT flags = TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN;
+    updateSystemMenuState(reinterpret_cast<void *>(menu));
+
+    UINT flags = TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON;
     const int command = TrackPopupMenu(menu, flags, globalPos.x(), globalPos.y(), 0, hwnd, nullptr);
     if (command != 0) {
-        PostMessage(hwnd, WM_SYSCOMMAND, static_cast<WPARAM>(command), 0);
+        const UINT sysCommand = static_cast<UINT>(command) & 0xFFF0;
+
+        if (sysCommand == SC_MOVE || sysCommand == SC_SIZE) {
+            ReleaseCapture();
+        }
+
+        SendMessage(hwnd, WM_SYSCOMMAND, static_cast<WPARAM>(sysCommand), 0);
     }
 #else
     Q_UNUSED(globalPos)
+#endif
+}
+
+void FramelessWindow::updateSystemMenuState(void *menuHandle) const
+{
+#ifdef Q_OS_WIN
+    if (menuHandle == nullptr) {
+        return;
+    }
+
+    HMENU menu = static_cast<HMENU>(menuHandle);
+    const bool maximized = isMaximized();
+    const bool minimized = isMinimized();
+
+    auto setItemEnabled = [menu](UINT item, bool enabled) {
+        EnableMenuItem(menu, item, MF_BYCOMMAND | (enabled ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)));
+    };
+
+    setItemEnabled(SC_RESTORE, maximized || minimized);
+    setItemEnabled(SC_MOVE, !maximized && !minimized);
+    setItemEnabled(SC_SIZE, !maximized && !minimized);
+    setItemEnabled(SC_MINIMIZE, !minimized);
+    setItemEnabled(SC_MAXIMIZE, !maximized);
+
+    DrawMenuBar(reinterpret_cast<HWND>(winId()));
+#else
+    Q_UNUSED(menuHandle)
 #endif
 }
 
@@ -379,6 +437,8 @@ void FramelessWindow::updateMaximizeButtonState()
     if (m_titleBar == nullptr) {
         return;
     }
+
+    m_titleBar->setMaximized(isMaximized());
 
     setWindowTitle(isMaximized() ? QStringLiteral("Better Frameless Window (Maximized)") : QStringLiteral("Better Frameless Window"));
 }
@@ -398,8 +458,30 @@ void FramelessWindow::ensureNativeResizeStyle()
 #ifdef Q_OS_WIN
     const HWND hwnd = reinterpret_cast<HWND>(winId());
     LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
-    style |= WS_THICKFRAME | WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU;
+    style &= ~static_cast<LONG_PTR>(WS_POPUP);
+    style |= WS_OVERLAPPED | WS_THICKFRAME | WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU;
+
+    LONG_PTR exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+    exStyle &= ~static_cast<LONG_PTR>(WS_EX_TOOLWINDOW);
+    exStyle |= WS_EX_APPWINDOW;
+
     SetWindowLongPtr(hwnd, GWL_STYLE, style);
+    SetWindowLongPtr(hwnd, GWL_EXSTYLE, exStyle);
+
+    SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+#endif
+}
+
+void FramelessWindow::syncNativeWindowFrame()
+{
+#ifdef Q_OS_WIN
+    const HWND hwnd = reinterpret_cast<HWND>(winId());
+
+    LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
+    style |= WS_OVERLAPPED | WS_THICKFRAME | WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU;
+    SetWindowLongPtr(hwnd, GWL_STYLE, style);
+
     SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 #endif
