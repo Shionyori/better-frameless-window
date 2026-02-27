@@ -21,6 +21,18 @@
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
 #include <windowsx.h>
+#include <dwmapi.h>
+
+#ifndef DWMWA_WINDOW_CORNER_PREFERENCE
+#define DWMWA_WINDOW_CORNER_PREFERENCE 33
+#endif
+
+#ifndef DWMWCP_DEFAULT
+#define DWMWCP_DEFAULT 0
+#define DWMWCP_DONOTROUND 1
+#define DWMWCP_ROUND 2
+#define DWMWCP_ROUNDSMALL 3
+#endif
 #endif
 
 FramelessWindow::FramelessWindow(QWidget *parent)
@@ -124,7 +136,7 @@ bool FramelessWindow::nativeEvent(const QByteArray &eventType, void *message, qi
 
     switch (msg->message) {
     case WM_NCHITTEST: {
-        const auto globalPos = QPoint(GET_X_LPARAM(msg->lParam), GET_Y_LPARAM(msg->lParam));
+        const QPoint globalPos = QCursor::pos();
         const QPoint localPos = mapFromGlobal(globalPos);
         const int hit = hitTest(localPos);
         if (hit != HTCLIENT) {
@@ -193,6 +205,7 @@ void FramelessWindow::changeEvent(QEvent *event)
     QWidget::changeEvent(event);
     if (event->type() == QEvent::WindowStateChange) {
         syncNativeWindowFrame();
+        applyRoundedCorners();
         updateMaximizeButtonState();
     }
 }
@@ -227,6 +240,7 @@ void FramelessWindow::showEvent(QShowEvent *event)
     QWidget::showEvent(event);
     ensureNativeResizeStyle();
     syncNativeWindowFrame();
+    applyRoundedCorners();
 }
 
 void FramelessWindow::mousePressEvent(QMouseEvent *event)
@@ -381,6 +395,8 @@ void FramelessWindow::startSystemMove()
 void FramelessWindow::showSystemMenu(const QPoint &globalPos)
 {
 #ifdef Q_OS_WIN
+    Q_UNUSED(globalPos)
+
     const HWND hwnd = reinterpret_cast<HWND>(winId());
     HMENU menu = GetSystemMenu(hwnd, FALSE);
     if (menu == nullptr) {
@@ -389,8 +405,11 @@ void FramelessWindow::showSystemMenu(const QPoint &globalPos)
 
     updateSystemMenuState(reinterpret_cast<void *>(menu));
 
+    POINT cursorPos{};
+    GetCursorPos(&cursorPos);
+
     UINT flags = TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON;
-    const int command = TrackPopupMenu(menu, flags, globalPos.x(), globalPos.y(), 0, hwnd, nullptr);
+    const int command = TrackPopupMenu(menu, flags, cursorPos.x, cursorPos.y, 0, hwnd, nullptr);
     if (command != 0) {
         const UINT sysCommand = static_cast<UINT>(command) & 0xFFF0;
 
@@ -484,6 +503,23 @@ void FramelessWindow::syncNativeWindowFrame()
 
     SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+#endif
+}
+
+void FramelessWindow::applyRoundedCorners()
+{
+#ifdef Q_OS_WIN
+    const HWND hwnd = reinterpret_cast<HWND>(winId());
+
+    if (hwnd == nullptr || isMaximized() || isMinimized()) {
+        return;
+    }
+
+    const DWORD corner = DWMWCP_ROUND;
+    DwmSetWindowAttribute(hwnd,
+                          DWMWA_WINDOW_CORNER_PREFERENCE,
+                          &corner,
+                          sizeof(corner));
 #endif
 }
 

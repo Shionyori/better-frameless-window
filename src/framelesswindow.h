@@ -37,6 +37,7 @@ protected:
     void updateCursorForPosition(const QPoint &localPos);
     void ensureNativeResizeStyle();
     void syncNativeWindowFrame();
+    void applyRoundedCorners();
     Qt::CursorShape cursorForEdges(Qt::Edges edges) const;
 
 private:
