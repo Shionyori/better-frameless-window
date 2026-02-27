@@ -25,7 +25,9 @@ find_package(Qt6 REQUIRED COMPONENTS
 )
 
 # Add executable and specify source files
-add_executable(${PROJECT_NAME}
+add_executable(${TARGET_NAME})
+
+target_sources(${TARGET_NAME} PRIVATE
     src/main.cpp
     src/framelesswindow.cpp
     src/framelesswindow.h
@@ -34,7 +36,7 @@ add_executable(${PROJECT_NAME}
 )
 
 # Link Qt6 libraries to the executable
-target_link_libraries(${PROJECT_NAME} PRIVATE 
+target_link_libraries(${TARGET_NAME} PRIVATE 
     Qt6::Core 
     Qt6::Gui 
     Qt6::Widgets
@@ -56,7 +58,7 @@ if(WIN32)
     if(WINDEPLOYQT_EXECUTABLE)
         # Run windeployqt after build to copy necessary DLLs to the output directory
         # Use generator expressions to select --debug or --release based on configuration
-        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E echo "Deploying Qt dependencies via windeployqt..."
             COMMAND ${WINDEPLOYQT_EXECUTABLE} 
                 $<$<CONFIG:Debug>:--debug>
@@ -66,16 +68,16 @@ if(WIN32)
                 --no-translations     # Translation files are usually not needed during development
                 --no-system-d3d-compiler
                 --verbose 0
-                $<TARGET_FILE:${PROJECT_NAME}>
+                $<TARGET_FILE:${TARGET_NAME}>
             COMMENT "Running windeployqt to copy DLLs..."
         )
     endif()
 elseif(APPLE)
     # macOS Bundle configuration
-    set_target_properties(${PROJECT_NAME} PROPERTIES
+    set_target_properties(${TARGET_NAME} PROPERTIES
         MACOSX_BUNDLE ON
         MACOSX_BUNDLE_GUI_IDENTIFIER my.example.com
-        MACOSX_BUNDLE_BUNDLE_NAME ${PROJECT_NAME}
+        MACOSX_BUNDLE_BUNDLE_NAME ${TARGET_NAME}
         MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
         MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
     )
@@ -91,9 +93,9 @@ elseif(APPLE)
 
     if(MACDEPLOYQT_EXECUTABLE)
         # Run macdeployqt after build to create .app bundle and copy necessary Frameworks
-        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
             COMMAND ${MACDEPLOYQT_EXECUTABLE} 
-                $<TARGET_BUNDLE_DIR:${PROJECT_NAME}>
+                $<TARGET_BUNDLE_DIR:${TARGET_NAME}>
                 -verbose=0
             COMMENT "Running macdeployqt to bundle Frameworks..."
         )
