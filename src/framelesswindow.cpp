@@ -90,7 +90,8 @@ void FramelessWindow::initWindow()
             font-size: 14px;
         }
         #TitleBarMinimizeButton:hover,
-        #TitleBarMaximizeButton:hover {
+        #TitleBarMaximizeButton:hover,
+        #TitleBarMaximizeButton[nativeHover="true"] {
             background: #e8e8e8;
         }
         #TitleBarCloseButton:hover {
@@ -119,21 +120,7 @@ void FramelessWindow::initLayout()
     connect(m_titleBar, &TitleBar::minimizeRequested, this, &FramelessWindow::showMinimized);
     connect(m_titleBar, &TitleBar::maximizeRestoreRequested, this, &FramelessWindow::toggleMaximizeRestore);
     connect(m_titleBar, &TitleBar::closeRequested, this, &FramelessWindow::close);
-    connect(m_titleBar, &TitleBar::systemMoveRequested, this, [this](const QPoint &globalPos) {
-        if (isMaximized() || windowHandle() == nullptr) {
-            startSystemMove();
-            return;
-        }
-
-        const QPoint localPos = mapFromGlobal(globalPos);
-        const Qt::Edges edges = edgesForLocalPos(localPos);
-        if (edges != Qt::Edges()) {
-            windowHandle()->startSystemResize(edges);
-            return;
-        }
-
-        startSystemMove();
-    });
+    connect(m_titleBar, &TitleBar::systemMoveRequested, this, &FramelessWindow::startSystemMove);
     connect(m_titleBar, &TitleBar::systemMenuRequested, this, &FramelessWindow::showSystemMenu);
 
     updateMaximizeButtonState();
@@ -152,12 +139,55 @@ bool FramelessWindow::nativeEvent(const QByteArray &eventType, void *message, qi
     case WM_NCHITTEST: {
         const QPoint globalPos(GET_X_LPARAM(msg->lParam), GET_Y_LPARAM(msg->lParam));
         const int hit = hitTest(globalPos);
+
+        if (m_titleBar != nullptr) {
+            m_titleBar->setMaximizeButtonNativeHover(hit == HTMAXBUTTON);
+        }
+
         if (hit != HTCLIENT) {
             *result = hit;
             return true;
         }
         break;
     }
+    case WM_NCLBUTTONDOWN:
+        if (msg->wParam == HTMAXBUTTON) {
+            if (m_titleBar != nullptr) {
+                m_titleBar->setMaximizeButtonNativeHover(false);
+            }
+            toggleMaximizeRestore();
+            *result = 0;
+            return true;
+        }
+        break;
+    case WM_NCLBUTTONDBLCLK:
+        if (msg->wParam == HTMAXBUTTON) {
+            if (m_titleBar != nullptr) {
+                m_titleBar->setMaximizeButtonNativeHover(false);
+            }
+            toggleMaximizeRestore();
+            *result = 0;
+            return true;
+        }
+        break;
+    case WM_NCMOUSELEAVE:
+    case WM_MOUSELEAVE:
+        if (m_titleBar != nullptr) {
+            m_titleBar->setMaximizeButtonNativeHover(false);
+        }
+        break;
+    case WM_CAPTURECHANGED:
+    case WM_KILLFOCUS:
+    case WM_SIZE:
+        if (m_titleBar != nullptr) {
+            m_titleBar->setMaximizeButtonNativeHover(false);
+        }
+        break;
+    case WM_ACTIVATE:
+        if (LOWORD(msg->wParam) == WA_INACTIVE && m_titleBar != nullptr) {
+            m_titleBar->setMaximizeButtonNativeHover(false);
+        }
+        break;
     case WM_NCCALCSIZE:
         if (msg->wParam == TRUE) {
             *result = 0;
@@ -231,7 +261,23 @@ void FramelessWindow::changeEvent(QEvent *event)
 
 bool FramelessWindow::eventFilter(QObject *watched, QEvent *event)
 {
-    Q_UNUSED(watched)
+    if (event->type() == QEvent::MouseButtonPress) {
+        const bool canInitiateResize = watched == this
+                                       || watched == m_titleBar
+                                       || watched == m_contentLabel;
+        if (!canInitiateResize || qobject_cast<QPushButton *>(watched) != nullptr) {
+            return QWidget::eventFilter(watched, event);
+        }
+
+        auto *mouseEvent = static_cast<QMouseEvent *>(event);
+        if (mouseEvent->button() == Qt::LeftButton) {
+            const bool started = tryStartSystemResizeAtGlobalPos(mouseEvent->globalPosition().toPoint());
+            if (started) {
+                mouseEvent->accept();
+                return true;
+            }
+        }
+    }
 
     if (event->type() == QEvent::MouseMove) {
         auto *mouseEvent = static_cast<QMouseEvent *>(event);
@@ -266,10 +312,9 @@ void FramelessWindow::showEvent(QShowEvent *event)
 
 void FramelessWindow::mousePressEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::LeftButton && windowHandle() != nullptr && !isMaximized()) {
-        const Qt::Edges edges = edgesForLocalPos(event->pos());
-        if (edges != Qt::Edges()) {
-            windowHandle()->startSystemResize(edges);
+    if (event->button() == Qt::LeftButton) {
+        const bool started = tryStartSystemResizeAtLocalPos(event->pos());
+        if (started) {
             event->accept();
             return;
         }
@@ -293,14 +338,26 @@ void FramelessWindow::leaveEvent(QEvent *event)
 int FramelessWindow::hitTest(const QPoint &globalPos) const
 {
 #ifdef Q_OS_WIN
-    const int border = resizeBorderThickness();
-    const int corner = border + 2;
-    const QRect globalRect = frameGeometry();
+    const HWND hwnd = reinterpret_cast<HWND>(winId());
+    if (hwnd == nullptr) {
+        return HTCLIENT;
+    }
 
-    const int left = globalRect.left();
-    const int top = globalRect.top();
-    const int right = globalRect.right();
-    const int bottom = globalRect.bottom();
+    RECT windowRect{};
+    if (!GetWindowRect(hwnd, &windowRect)) {
+        return HTCLIENT;
+    }
+
+    const UINT dpi = GetDpiForWindow(hwnd);
+    const int frame = GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi);
+    const int padded = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+    const int border = qBound(4, frame + padded, 12);
+    const int corner = border + 2;
+
+    const int left = windowRect.left;
+    const int top = windowRect.top;
+    const int right = windowRect.right - 1;
+    const int bottom = windowRect.bottom - 1;
     const int x = globalPos.x();
     const int y = globalPos.y();
 
@@ -349,11 +406,11 @@ int FramelessWindow::hitTest(const QPoint &globalPos) const
             return HTRIGHT;
     }
 
-    if (!globalRect.contains(globalPos)) {
+    if (x < left || x > right || y < top || y > bottom) {
         return HTCLIENT;
     }
 
-    const QPoint localPos = mapFromGlobal(globalPos);
+    const QPoint localPos = mapFromGlobal(QCursor::pos());
 
     if (m_titleBar != nullptr && m_titleBar->geometry().contains(localPos)) {
         QWidget *hovered = childAt(localPos);
@@ -361,6 +418,9 @@ int FramelessWindow::hitTest(const QPoint &globalPos) const
         const bool onButton = button != nullptr;
 
         if (onButton && button->objectName() == QStringLiteral("TitleBarMaximizeButton")) {
+            if (GetKeyState(VK_LBUTTON) < 0) {
+                return HTCLIENT;
+            }
             return HTMAXBUTTON;
         }
 
@@ -436,6 +496,10 @@ Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
 void FramelessWindow::toggleMaximizeRestore()
 {
 #ifdef Q_OS_WIN
+    if (m_titleBar != nullptr) {
+        m_titleBar->setMaximizeButtonNativeHover(false);
+    }
+
     const HWND hwnd = reinterpret_cast<HWND>(winId());
     const WPARAM command = isMaximized() ? SC_RESTORE : SC_MAXIMIZE;
     PostMessage(hwnd, WM_SYSCOMMAND, command, 0);
@@ -533,6 +597,26 @@ void FramelessWindow::updateCursorForPosition(const QPoint &localPos)
     } else {
         setCursor(shape);
     }
+}
+
+bool FramelessWindow::tryStartSystemResizeAtLocalPos(const QPoint &localPos)
+{
+    if (windowHandle() == nullptr || isMaximized()) {
+        return false;
+    }
+
+    const Qt::Edges edges = edgesForLocalPos(localPos);
+    if (edges == Qt::Edges()) {
+        return false;
+    }
+
+    windowHandle()->startSystemResize(edges);
+    return true;
+}
+
+bool FramelessWindow::tryStartSystemResizeAtGlobalPos(const QPoint &globalPos)
+{
+    return tryStartSystemResizeAtLocalPos(mapFromGlobal(globalPos));
 }
 
 void FramelessWindow::ensureNativeResizeStyle()

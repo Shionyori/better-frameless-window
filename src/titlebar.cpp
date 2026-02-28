@@ -1,9 +1,11 @@
 #include "titlebar.h"
 
+#include <QApplication>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QStyle>
 
 TitleBar::TitleBar(QWidget *parent)
     : QWidget(parent)
@@ -11,6 +13,8 @@ TitleBar::TitleBar(QWidget *parent)
     , m_minimizeButton(new QPushButton("-", this))
     , m_maximizeButton(new QPushButton("□", this))
     , m_closeButton(new QPushButton("×", this))
+    , m_leftPressed(false)
+    , m_dragInitiated(false)
 {
     setFixedHeight(36);
 
@@ -40,9 +44,27 @@ TitleBar::TitleBar(QWidget *parent)
     connect(m_closeButton, &QPushButton::clicked, this, &TitleBar::closeRequested);
 }
 
+bool TitleBar::isOnControlButton(const QPoint &pos) const
+{
+    QWidget *hovered = childAt(pos);
+    return hovered != nullptr && qobject_cast<QPushButton *>(hovered) != nullptr;
+}
+
 int TitleBar::heightHint() const
 {
     return height();
+}
+
+void TitleBar::setMaximizeButtonNativeHover(bool hovered)
+{
+    if (m_maximizeButton->property("nativeHover").toBool() == hovered) {
+        return;
+    }
+
+    m_maximizeButton->setProperty("nativeHover", hovered);
+    m_maximizeButton->style()->unpolish(m_maximizeButton);
+    m_maximizeButton->style()->polish(m_maximizeButton);
+    m_maximizeButton->update();
 }
 
 void TitleBar::setMaximized(bool maximized)
@@ -50,12 +72,16 @@ void TitleBar::setMaximized(bool maximized)
     m_minimizeButton->setEnabled(true);
     m_maximizeButton->setEnabled(true);
     m_closeButton->setEnabled(true);
+    setMaximizeButtonNativeHover(false);
     m_maximizeButton->setText(maximized ? "❐" : "□");
 }
 
 void TitleBar::mouseDoubleClickEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::LeftButton) {
+    m_leftPressed = false;
+    m_dragInitiated = false;
+
+    if (event->button() == Qt::LeftButton && !isOnControlButton(event->pos())) {
         emit maximizeRestoreRequested();
         event->accept();
         return;
@@ -66,13 +92,15 @@ void TitleBar::mouseDoubleClickEvent(QMouseEvent *event)
 
 void TitleBar::mousePressEvent(QMouseEvent *event)
 {
-    if (childAt(event->pos()) != nullptr && qobject_cast<QPushButton *>(childAt(event->pos())) != nullptr) {
+    if (isOnControlButton(event->pos())) {
         QWidget::mousePressEvent(event);
         return;
     }
 
     if (event->button() == Qt::LeftButton) {
-        emit systemMoveRequested(event->globalPos());
+        m_leftPressed = true;
+        m_dragInitiated = false;
+        m_pressPos = event->pos();
         event->accept();
         return;
     }
@@ -84,4 +112,44 @@ void TitleBar::mousePressEvent(QMouseEvent *event)
     }
 
     QWidget::mousePressEvent(event);
+}
+
+void TitleBar::mouseMoveEvent(QMouseEvent *event)
+{
+    if (!m_leftPressed || (event->buttons() & Qt::LeftButton) == 0) {
+        QWidget::mouseMoveEvent(event);
+        return;
+    }
+
+    if (!m_dragInitiated) {
+        const int distance = (event->pos() - m_pressPos).manhattanLength();
+        if (distance >= QApplication::startDragDistance()) {
+            m_dragInitiated = true;
+            emit systemMoveRequested();
+        }
+    }
+
+    event->accept();
+}
+
+void TitleBar::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton) {
+        m_leftPressed = false;
+        m_dragInitiated = false;
+        event->accept();
+        return;
+    }
+
+    QWidget::mouseReleaseEvent(event);
+}
+
+void TitleBar::leaveEvent(QEvent *event)
+{
+    if (QApplication::mouseButtons().testFlag(Qt::LeftButton) == false) {
+        m_leftPressed = false;
+        m_dragInitiated = false;
+    }
+
+    QWidget::leaveEvent(event);
 }

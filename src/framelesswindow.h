@@ -36,6 +36,8 @@ protected:
     void updateSystemMenuState(void *menuHandle) const;
     void updateMaximizeButtonState();
     void updateCursorForPosition(const QPoint &localPos);
+    bool tryStartSystemResizeAtLocalPos(const QPoint &localPos);
+    bool tryStartSystemResizeAtGlobalPos(const QPoint &globalPos);
     void ensureNativeResizeStyle();
     void syncNativeWindowFrame();
     void applyRoundedCorners();
