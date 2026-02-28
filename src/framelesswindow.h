@@ -26,7 +26,7 @@ protected:
     void initWindow();
     void initLayout();
     void initMouseTracking();
-    int hitTest(const QPoint &localPos) const;
+    int hitTest(const QPoint &globalPos) const;
     int resizeBorderThickness() const;
     Qt::Edges edgesForLocalPos(const QPoint &localPos) const;
     void toggleMaximizeRestore();

@@ -136,9 +136,8 @@ bool FramelessWindow::nativeEvent(const QByteArray &eventType, void *message, qi
 
     switch (msg->message) {
     case WM_NCHITTEST: {
-        const QPoint globalPos = QCursor::pos();
-        const QPoint localPos = mapFromGlobal(globalPos);
-        const int hit = hitTest(localPos);
+        const QPoint globalPos(GET_X_LPARAM(msg->lParam), GET_Y_LPARAM(msg->lParam));
+        const int hit = hitTest(globalPos);
         if (hit != HTCLIENT) {
             *result = hit;
             return true;
@@ -269,10 +268,46 @@ void FramelessWindow::leaveEvent(QEvent *event)
     QWidget::leaveEvent(event);
 }
 
-int FramelessWindow::hitTest(const QPoint &localPos) const
+int FramelessWindow::hitTest(const QPoint &globalPos) const
 {
 #ifdef Q_OS_WIN
-    const Qt::Edges edges = edgesForLocalPos(localPos);
+    const int border = resizeBorderThickness();
+    const int corner = border + 2;
+    const QRect globalRect = frameGeometry();
+
+    const int left = globalRect.left();
+    const int top = globalRect.top();
+    const int right = globalRect.right();
+    const int bottom = globalRect.bottom();
+    const int x = globalPos.x();
+    const int y = globalPos.y();
+
+    Qt::Edges edges;
+
+    const bool onLeftCorner = (x >= left - corner && x < left + corner);
+    const bool onRightCorner = (x <= right + corner && x > right - corner);
+    const bool onTopCorner = (y >= top - corner && y < top + corner);
+    const bool onBottomCorner = (y <= bottom + corner && y > bottom - corner);
+
+    if (onLeftCorner && onTopCorner)
+        edges = Qt::TopEdge | Qt::LeftEdge;
+    else if (onRightCorner && onTopCorner)
+        edges = Qt::TopEdge | Qt::RightEdge;
+    else if (onLeftCorner && onBottomCorner)
+        edges = Qt::BottomEdge | Qt::LeftEdge;
+    else if (onRightCorner && onBottomCorner)
+        edges = Qt::BottomEdge | Qt::RightEdge;
+    else {
+        if (x >= left - border && x < left + border)
+            edges |= Qt::LeftEdge;
+        if (x <= right + border && x > right - border)
+            edges |= Qt::RightEdge;
+        if (y >= top - border && y < top + border)
+            edges |= Qt::TopEdge;
+        if (y <= bottom + border && y > bottom - border)
+            edges |= Qt::BottomEdge;
+    }
+
     if (edges != Qt::Edges()) {
         if (edges == (Qt::TopEdge | Qt::LeftEdge))
             return HTTOPLEFT;
@@ -291,6 +326,12 @@ int FramelessWindow::hitTest(const QPoint &localPos) const
         if (edges == Qt::RightEdge)
             return HTRIGHT;
     }
+
+    if (!globalRect.contains(globalPos)) {
+        return HTCLIENT;
+    }
+
+    const QPoint localPos = mapFromGlobal(globalPos);
 
     if (m_titleBar != nullptr && m_titleBar->geometry().contains(localPos)) {
         QWidget *hovered = childAt(localPos);

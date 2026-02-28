@@ -22,5 +22,6 @@ compile_commands.json
 Thumbs.db
 
 # workfiles
+workfiles/
 whattodo.md
 todolist.md
