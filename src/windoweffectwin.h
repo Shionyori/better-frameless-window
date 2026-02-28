@@ -1,9 +1,37 @@
 #pragma once
 
+#include <QColor>
+
 class WindowEffectWin
 {
 public:
+    enum class BackdropMode {
+        None,
+        MicaSystem,
+        MicaLegacy,
+        Acrylic
+    };
+
+    struct VisualEffectOptions {
+        bool shadowEnabled = true;
+        bool backdropEnabled = true;
+        bool roundedCornersEnabled = true;
+        bool immersiveDarkModeEnabled = true;
+        bool useDarkMode = false;
+        bool maximized = false;
+        bool minimized = false;
+        QColor borderColor;
+    };
+
     WindowEffectWin() = default;
 
-    void applyShadow(void *hwnd, bool enabled = true) const;
+    void applyVisualEffects(void *hwnd, const VisualEffectOptions &options) const;
+    void applyShadow(void *hwnd, bool enabled, bool maximized, bool minimized) const;
+    void applyRoundedCorners(void *hwnd, bool enabled, bool maximized, bool minimized) const;
+    void applyImmersiveDarkMode(void *hwnd, bool enabled, bool useDarkMode) const;
+    void applyBackdropEffects(void *hwnd, bool enabled, bool useDarkMode, bool maximized, bool minimized) const;
+    void applyBorderColor(void *hwnd, const QColor &borderColor) const;
+
+private:
+    BackdropMode selectBackdropMode(void *hwnd, bool enabled, bool maximized, bool minimized) const;
 };

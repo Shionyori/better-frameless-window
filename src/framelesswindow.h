@@ -1,5 +1,7 @@
 #pragma once
 
+#include "windoweffectwin.h"
+
 #include <QWidget>
 
 class QVBoxLayout;
@@ -24,13 +26,6 @@ public:
     bool isImmersiveDarkModeEnabled() const;
 
 protected:
-    enum class BackdropMode {
-        None,
-        MicaSystem,
-        MicaLegacy,
-        Acrylic
-    };
-
     bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
     void paintEvent(QPaintEvent *e) override;
@@ -61,7 +56,6 @@ protected:
     void applyImmersiveDarkMode();
     void applyBackdropEffects();
     void applyVisualEffects();
-    BackdropMode selectBackdropMode() const;
     void applyBorderColor();
     bool shouldUseDarkMode() const;
     QColor preferredBorderColor() const;
@@ -75,4 +69,5 @@ private:
     bool m_backdropEnabled;
     bool m_roundedCornersEnabled;
     bool m_immersiveDarkModeEnabled;
+    WindowEffectWin m_windowEffect;
 };

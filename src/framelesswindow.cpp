@@ -1,5 +1,6 @@
 #include "framelesswindow.h"
 
+#include "winutils.h"
 #include "titlebar.h"
 
 #include <QApplication>
@@ -23,149 +24,6 @@
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
 #include <windowsx.h>
-#include <dwmapi.h>
-
-#ifndef DWMWA_WINDOW_CORNER_PREFERENCE
-#define DWMWA_WINDOW_CORNER_PREFERENCE 33
-#endif
-
-#ifndef DWMWA_BORDER_COLOR
-#define DWMWA_BORDER_COLOR 34
-#endif
-
-#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
-#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
-#endif
-
-#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1
-#define DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 19
-#endif
-
-#ifndef DWMWA_SYSTEMBACKDROP_TYPE
-#define DWMWA_SYSTEMBACKDROP_TYPE 38
-#endif
-
-#ifndef DWMWA_MICA_EFFECT
-#define DWMWA_MICA_EFFECT 1029
-#endif
-
-#ifndef DWMSBT_AUTO
-#define DWMSBT_AUTO 0
-#define DWMSBT_NONE 1
-#define DWMSBT_MAINWINDOW 2
-#define DWMSBT_TRANSIENTWINDOW 3
-#define DWMSBT_TABBEDWINDOW 4
-#endif
-
-namespace {
-enum ACCENT_STATE {
-    ACCENT_DISABLED = 0,
-    ACCENT_ENABLE_GRADIENT = 1,
-    ACCENT_ENABLE_TRANSPARENTGRADIENT = 2,
-    ACCENT_ENABLE_BLURBEHIND = 3,
-    ACCENT_ENABLE_ACRYLICBLURBEHIND = 4
-};
-
-struct ACCENT_POLICY {
-    int AccentState;
-    int AccentFlags;
-    int GradientColor;
-    int AnimationId;
-};
-
-enum WINDOWCOMPOSITIONATTRIB {
-    WCA_ACCENT_POLICY = 19
-};
-
-struct WINDOWCOMPOSITIONATTRIBDATA {
-    WINDOWCOMPOSITIONATTRIB Attrib;
-    PVOID pvData;
-    SIZE_T cbData;
-};
-
-using SetWindowCompositionAttributePtr = BOOL(WINAPI *)(HWND, WINDOWCOMPOSITIONATTRIBDATA *);
-
-DWORD windowsBuildNumber()
-{
-    static DWORD cachedBuild = 0;
-    static bool initialized = false;
-    if (initialized) {
-        return cachedBuild;
-    }
-
-    initialized = true;
-    using RtlGetVersionPtr = LONG(WINAPI *)(PRTL_OSVERSIONINFOW);
-    HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
-    if (ntdll == nullptr) {
-        return cachedBuild;
-    }
-
-    const auto rtlGetVersion = reinterpret_cast<RtlGetVersionPtr>(GetProcAddress(ntdll, "RtlGetVersion"));
-    if (rtlGetVersion == nullptr) {
-        return cachedBuild;
-    }
-
-    RTL_OSVERSIONINFOW ver{};
-    ver.dwOSVersionInfoSize = sizeof(ver);
-    if (rtlGetVersion(&ver) == 0) {
-        cachedBuild = ver.dwBuildNumber;
-    }
-
-    return cachedBuild;
-}
-
-SetWindowCompositionAttributePtr getSetWindowCompositionAttribute()
-{
-    static SetWindowCompositionAttributePtr fn = nullptr;
-    static bool initialized = false;
-    if (initialized) {
-        return fn;
-    }
-
-    initialized = true;
-    HMODULE user32 = GetModuleHandleW(L"user32.dll");
-    if (user32 == nullptr) {
-        return nullptr;
-    }
-
-    fn = reinterpret_cast<SetWindowCompositionAttributePtr>(GetProcAddress(user32, "SetWindowCompositionAttribute"));
-    return fn;
-}
-
-void applyAcrylicAccent(HWND hwnd, bool enable, bool darkMode)
-{
-    const auto setWindowCompositionAttribute = getSetWindowCompositionAttribute();
-    if (setWindowCompositionAttribute == nullptr) {
-        return;
-    }
-
-    ACCENT_POLICY accent{};
-    if (enable) {
-        accent.AccentState = ACCENT_ENABLE_ACRYLICBLURBEHIND;
-        accent.AccentFlags = 2;
-        const int alpha = 0xCC;
-        const int red = darkMode ? 0x20 : 0xF3;
-        const int green = darkMode ? 0x20 : 0xF4;
-        const int blue = darkMode ? 0x20 : 0xF6;
-        accent.GradientColor = (alpha << 24) | (blue << 16) | (green << 8) | red;
-    } else {
-        accent.AccentState = ACCENT_DISABLED;
-    }
-
-    WINDOWCOMPOSITIONATTRIBDATA data{};
-    data.Attrib = WCA_ACCENT_POLICY;
-    data.pvData = &accent;
-    data.cbData = sizeof(accent);
-    setWindowCompositionAttribute(hwnd, &data);
-}
-}
-
-#ifndef DWMWCP_DEFAULT
-#define DWMWCP_DEFAULT 0
-#define DWMWCP_DONOTROUND 1
-#define DWMWCP_ROUND 2
-#define DWMWCP_ROUNDSMALL 3
-#endif
 #endif
 
 FramelessWindow::FramelessWindow(QWidget *parent)
@@ -191,7 +49,7 @@ void FramelessWindow::setShadowEnabled(bool enabled)
     }
 
     m_shadowEnabled = enabled;
-    applyNativeShadow();
+    applyVisualEffects();
 }
 
 void FramelessWindow::setBackdropEnabled(bool enabled)
@@ -201,7 +59,7 @@ void FramelessWindow::setBackdropEnabled(bool enabled)
     }
 
     m_backdropEnabled = enabled;
-    applyBackdropEffects();
+    applyVisualEffects();
 }
 
 void FramelessWindow::setRoundedCornersEnabled(bool enabled)
@@ -211,7 +69,7 @@ void FramelessWindow::setRoundedCornersEnabled(bool enabled)
     }
 
     m_roundedCornersEnabled = enabled;
-    applyRoundedCorners();
+    applyVisualEffects();
 }
 
 void FramelessWindow::setImmersiveDarkModeEnabled(bool enabled)
@@ -221,7 +79,7 @@ void FramelessWindow::setImmersiveDarkModeEnabled(bool enabled)
     }
 
     m_immersiveDarkModeEnabled = enabled;
-    applyImmersiveDarkMode();
+    applyVisualEffects();
 }
 
 bool FramelessWindow::isShadowEnabled() const
@@ -323,9 +181,7 @@ bool FramelessWindow::nativeEvent(const QByteArray &eventType, void *message, qi
         const QPoint globalPos(GET_X_LPARAM(msg->lParam), GET_Y_LPARAM(msg->lParam));
         const int hit = hitTest(globalPos);
 
-        if (m_titleBar != nullptr) {
-            m_titleBar->setMaximizeButtonNativeHover(hit == HTMAXBUTTON);
-        }
+        WinUtils::setMaximizeButtonNativeHover(m_titleBar, hit == HTMAXBUTTON);
 
         if (hit != HTCLIENT) {
             *result = hit;
@@ -335,9 +191,7 @@ bool FramelessWindow::nativeEvent(const QByteArray &eventType, void *message, qi
     }
     case WM_NCLBUTTONDOWN:
         if (msg->wParam == HTMAXBUTTON) {
-            if (m_titleBar != nullptr) {
-                m_titleBar->setMaximizeButtonNativeHover(false);
-            }
+            WinUtils::setMaximizeButtonNativeHover(m_titleBar, false);
             toggleMaximizeRestore();
             *result = 0;
             return true;
@@ -345,9 +199,7 @@ bool FramelessWindow::nativeEvent(const QByteArray &eventType, void *message, qi
         break;
     case WM_NCLBUTTONDBLCLK:
         if (msg->wParam == HTMAXBUTTON) {
-            if (m_titleBar != nullptr) {
-                m_titleBar->setMaximizeButtonNativeHover(false);
-            }
+            WinUtils::setMaximizeButtonNativeHover(m_titleBar, false);
             toggleMaximizeRestore();
             *result = 0;
             return true;
@@ -355,20 +207,16 @@ bool FramelessWindow::nativeEvent(const QByteArray &eventType, void *message, qi
         break;
     case WM_NCMOUSELEAVE:
     case WM_MOUSELEAVE:
-        if (m_titleBar != nullptr) {
-            m_titleBar->setMaximizeButtonNativeHover(false);
-        }
+        WinUtils::setMaximizeButtonNativeHover(m_titleBar, false);
         break;
     case WM_CAPTURECHANGED:
     case WM_KILLFOCUS:
     case WM_SIZE:
-        if (m_titleBar != nullptr) {
-            m_titleBar->setMaximizeButtonNativeHover(false);
-        }
+        WinUtils::setMaximizeButtonNativeHover(m_titleBar, false);
         break;
     case WM_ACTIVATE:
-        if (LOWORD(msg->wParam) == WA_INACTIVE && m_titleBar != nullptr) {
-            m_titleBar->setMaximizeButtonNativeHover(false);
+        if (LOWORD(msg->wParam) == WA_INACTIVE) {
+            WinUtils::setMaximizeButtonNativeHover(m_titleBar, false);
         }
         break;
     case WM_NCCALCSIZE:
@@ -543,29 +391,22 @@ int FramelessWindow::hitTest(const QPoint &globalPos) const
         return HTCLIENT;
     }
 
-    const int nativeWidth = qMax(1, right - left + 1);
-    const int nativeHeight = qMax(1, bottom - top + 1);
     const int logicalWidth = qMax(1, width());
     const int logicalHeight = qMax(1, height());
+    const QRect nativeWindowRect(left, top, right - left + 1, bottom - top + 1);
+    const QPoint localPos = WinUtils::toLocalPos(globalPos, nativeWindowRect, logicalWidth, logicalHeight);
 
-    const QPoint localPos(
-        qBound(0, ((x - left) * logicalWidth) / nativeWidth, logicalWidth - 1),
-        qBound(0, ((y - top) * logicalHeight) / nativeHeight, logicalHeight - 1));
-
-    bool onMaximizeButton = false;
-    if (m_titleBar != nullptr && m_titleBar->geometry().contains(localPos)) {
-        const QPoint titleBarPos = m_titleBar->mapFrom(this, localPos);
-        QWidget *hovered = m_titleBar->childAt(titleBarPos);
-        const auto *button = qobject_cast<QPushButton *>(hovered);
-        onMaximizeButton = button != nullptr
-                           && button->objectName() == QStringLiteral("TitleBarMaximizeButton");
-    }
-
-    if (onMaximizeButton) {
+    if (WinUtils::isOnMaximizeButton(m_titleBar, this, localPos)) {
         if (GetKeyState(VK_LBUTTON) < 0) {
             return HTCLIENT;
         }
         return HTMAXBUTTON;
+    }
+
+    const bool onTitleBarCaptionArea = WinUtils::isOnTitleBarCaptionArea(m_titleBar, this, localPos);
+
+    if (isMaximized()) {
+        return onTitleBarCaptionArea ? HTCAPTION : HTCLIENT;
     }
 
     Qt::Edges edges;
@@ -595,32 +436,11 @@ int FramelessWindow::hitTest(const QPoint &globalPos) const
     }
 
     if (edges != Qt::Edges()) {
-        if (edges == (Qt::TopEdge | Qt::LeftEdge))
-            return HTTOPLEFT;
-        if (edges == (Qt::TopEdge | Qt::RightEdge))
-            return HTTOPRIGHT;
-        if (edges == (Qt::BottomEdge | Qt::LeftEdge))
-            return HTBOTTOMLEFT;
-        if (edges == (Qt::BottomEdge | Qt::RightEdge))
-            return HTBOTTOMRIGHT;
-        if (edges == Qt::TopEdge)
-            return HTTOP;
-        if (edges == Qt::BottomEdge)
-            return HTBOTTOM;
-        if (edges == Qt::LeftEdge)
-            return HTLEFT;
-        if (edges == Qt::RightEdge)
-            return HTRIGHT;
+        return WinUtils::hitFromEdges(edges);
     }
 
-    if (m_titleBar != nullptr && m_titleBar->geometry().contains(localPos)) {
-        QWidget *hovered = childAt(localPos);
-        const auto *button = qobject_cast<QPushButton *>(hovered);
-        const bool onButton = button != nullptr;
-
-        if (!onButton) {
-            return HTCAPTION;
-        }
+    if (onTitleBarCaptionArea) {
+        return HTCAPTION;
     }
 #endif
 
@@ -690,9 +510,7 @@ Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
 void FramelessWindow::toggleMaximizeRestore()
 {
 #ifdef Q_OS_WIN
-    if (m_titleBar != nullptr) {
-        m_titleBar->setMaximizeButtonNativeHover(false);
-    }
+    WinUtils::setMaximizeButtonNativeHover(m_titleBar, false);
 
     const HWND hwnd = reinterpret_cast<HWND>(winId());
     const WPARAM command = isMaximized() ? SC_RESTORE : SC_MAXIMIZE;
@@ -816,186 +634,69 @@ bool FramelessWindow::tryStartSystemResizeAtGlobalPos(const QPoint &globalPos)
 void FramelessWindow::ensureNativeResizeStyle()
 {
 #ifdef Q_OS_WIN
-    const HWND hwnd = reinterpret_cast<HWND>(winId());
-    LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
-    style &= ~static_cast<LONG_PTR>(WS_POPUP);
-    style |= WS_OVERLAPPED | WS_THICKFRAME | WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU;
-
-    LONG_PTR exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
-    exStyle &= ~static_cast<LONG_PTR>(WS_EX_TOOLWINDOW);
-    exStyle |= WS_EX_APPWINDOW;
-
-    SetWindowLongPtr(hwnd, GWL_STYLE, style);
-    SetWindowLongPtr(hwnd, GWL_EXSTYLE, exStyle);
-
-    SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
-                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    void *hwnd = reinterpret_cast<void *>(winId());
+    WinUtils::syncNativeWindowStyles(hwnd, true);
 #endif
 }
 
 void FramelessWindow::syncNativeWindowFrame()
 {
 #ifdef Q_OS_WIN
-    const HWND hwnd = reinterpret_cast<HWND>(winId());
-
-    LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
-    style |= WS_OVERLAPPED | WS_THICKFRAME | WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU;
-    SetWindowLongPtr(hwnd, GWL_STYLE, style);
-
-    SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
-                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    void *hwnd = reinterpret_cast<void *>(winId());
+    WinUtils::syncNativeWindowStyles(hwnd, false);
 #endif
 }
 
 void FramelessWindow::applyRoundedCorners()
 {
-#ifdef Q_OS_WIN
-    const HWND hwnd = reinterpret_cast<HWND>(winId());
-
-    if (hwnd == nullptr) {
-        return;
-    }
-
-    const bool enableRoundedCorners = m_roundedCornersEnabled && !isMaximized() && !isMinimized();
-    const DWORD corner = enableRoundedCorners ? DWMWCP_ROUND : DWMWCP_DONOTROUND;
-    DwmSetWindowAttribute(hwnd,
-                          DWMWA_WINDOW_CORNER_PREFERENCE,
-                          &corner,
-                          sizeof(corner));
-#endif
+    void *hwnd = reinterpret_cast<void *>(winId());
+    m_windowEffect.applyRoundedCorners(hwnd,
+                                       m_roundedCornersEnabled,
+                                       isMaximized(),
+                                       isMinimized());
 }
 
 void FramelessWindow::applyNativeShadow()
 {
-#ifdef Q_OS_WIN
-    const HWND hwnd = reinterpret_cast<HWND>(winId());
-    if (hwnd == nullptr) {
-        return;
-    }
-
-    BOOL compositionEnabled = FALSE;
-    if (FAILED(DwmIsCompositionEnabled(&compositionEnabled)) || !compositionEnabled) {
-        return;
-    }
-
-    const bool enableShadow = m_shadowEnabled && !isMaximized() && !isMinimized();
-
-    const DWMNCRENDERINGPOLICY policy = enableShadow ? DWMNCRP_ENABLED : DWMNCRP_DISABLED;
-    DwmSetWindowAttribute(hwnd,
-                          DWMWA_NCRENDERING_POLICY,
-                          &policy,
-                          sizeof(policy));
-
-    const MARGINS margins = enableShadow ? MARGINS{1, 1, 1, 1} : MARGINS{0, 0, 0, 0};
-    DwmExtendFrameIntoClientArea(hwnd, &margins);
-#endif
+    void *hwnd = reinterpret_cast<void *>(winId());
+    m_windowEffect.applyShadow(hwnd,
+                               m_shadowEnabled,
+                               isMaximized(),
+                               isMinimized());
 }
 
 void FramelessWindow::applyImmersiveDarkMode()
 {
-#ifdef Q_OS_WIN
-    const HWND hwnd = reinterpret_cast<HWND>(winId());
-    if (hwnd == nullptr) {
-        return;
-    }
-
-    const BOOL enabled = (m_immersiveDarkModeEnabled && shouldUseDarkMode()) ? TRUE : FALSE;
-    HRESULT result = DwmSetWindowAttribute(hwnd,
-                                           DWMWA_USE_IMMERSIVE_DARK_MODE,
-                                           &enabled,
-                                           sizeof(enabled));
-    if (FAILED(result)) {
-        DwmSetWindowAttribute(hwnd,
-                              DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
-                              &enabled,
-                              sizeof(enabled));
-    }
-#endif
-}
-
-FramelessWindow::BackdropMode FramelessWindow::selectBackdropMode() const
-{
-#ifdef Q_OS_WIN
-    if (!m_backdropEnabled) {
-        return BackdropMode::None;
-    }
-
-    const HWND hwnd = reinterpret_cast<HWND>(winId());
-    if (hwnd == nullptr || isMinimized() || isMaximized()) {
-        return BackdropMode::None;
-    }
-
-    const DWORD build = windowsBuildNumber();
-    if (build >= 22621) {
-        return BackdropMode::MicaSystem;
-    }
-
-    if (build >= 22000) {
-        return BackdropMode::MicaLegacy;
-    }
-
-    if (build >= 17763 && getSetWindowCompositionAttribute() != nullptr) {
-        return BackdropMode::Acrylic;
-    }
-#endif
-
-    return BackdropMode::None;
+    void *hwnd = reinterpret_cast<void *>(winId());
+    m_windowEffect.applyImmersiveDarkMode(hwnd,
+                                          m_immersiveDarkModeEnabled,
+                                          shouldUseDarkMode());
 }
 
 void FramelessWindow::applyBackdropEffects()
 {
-#ifdef Q_OS_WIN
-    const HWND hwnd = reinterpret_cast<HWND>(winId());
-    if (hwnd == nullptr) {
-        return;
-    }
-
-    BackdropMode mode = selectBackdropMode();
-    if (mode == BackdropMode::MicaSystem) {
-        const DWORD backdrop = DWMSBT_MAINWINDOW;
-        const HRESULT hr = DwmSetWindowAttribute(hwnd,
-                                                 DWMWA_SYSTEMBACKDROP_TYPE,
-                                                 &backdrop,
-                                                 sizeof(backdrop));
-        if (SUCCEEDED(hr)) {
-            const BOOL disableLegacyMica = FALSE;
-            DwmSetWindowAttribute(hwnd,
-                                  DWMWA_MICA_EFFECT,
-                                  &disableLegacyMica,
-                                  sizeof(disableLegacyMica));
-            return;
-        }
-
-        mode = BackdropMode::MicaLegacy;
-    }
-
-    const DWORD noneBackdrop = DWMSBT_NONE;
-    DwmSetWindowAttribute(hwnd,
-                          DWMWA_SYSTEMBACKDROP_TYPE,
-                          &noneBackdrop,
-                          sizeof(noneBackdrop));
-
-    const BOOL enableLegacyMica = (mode == BackdropMode::MicaLegacy) ? TRUE : FALSE;
-    DwmSetWindowAttribute(hwnd,
-                          DWMWA_MICA_EFFECT,
-                          &enableLegacyMica,
-                          sizeof(enableLegacyMica));
-
-    if (mode == BackdropMode::Acrylic) {
-        applyAcrylicAccent(hwnd, true, shouldUseDarkMode());
-    } else {
-        applyAcrylicAccent(hwnd, false, shouldUseDarkMode());
-    }
-#endif
+    void *hwnd = reinterpret_cast<void *>(winId());
+    m_windowEffect.applyBackdropEffects(hwnd,
+                                        m_backdropEnabled,
+                                        shouldUseDarkMode(),
+                                        isMaximized(),
+                                        isMinimized());
 }
 
 void FramelessWindow::applyVisualEffects()
 {
-    applyNativeShadow();
-    applyRoundedCorners();
-    applyImmersiveDarkMode();
-    applyBackdropEffects();
-    applyBorderColor();
+    WindowEffectWin::VisualEffectOptions options;
+    options.shadowEnabled = m_shadowEnabled;
+    options.backdropEnabled = m_backdropEnabled;
+    options.roundedCornersEnabled = m_roundedCornersEnabled;
+    options.immersiveDarkModeEnabled = m_immersiveDarkModeEnabled;
+    options.useDarkMode = shouldUseDarkMode();
+    options.maximized = isMaximized();
+    options.minimized = isMinimized();
+    options.borderColor = preferredBorderColor();
+
+    void *hwnd = reinterpret_cast<void *>(winId());
+    m_windowEffect.applyVisualEffects(hwnd, options);
 }
 
 bool FramelessWindow::shouldUseDarkMode() const
@@ -1006,19 +707,8 @@ bool FramelessWindow::shouldUseDarkMode() const
 
 void FramelessWindow::applyBorderColor()
 {
-#ifdef Q_OS_WIN
-    const HWND hwnd = reinterpret_cast<HWND>(winId());
-    if (hwnd == nullptr) {
-        return;
-    }
-
-    const QColor border = preferredBorderColor();
-    const COLORREF colorRef = RGB(border.red(), border.green(), border.blue());
-    DwmSetWindowAttribute(hwnd,
-                          DWMWA_BORDER_COLOR,
-                          &colorRef,
-                          sizeof(colorRef));
-#endif
+    void *hwnd = reinterpret_cast<void *>(winId());
+    m_windowEffect.applyBorderColor(hwnd, preferredBorderColor());
 }
 
 QColor FramelessWindow::preferredBorderColor() const

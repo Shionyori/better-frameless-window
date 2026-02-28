@@ -33,6 +33,10 @@ target_sources(${TARGET_NAME} PRIVATE
     src/framelesswindow.h
     src/titlebar.cpp
     src/titlebar.h
+    src/windoweffectwin.cpp
+    src/windoweffectwin.h
+    src/winutils.cpp
+    src/winutils.h
 )
 
 # Link Qt6 libraries to the executable
