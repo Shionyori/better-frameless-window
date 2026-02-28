@@ -10,6 +10,8 @@
 #include <QMouseEvent>
 #include <QObject>
 #include <QPainter>
+#include <QColor>
+#include <QPalette>
 #include <QPushButton>
 #include <QScreen>
 #include <QShowEvent>
@@ -25,6 +27,18 @@
 
 #ifndef DWMWA_WINDOW_CORNER_PREFERENCE
 #define DWMWA_WINDOW_CORNER_PREFERENCE 33
+#endif
+
+#ifndef DWMWA_BORDER_COLOR
+#define DWMWA_BORDER_COLOR 34
+#endif
+
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+#endif
+
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1
+#define DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 19
 #endif
 
 #ifndef DWMWCP_DEFAULT
@@ -205,7 +219,13 @@ void FramelessWindow::changeEvent(QEvent *event)
     if (event->type() == QEvent::WindowStateChange) {
         syncNativeWindowFrame();
         applyRoundedCorners();
+        applyImmersiveDarkMode();
+        applyBorderColor();
         updateMaximizeButtonState();
+    } else if (event->type() == QEvent::ApplicationPaletteChange
+               || event->type() == QEvent::PaletteChange) {
+        applyImmersiveDarkMode();
+        applyBorderColor();
     }
 }
 
@@ -240,6 +260,8 @@ void FramelessWindow::showEvent(QShowEvent *event)
     ensureNativeResizeStyle();
     syncNativeWindowFrame();
     applyRoundedCorners();
+    applyImmersiveDarkMode();
+    applyBorderColor();
 }
 
 void FramelessWindow::mousePressEvent(QMouseEvent *event)
@@ -562,6 +584,67 @@ void FramelessWindow::applyRoundedCorners()
                           &corner,
                           sizeof(corner));
 #endif
+}
+
+void FramelessWindow::applyImmersiveDarkMode()
+{
+#ifdef Q_OS_WIN
+    const HWND hwnd = reinterpret_cast<HWND>(winId());
+    if (hwnd == nullptr) {
+        return;
+    }
+
+    const BOOL enabled = shouldUseDarkMode() ? TRUE : FALSE;
+    HRESULT result = DwmSetWindowAttribute(hwnd,
+                                           DWMWA_USE_IMMERSIVE_DARK_MODE,
+                                           &enabled,
+                                           sizeof(enabled));
+    if (FAILED(result)) {
+        DwmSetWindowAttribute(hwnd,
+                              DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
+                              &enabled,
+                              sizeof(enabled));
+    }
+#endif
+}
+
+bool FramelessWindow::shouldUseDarkMode() const
+{
+    const QColor windowColor = palette().color(QPalette::Window);
+    return windowColor.lightness() < 128;
+}
+
+void FramelessWindow::applyBorderColor()
+{
+#ifdef Q_OS_WIN
+    const HWND hwnd = reinterpret_cast<HWND>(winId());
+    if (hwnd == nullptr) {
+        return;
+    }
+
+    const QColor border = preferredBorderColor();
+    const COLORREF colorRef = RGB(border.red(), border.green(), border.blue());
+    DwmSetWindowAttribute(hwnd,
+                          DWMWA_BORDER_COLOR,
+                          &colorRef,
+                          sizeof(colorRef));
+#endif
+}
+
+QColor FramelessWindow::preferredBorderColor() const
+{
+    const QPalette pal = palette();
+    QColor border = pal.color(QPalette::Mid);
+
+    if (shouldUseDarkMode()) {
+        border = border.lighter(120);
+    }
+
+    if (!border.isValid()) {
+        border = QColor(185, 192, 202);
+    }
+
+    return border;
 }
 
 Qt::CursorShape FramelessWindow::cursorForEdges(Qt::Edges edges) const

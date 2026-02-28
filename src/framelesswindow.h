@@ -5,6 +5,7 @@
 class QVBoxLayout;
 class QLabel;
 class TitleBar;
+class QColor;
 
 class FramelessWindow : public QWidget
 {
@@ -38,6 +39,10 @@ protected:
     void ensureNativeResizeStyle();
     void syncNativeWindowFrame();
     void applyRoundedCorners();
+    void applyImmersiveDarkMode();
+    void applyBorderColor();
+    bool shouldUseDarkMode() const;
+    QColor preferredBorderColor() const;
     Qt::CursorShape cursorForEdges(Qt::Edges edges) const;
 
 private:
