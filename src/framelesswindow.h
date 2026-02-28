@@ -14,6 +14,15 @@ public:
     explicit FramelessWindow(QWidget *parent = nullptr);
     ~FramelessWindow();
 
+    void setShadowEnabled(bool enabled);
+    void setBackdropEnabled(bool enabled);
+    void setRoundedCornersEnabled(bool enabled);
+    void setImmersiveDarkModeEnabled(bool enabled);
+    bool isShadowEnabled() const;
+    bool isBackdropEnabled() const;
+    bool isRoundedCornersEnabled() const;
+    bool isImmersiveDarkModeEnabled() const;
+
 protected:
     enum class BackdropMode {
         None,
@@ -51,6 +60,7 @@ protected:
     void applyNativeShadow();
     void applyImmersiveDarkMode();
     void applyBackdropEffects();
+    void applyVisualEffects();
     BackdropMode selectBackdropMode() const;
     void applyBorderColor();
     bool shouldUseDarkMode() const;
@@ -61,4 +71,8 @@ private:
     TitleBar *m_titleBar;
     QLabel *m_contentLabel;
     QVBoxLayout *m_layout;
+    bool m_shadowEnabled;
+    bool m_backdropEnabled;
+    bool m_roundedCornersEnabled;
+    bool m_immersiveDarkModeEnabled;
 };

@@ -173,12 +173,76 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_titleBar(nullptr)
     , m_contentLabel(nullptr)
     , m_layout(nullptr)
+    , m_shadowEnabled(true)
+    , m_backdropEnabled(true)
+    , m_roundedCornersEnabled(true)
+    , m_immersiveDarkModeEnabled(true)
 {
     initWindow();
     initLayout();
 }
 
 FramelessWindow::~FramelessWindow() = default;
+
+void FramelessWindow::setShadowEnabled(bool enabled)
+{
+    if (m_shadowEnabled == enabled) {
+        return;
+    }
+
+    m_shadowEnabled = enabled;
+    applyNativeShadow();
+}
+
+void FramelessWindow::setBackdropEnabled(bool enabled)
+{
+    if (m_backdropEnabled == enabled) {
+        return;
+    }
+
+    m_backdropEnabled = enabled;
+    applyBackdropEffects();
+}
+
+void FramelessWindow::setRoundedCornersEnabled(bool enabled)
+{
+    if (m_roundedCornersEnabled == enabled) {
+        return;
+    }
+
+    m_roundedCornersEnabled = enabled;
+    applyRoundedCorners();
+}
+
+void FramelessWindow::setImmersiveDarkModeEnabled(bool enabled)
+{
+    if (m_immersiveDarkModeEnabled == enabled) {
+        return;
+    }
+
+    m_immersiveDarkModeEnabled = enabled;
+    applyImmersiveDarkMode();
+}
+
+bool FramelessWindow::isShadowEnabled() const
+{
+    return m_shadowEnabled;
+}
+
+bool FramelessWindow::isBackdropEnabled() const
+{
+    return m_backdropEnabled;
+}
+
+bool FramelessWindow::isRoundedCornersEnabled() const
+{
+    return m_roundedCornersEnabled;
+}
+
+bool FramelessWindow::isImmersiveDarkModeEnabled() const
+{
+    return m_immersiveDarkModeEnabled;
+}
 
 void FramelessWindow::initWindow()
 {
@@ -367,17 +431,11 @@ void FramelessWindow::changeEvent(QEvent *event)
     QWidget::changeEvent(event);
     if (event->type() == QEvent::WindowStateChange) {
         syncNativeWindowFrame();
-        applyNativeShadow();
-        applyRoundedCorners();
-        applyImmersiveDarkMode();
-        applyBackdropEffects();
-        applyBorderColor();
+        applyVisualEffects();
         updateMaximizeButtonState();
     } else if (event->type() == QEvent::ApplicationPaletteChange
                || event->type() == QEvent::PaletteChange) {
-        applyImmersiveDarkMode();
-        applyBackdropEffects();
-        applyBorderColor();
+        applyVisualEffects();
     }
 }
 
@@ -427,11 +485,7 @@ void FramelessWindow::showEvent(QShowEvent *event)
     QWidget::showEvent(event);
     ensureNativeResizeStyle();
     syncNativeWindowFrame();
-    applyNativeShadow();
-    applyRoundedCorners();
-    applyImmersiveDarkMode();
-    applyBackdropEffects();
-    applyBorderColor();
+    applyVisualEffects();
 }
 
 void FramelessWindow::mousePressEvent(QMouseEvent *event)
@@ -782,11 +836,12 @@ void FramelessWindow::applyRoundedCorners()
 #ifdef Q_OS_WIN
     const HWND hwnd = reinterpret_cast<HWND>(winId());
 
-    if (hwnd == nullptr || isMaximized() || isMinimized()) {
+    if (hwnd == nullptr) {
         return;
     }
 
-    const DWORD corner = DWMWCP_ROUND;
+    const bool enableRoundedCorners = m_roundedCornersEnabled && !isMaximized() && !isMinimized();
+    const DWORD corner = enableRoundedCorners ? DWMWCP_ROUND : DWMWCP_DONOTROUND;
     DwmSetWindowAttribute(hwnd,
                           DWMWA_WINDOW_CORNER_PREFERENCE,
                           &corner,
@@ -807,7 +862,7 @@ void FramelessWindow::applyNativeShadow()
         return;
     }
 
-    const bool enableShadow = !isMaximized() && !isMinimized();
+    const bool enableShadow = m_shadowEnabled && !isMaximized() && !isMinimized();
 
     const DWMNCRENDERINGPOLICY policy = enableShadow ? DWMNCRP_ENABLED : DWMNCRP_DISABLED;
     DwmSetWindowAttribute(hwnd,
@@ -828,7 +883,7 @@ void FramelessWindow::applyImmersiveDarkMode()
         return;
     }
 
-    const BOOL enabled = shouldUseDarkMode() ? TRUE : FALSE;
+    const BOOL enabled = (m_immersiveDarkModeEnabled && shouldUseDarkMode()) ? TRUE : FALSE;
     HRESULT result = DwmSetWindowAttribute(hwnd,
                                            DWMWA_USE_IMMERSIVE_DARK_MODE,
                                            &enabled,
@@ -845,6 +900,10 @@ void FramelessWindow::applyImmersiveDarkMode()
 FramelessWindow::BackdropMode FramelessWindow::selectBackdropMode() const
 {
 #ifdef Q_OS_WIN
+    if (!m_backdropEnabled) {
+        return BackdropMode::None;
+    }
+
     const HWND hwnd = reinterpret_cast<HWND>(winId());
     if (hwnd == nullptr || isMinimized() || isMaximized()) {
         return BackdropMode::None;
@@ -912,6 +971,15 @@ void FramelessWindow::applyBackdropEffects()
         applyAcrylicAccent(hwnd, false, shouldUseDarkMode());
     }
 #endif
+}
+
+void FramelessWindow::applyVisualEffects()
+{
+    applyNativeShadow();
+    applyRoundedCorners();
+    applyImmersiveDarkMode();
+    applyBackdropEffects();
+    applyBorderColor();
 }
 
 bool FramelessWindow::shouldUseDarkMode() const
