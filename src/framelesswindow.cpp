@@ -539,6 +539,35 @@ int FramelessWindow::hitTest(const QPoint &globalPos) const
     const int x = globalPos.x();
     const int y = globalPos.y();
 
+    if (x < left || x > right || y < top || y > bottom) {
+        return HTCLIENT;
+    }
+
+    const int nativeWidth = qMax(1, right - left + 1);
+    const int nativeHeight = qMax(1, bottom - top + 1);
+    const int logicalWidth = qMax(1, width());
+    const int logicalHeight = qMax(1, height());
+
+    const QPoint localPos(
+        qBound(0, ((x - left) * logicalWidth) / nativeWidth, logicalWidth - 1),
+        qBound(0, ((y - top) * logicalHeight) / nativeHeight, logicalHeight - 1));
+
+    bool onMaximizeButton = false;
+    if (m_titleBar != nullptr && m_titleBar->geometry().contains(localPos)) {
+        const QPoint titleBarPos = m_titleBar->mapFrom(this, localPos);
+        QWidget *hovered = m_titleBar->childAt(titleBarPos);
+        const auto *button = qobject_cast<QPushButton *>(hovered);
+        onMaximizeButton = button != nullptr
+                           && button->objectName() == QStringLiteral("TitleBarMaximizeButton");
+    }
+
+    if (onMaximizeButton) {
+        if (GetKeyState(VK_LBUTTON) < 0) {
+            return HTCLIENT;
+        }
+        return HTMAXBUTTON;
+    }
+
     Qt::Edges edges;
 
     const bool onLeftCorner = (x >= left - corner && x < left + corner);
@@ -584,23 +613,10 @@ int FramelessWindow::hitTest(const QPoint &globalPos) const
             return HTRIGHT;
     }
 
-    if (x < left || x > right || y < top || y > bottom) {
-        return HTCLIENT;
-    }
-
-    const QPoint localPos = mapFromGlobal(QCursor::pos());
-
     if (m_titleBar != nullptr && m_titleBar->geometry().contains(localPos)) {
         QWidget *hovered = childAt(localPos);
         const auto *button = qobject_cast<QPushButton *>(hovered);
         const bool onButton = button != nullptr;
-
-        if (onButton && button->objectName() == QStringLiteral("TitleBarMaximizeButton")) {
-            if (GetKeyState(VK_LBUTTON) < 0) {
-                return HTCLIENT;
-            }
-            return HTMAXBUTTON;
-        }
 
         if (!onButton) {
             return HTCAPTION;
