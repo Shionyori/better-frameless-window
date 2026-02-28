@@ -48,6 +48,7 @@ protected:
     void ensureNativeResizeStyle();
     void syncNativeWindowFrame();
     void applyRoundedCorners();
+    void applyNativeShadow();
     void applyImmersiveDarkMode();
     void applyBackdropEffects();
     BackdropMode selectBackdropMode() const;

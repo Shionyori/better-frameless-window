@@ -367,6 +367,7 @@ void FramelessWindow::changeEvent(QEvent *event)
     QWidget::changeEvent(event);
     if (event->type() == QEvent::WindowStateChange) {
         syncNativeWindowFrame();
+        applyNativeShadow();
         applyRoundedCorners();
         applyImmersiveDarkMode();
         applyBackdropEffects();
@@ -426,6 +427,7 @@ void FramelessWindow::showEvent(QShowEvent *event)
     QWidget::showEvent(event);
     ensureNativeResizeStyle();
     syncNativeWindowFrame();
+    applyNativeShadow();
     applyRoundedCorners();
     applyImmersiveDarkMode();
     applyBackdropEffects();
@@ -789,6 +791,32 @@ void FramelessWindow::applyRoundedCorners()
                           DWMWA_WINDOW_CORNER_PREFERENCE,
                           &corner,
                           sizeof(corner));
+#endif
+}
+
+void FramelessWindow::applyNativeShadow()
+{
+#ifdef Q_OS_WIN
+    const HWND hwnd = reinterpret_cast<HWND>(winId());
+    if (hwnd == nullptr) {
+        return;
+    }
+
+    BOOL compositionEnabled = FALSE;
+    if (FAILED(DwmIsCompositionEnabled(&compositionEnabled)) || !compositionEnabled) {
+        return;
+    }
+
+    const bool enableShadow = !isMaximized() && !isMinimized();
+
+    const DWMNCRENDERINGPOLICY policy = enableShadow ? DWMNCRP_ENABLED : DWMNCRP_DISABLED;
+    DwmSetWindowAttribute(hwnd,
+                          DWMWA_NCRENDERING_POLICY,
+                          &policy,
+                          sizeof(policy));
+
+    const MARGINS margins = enableShadow ? MARGINS{1, 1, 1, 1} : MARGINS{0, 0, 0, 0};
+    DwmExtendFrameIntoClientArea(hwnd, &margins);
 #endif
 }
 
