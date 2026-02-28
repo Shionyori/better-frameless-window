@@ -15,6 +15,13 @@ public:
     ~FramelessWindow();
 
 protected:
+    enum class BackdropMode {
+        None,
+        MicaSystem,
+        MicaLegacy,
+        Acrylic
+    };
+
     bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
     void paintEvent(QPaintEvent *e) override;
@@ -42,6 +49,8 @@ protected:
     void syncNativeWindowFrame();
     void applyRoundedCorners();
     void applyImmersiveDarkMode();
+    void applyBackdropEffects();
+    BackdropMode selectBackdropMode() const;
     void applyBorderColor();
     bool shouldUseDarkMode() const;
     QColor preferredBorderColor() const;

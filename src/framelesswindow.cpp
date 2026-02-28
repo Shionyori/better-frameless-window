@@ -41,6 +41,125 @@
 #define DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 19
 #endif
 
+#ifndef DWMWA_SYSTEMBACKDROP_TYPE
+#define DWMWA_SYSTEMBACKDROP_TYPE 38
+#endif
+
+#ifndef DWMWA_MICA_EFFECT
+#define DWMWA_MICA_EFFECT 1029
+#endif
+
+#ifndef DWMSBT_AUTO
+#define DWMSBT_AUTO 0
+#define DWMSBT_NONE 1
+#define DWMSBT_MAINWINDOW 2
+#define DWMSBT_TRANSIENTWINDOW 3
+#define DWMSBT_TABBEDWINDOW 4
+#endif
+
+namespace {
+enum ACCENT_STATE {
+    ACCENT_DISABLED = 0,
+    ACCENT_ENABLE_GRADIENT = 1,
+    ACCENT_ENABLE_TRANSPARENTGRADIENT = 2,
+    ACCENT_ENABLE_BLURBEHIND = 3,
+    ACCENT_ENABLE_ACRYLICBLURBEHIND = 4
+};
+
+struct ACCENT_POLICY {
+    int AccentState;
+    int AccentFlags;
+    int GradientColor;
+    int AnimationId;
+};
+
+enum WINDOWCOMPOSITIONATTRIB {
+    WCA_ACCENT_POLICY = 19
+};
+
+struct WINDOWCOMPOSITIONATTRIBDATA {
+    WINDOWCOMPOSITIONATTRIB Attrib;
+    PVOID pvData;
+    SIZE_T cbData;
+};
+
+using SetWindowCompositionAttributePtr = BOOL(WINAPI *)(HWND, WINDOWCOMPOSITIONATTRIBDATA *);
+
+DWORD windowsBuildNumber()
+{
+    static DWORD cachedBuild = 0;
+    static bool initialized = false;
+    if (initialized) {
+        return cachedBuild;
+    }
+
+    initialized = true;
+    using RtlGetVersionPtr = LONG(WINAPI *)(PRTL_OSVERSIONINFOW);
+    HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+    if (ntdll == nullptr) {
+        return cachedBuild;
+    }
+
+    const auto rtlGetVersion = reinterpret_cast<RtlGetVersionPtr>(GetProcAddress(ntdll, "RtlGetVersion"));
+    if (rtlGetVersion == nullptr) {
+        return cachedBuild;
+    }
+
+    RTL_OSVERSIONINFOW ver{};
+    ver.dwOSVersionInfoSize = sizeof(ver);
+    if (rtlGetVersion(&ver) == 0) {
+        cachedBuild = ver.dwBuildNumber;
+    }
+
+    return cachedBuild;
+}
+
+SetWindowCompositionAttributePtr getSetWindowCompositionAttribute()
+{
+    static SetWindowCompositionAttributePtr fn = nullptr;
+    static bool initialized = false;
+    if (initialized) {
+        return fn;
+    }
+
+    initialized = true;
+    HMODULE user32 = GetModuleHandleW(L"user32.dll");
+    if (user32 == nullptr) {
+        return nullptr;
+    }
+
+    fn = reinterpret_cast<SetWindowCompositionAttributePtr>(GetProcAddress(user32, "SetWindowCompositionAttribute"));
+    return fn;
+}
+
+void applyAcrylicAccent(HWND hwnd, bool enable, bool darkMode)
+{
+    const auto setWindowCompositionAttribute = getSetWindowCompositionAttribute();
+    if (setWindowCompositionAttribute == nullptr) {
+        return;
+    }
+
+    ACCENT_POLICY accent{};
+    if (enable) {
+        accent.AccentState = ACCENT_ENABLE_ACRYLICBLURBEHIND;
+        accent.AccentFlags = 2;
+        const int alpha = 0xCC;
+        const int red = darkMode ? 0x20 : 0xF3;
+        const int green = darkMode ? 0x20 : 0xF4;
+        const int blue = darkMode ? 0x20 : 0xF6;
+        accent.GradientColor = (alpha << 24) | (blue << 16) | (green << 8) | red;
+    } else {
+        accent.AccentState = ACCENT_DISABLED;
+    }
+
+    WINDOWCOMPOSITIONATTRIBDATA data{};
+    data.Attrib = WCA_ACCENT_POLICY;
+    data.pvData = &accent;
+    data.cbData = sizeof(accent);
+    setWindowCompositionAttribute(hwnd, &data);
+}
+}
+
 #ifndef DWMWCP_DEFAULT
 #define DWMWCP_DEFAULT 0
 #define DWMWCP_DONOTROUND 1
@@ -250,11 +369,13 @@ void FramelessWindow::changeEvent(QEvent *event)
         syncNativeWindowFrame();
         applyRoundedCorners();
         applyImmersiveDarkMode();
+        applyBackdropEffects();
         applyBorderColor();
         updateMaximizeButtonState();
     } else if (event->type() == QEvent::ApplicationPaletteChange
                || event->type() == QEvent::PaletteChange) {
         applyImmersiveDarkMode();
+        applyBackdropEffects();
         applyBorderColor();
     }
 }
@@ -307,6 +428,7 @@ void FramelessWindow::showEvent(QShowEvent *event)
     syncNativeWindowFrame();
     applyRoundedCorners();
     applyImmersiveDarkMode();
+    applyBackdropEffects();
     applyBorderColor();
 }
 
@@ -688,6 +810,78 @@ void FramelessWindow::applyImmersiveDarkMode()
                               DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
                               &enabled,
                               sizeof(enabled));
+    }
+#endif
+}
+
+FramelessWindow::BackdropMode FramelessWindow::selectBackdropMode() const
+{
+#ifdef Q_OS_WIN
+    const HWND hwnd = reinterpret_cast<HWND>(winId());
+    if (hwnd == nullptr || isMinimized() || isMaximized()) {
+        return BackdropMode::None;
+    }
+
+    const DWORD build = windowsBuildNumber();
+    if (build >= 22621) {
+        return BackdropMode::MicaSystem;
+    }
+
+    if (build >= 22000) {
+        return BackdropMode::MicaLegacy;
+    }
+
+    if (build >= 17763 && getSetWindowCompositionAttribute() != nullptr) {
+        return BackdropMode::Acrylic;
+    }
+#endif
+
+    return BackdropMode::None;
+}
+
+void FramelessWindow::applyBackdropEffects()
+{
+#ifdef Q_OS_WIN
+    const HWND hwnd = reinterpret_cast<HWND>(winId());
+    if (hwnd == nullptr) {
+        return;
+    }
+
+    BackdropMode mode = selectBackdropMode();
+    if (mode == BackdropMode::MicaSystem) {
+        const DWORD backdrop = DWMSBT_MAINWINDOW;
+        const HRESULT hr = DwmSetWindowAttribute(hwnd,
+                                                 DWMWA_SYSTEMBACKDROP_TYPE,
+                                                 &backdrop,
+                                                 sizeof(backdrop));
+        if (SUCCEEDED(hr)) {
+            const BOOL disableLegacyMica = FALSE;
+            DwmSetWindowAttribute(hwnd,
+                                  DWMWA_MICA_EFFECT,
+                                  &disableLegacyMica,
+                                  sizeof(disableLegacyMica));
+            return;
+        }
+
+        mode = BackdropMode::MicaLegacy;
+    }
+
+    const DWORD noneBackdrop = DWMSBT_NONE;
+    DwmSetWindowAttribute(hwnd,
+                          DWMWA_SYSTEMBACKDROP_TYPE,
+                          &noneBackdrop,
+                          sizeof(noneBackdrop));
+
+    const BOOL enableLegacyMica = (mode == BackdropMode::MicaLegacy) ? TRUE : FALSE;
+    DwmSetWindowAttribute(hwnd,
+                          DWMWA_MICA_EFFECT,
+                          &enableLegacyMica,
+                          sizeof(enableLegacyMica));
+
+    if (mode == BackdropMode::Acrylic) {
+        applyAcrylicAccent(hwnd, true, shouldUseDarkMode());
+    } else {
+        applyAcrylicAccent(hwnd, false, shouldUseDarkMode());
     }
 #endif
 }
