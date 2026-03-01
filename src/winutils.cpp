@@ -1,5 +1,6 @@
 #include "winutils.h"
 
+#include "diagnostics.h"
 #include "titlebar.h"
 
 #include <QPushButton>
@@ -74,6 +75,7 @@ void syncNativeWindowStyles(void *hwnd, bool includeExStyle)
     SetLastError(0);
     LONG_PTR style = GetWindowLongPtr(win, GWL_STYLE);
     if (style == 0 && GetLastError() != 0) {
+        Diagnostics::logWarning(QStringLiteral("syncNativeWindowStyles: GetWindowLongPtr(GWL_STYLE) failed"));
         return;
     }
 
@@ -84,6 +86,7 @@ void syncNativeWindowStyles(void *hwnd, bool includeExStyle)
 
     SetLastError(0);
     if (SetWindowLongPtr(win, GWL_STYLE, style) == 0 && GetLastError() != 0) {
+        Diagnostics::logWarning(QStringLiteral("syncNativeWindowStyles: SetWindowLongPtr(GWL_STYLE) failed"));
         return;
     }
 
@@ -91,6 +94,7 @@ void syncNativeWindowStyles(void *hwnd, bool includeExStyle)
         SetLastError(0);
         LONG_PTR exStyle = GetWindowLongPtr(win, GWL_EXSTYLE);
         if (exStyle == 0 && GetLastError() != 0) {
+            Diagnostics::logWarning(QStringLiteral("syncNativeWindowStyles: GetWindowLongPtr(GWL_EXSTYLE) failed"));
             return;
         }
 
@@ -99,6 +103,7 @@ void syncNativeWindowStyles(void *hwnd, bool includeExStyle)
 
         SetLastError(0);
         if (SetWindowLongPtr(win, GWL_EXSTYLE, exStyle) == 0 && GetLastError() != 0) {
+            Diagnostics::logWarning(QStringLiteral("syncNativeWindowStyles: SetWindowLongPtr(GWL_EXSTYLE) failed"));
             return;
         }
     }
@@ -106,6 +111,7 @@ void syncNativeWindowStyles(void *hwnd, bool includeExStyle)
     const BOOL updated = SetWindowPos(win, nullptr, 0, 0, 0, 0,
                                       SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
     if (updated == FALSE) {
+        Diagnostics::logWarning(QStringLiteral("syncNativeWindowStyles: SetWindowPos(SWP_FRAMECHANGED) failed"));
         return;
     }
 #else

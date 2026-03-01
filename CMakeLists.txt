@@ -39,6 +39,8 @@ target_sources(${TARGET_NAME} PRIVATE
     src/winutils.h
     src/thememanager.cpp
     src/thememanager.h
+    src/diagnostics.cpp
+    src/diagnostics.h
 )
 
 # Link Qt6 libraries to the executable

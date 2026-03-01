@@ -1,5 +1,7 @@
 #include "windoweffectwin.h"
 
+#include "diagnostics.h"
+
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
 #include <dwmapi.h>
@@ -171,11 +173,13 @@ void WindowEffectWin::applyShadow(void *hwnd, bool enabled, bool maximized, bool
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
     if (win == nullptr) {
+        Diagnostics::logWarning(QStringLiteral("applyShadow: null HWND"));
         return;
     }
 
     BOOL compositionEnabled = FALSE;
     if (FAILED(DwmIsCompositionEnabled(&compositionEnabled)) || !compositionEnabled) {
+        Diagnostics::logWarning(QStringLiteral("applyShadow skipped: DWM composition disabled or unavailable"));
         return;
     }
 
@@ -201,6 +205,7 @@ void WindowEffectWin::applyRoundedCorners(void *hwnd, bool enabled, bool maximiz
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
     if (win == nullptr) {
+        Diagnostics::logWarning(QStringLiteral("applyRoundedCorners: null HWND"));
         return;
     }
 
@@ -223,6 +228,7 @@ void WindowEffectWin::applyImmersiveDarkMode(void *hwnd, bool enabled, bool useD
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
     if (win == nullptr) {
+        Diagnostics::logWarning(QStringLiteral("applyImmersiveDarkMode: null HWND"));
         return;
     }
 
@@ -232,6 +238,7 @@ void WindowEffectWin::applyImmersiveDarkMode(void *hwnd, bool enabled, bool useD
                                            &darkEnabled,
                                            sizeof(darkEnabled));
     if (FAILED(result)) {
+        Diagnostics::logWarning(QStringLiteral("applyImmersiveDarkMode: DWMWA_USE_IMMERSIVE_DARK_MODE failed, fallback to legacy attribute"));
         DwmSetWindowAttribute(win,
                               DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
                               &darkEnabled,
@@ -292,6 +299,7 @@ void WindowEffectWin::applyBackdropEffects(void *hwnd,
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
     if (win == nullptr) {
+        Diagnostics::logWarning(QStringLiteral("applyBackdropEffects: null HWND"));
         return;
     }
 
@@ -313,6 +321,7 @@ void WindowEffectWin::applyBackdropEffects(void *hwnd,
             return;
         }
 
+        Diagnostics::logWarning(QStringLiteral("applyBackdropEffects: DWMWA_SYSTEMBACKDROP_TYPE failed, fallback to legacy Mica"));
         mode = BackdropMode::MicaLegacy;
     }
 
@@ -350,11 +359,13 @@ void WindowEffectWin::applyAeroBlur(void *hwnd, bool enabled) const
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
     if (win == nullptr) {
+        Diagnostics::logWarning(QStringLiteral("applyAeroBlur: null HWND"));
         return;
     }
 
     BOOL compositionEnabled = FALSE;
     if (FAILED(DwmIsCompositionEnabled(&compositionEnabled)) || !compositionEnabled) {
+        Diagnostics::logWarning(QStringLiteral("applyAeroBlur skipped: DWM composition disabled or unavailable"));
         return;
     }
 

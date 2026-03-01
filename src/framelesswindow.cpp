@@ -1,5 +1,6 @@
 #include "framelesswindow.h"
 
+#include "diagnostics.h"
 #include "winutils.h"
 #include "titlebar.h"
 
@@ -136,6 +137,11 @@ void FramelessWindow::clearTitleBarWidgets()
     m_titleBar->clearCenterWidgets();
 }
 
+void FramelessWindow::setDiagnosticsEnabled(bool enabled)
+{
+    Diagnostics::setEnabled(enabled);
+}
+
 bool FramelessWindow::isShadowEnabled() const
 {
     return m_shadowEnabled;
@@ -159,6 +165,11 @@ bool FramelessWindow::isImmersiveDarkModeEnabled() const
 bool FramelessWindow::isAeroBlurEnabled() const
 {
     return m_aeroBlurEnabled;
+}
+
+bool FramelessWindow::isDiagnosticsEnabled() const
+{
+    return Diagnostics::isEnabled();
 }
 
 ThemeManager::ThemeMode FramelessWindow::themeMode() const
@@ -224,6 +235,7 @@ bool FramelessWindow::handleNativeWindowsMessage(void *message, qintptr *result)
 {
     const MSG *msg = static_cast<MSG *>(message);
     if (msg == nullptr) {
+        Diagnostics::logWarning(QStringLiteral("nativeEvent received null MSG pointer"));
         return false;
     }
 
@@ -291,6 +303,7 @@ bool FramelessWindow::handleGetMinMaxInfoMessage(void *lParam, qintptr *result)
 {
     auto *mmi = reinterpret_cast<MINMAXINFO *>(lParam);
     if (mmi == nullptr) {
+        Diagnostics::logWarning(QStringLiteral("WM_GETMINMAXINFO received null MINMAXINFO"));
         return false;
     }
 
@@ -594,6 +607,7 @@ void FramelessWindow::toggleMaximizeRestore()
 
     const HWND hwnd = reinterpret_cast<HWND>(winId());
     if (hwnd == nullptr) {
+        Diagnostics::logWarning(QStringLiteral("toggleMaximizeRestore: null HWND, fallback to QWidget state switch"));
         if (isMaximized()) {
             showNormal();
         } else {
@@ -627,11 +641,13 @@ void FramelessWindow::showSystemMenu(const QPoint &globalPos)
 
     const HWND hwnd = reinterpret_cast<HWND>(winId());
     if (hwnd == nullptr) {
+        Diagnostics::logWarning(QStringLiteral("showSystemMenu: null HWND"));
         return;
     }
 
     HMENU menu = GetSystemMenu(hwnd, FALSE);
     if (menu == nullptr) {
+        Diagnostics::logWarning(QStringLiteral("showSystemMenu: GetSystemMenu returned null"));
         return;
     }
 
@@ -743,6 +759,7 @@ void FramelessWindow::syncNativeWindowFrame()
 void FramelessWindow::applyVisualEffects()
 {
     if (windowHandle() == nullptr) {
+        Diagnostics::logWarning(QStringLiteral("applyVisualEffects skipped: windowHandle is null"));
         return;
     }
 
@@ -759,6 +776,7 @@ void FramelessWindow::applyVisualEffects()
 
     void *hwnd = reinterpret_cast<void *>(winId());
     if (hwnd == nullptr) {
+        Diagnostics::logWarning(QStringLiteral("applyVisualEffects skipped: winId returned null handle"));
         return;
     }
 

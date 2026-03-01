@@ -26,11 +26,13 @@ public:
     void setAccentColor(const QColor &accentColor);
     void addTitleBarWidget(QWidget *widget);
     void clearTitleBarWidgets();
+    void setDiagnosticsEnabled(bool enabled);
     bool isShadowEnabled() const;
     bool isBackdropEnabled() const;
     bool isRoundedCornersEnabled() const;
     bool isImmersiveDarkModeEnabled() const;
     bool isAeroBlurEnabled() const;
+    bool isDiagnosticsEnabled() const;
     ThemeManager::ThemeMode themeMode() const;
     QColor accentColor() const;
 
