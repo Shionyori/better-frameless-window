@@ -1,9 +1,16 @@
 #include "thememanager.h"
 
+#include <QUrl>
+
 namespace {
 QString colorToCss(const QColor &color)
 {
     return color.name(QColor::HexRgb);
+}
+
+QString cssUrlFromLocalPath(const QString &path)
+{
+    return QUrl::fromLocalFile(path).toString(QUrl::FullyEncoded);
 }
 }
 
@@ -29,6 +36,26 @@ QColor ThemeManager::accentColor() const
     return m_accentColor;
 }
 
+void ThemeManager::setBackgroundMode(BackgroundMode mode)
+{
+    m_backgroundMode = mode;
+}
+
+ThemeManager::BackgroundMode ThemeManager::backgroundMode() const
+{
+    return m_backgroundMode;
+}
+
+void ThemeManager::setBackgroundImagePath(const QString &imagePath)
+{
+    m_backgroundImagePath = imagePath;
+}
+
+QString ThemeManager::backgroundImagePath() const
+{
+    return m_backgroundImagePath;
+}
+
 bool ThemeManager::isDarkMode() const
 {
     return m_themeMode == ThemeMode::Dark;
@@ -49,9 +76,28 @@ QString ThemeManager::buildStyleSheet() const
     const QColor accentHover = m_accentColor;
     const QColor closeHover = QColor(232, 17, 35);
 
+    QString windowBackgroundRule = QStringLiteral("background-color: %1;").arg(colorToCss(windowBg));
+    if (m_backgroundMode == BackgroundMode::Gradient) {
+        const QColor gradStart = dark ? windowBg.lighter(120) : windowBg.lighter(106);
+        const QColor gradEnd = dark ? windowBg.darker(125) : windowBg.darker(108);
+        windowBackgroundRule = QStringLiteral(
+            "background-color: %1;"
+            "background-image: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %2, stop:1 %3);")
+                                   .arg(colorToCss(windowBg),
+                                        colorToCss(gradStart),
+                                        colorToCss(gradEnd));
+    } else if (m_backgroundMode == BackgroundMode::Image && !m_backgroundImagePath.trimmed().isEmpty()) {
+        windowBackgroundRule = QStringLiteral(
+            "background-color: %1;"
+            "background-image: url(\"%2\");"
+            "background-repeat: no-repeat;"
+            "background-position: center;")
+                                   .arg(colorToCss(windowBg), cssUrlFromLocalPath(m_backgroundImagePath));
+    }
+
     return QStringLiteral(R"(
         #FramelessWindow {
-            background-color: %1;
+            %1
             border: 1px solid %2;
         }
         TitleBar {
@@ -97,7 +143,7 @@ QString ThemeManager::buildStyleSheet() const
             color: white;
         }
     )")
-        .arg(colorToCss(windowBg),
+        .arg(windowBackgroundRule,
              colorToCss(windowBorder),
              colorToCss(titleBg),
              colorToCss(titleBorder),

@@ -9,6 +9,7 @@ class QVBoxLayout;
 class QLabel;
 class TitleBar;
 class QColor;
+class QString;
 
 class FramelessWindow : public QWidget
 {
@@ -24,6 +25,8 @@ public:
     void setAeroBlurEnabled(bool enabled);
     void setThemeMode(ThemeManager::ThemeMode mode);
     void setAccentColor(const QColor &accentColor);
+    void setBackgroundMode(ThemeManager::BackgroundMode mode);
+    void setBackgroundImagePath(const QString &imagePath);
     void addTitleBarWidget(QWidget *widget);
     void clearTitleBarWidgets();
     void setDiagnosticsEnabled(bool enabled);
@@ -35,6 +38,8 @@ public:
     bool isDiagnosticsEnabled() const;
     ThemeManager::ThemeMode themeMode() const;
     QColor accentColor() const;
+    ThemeManager::BackgroundMode backgroundMode() const;
+    QString backgroundImagePath() const;
 
 protected:
     bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;

@@ -126,6 +126,28 @@ void FramelessWindow::setAccentColor(const QColor &accentColor)
     applyVisualEffects();
 }
 
+void FramelessWindow::setBackgroundMode(ThemeManager::BackgroundMode mode)
+{
+    if (m_themeManager.backgroundMode() == mode) {
+        return;
+    }
+
+    m_themeManager.setBackgroundMode(mode);
+    applyTheme();
+}
+
+void FramelessWindow::setBackgroundImagePath(const QString &imagePath)
+{
+    if (m_themeManager.backgroundImagePath() == imagePath) {
+        return;
+    }
+
+    m_themeManager.setBackgroundImagePath(imagePath);
+    if (m_themeManager.backgroundMode() == ThemeManager::BackgroundMode::Image) {
+        applyTheme();
+    }
+}
+
 void FramelessWindow::addTitleBarWidget(QWidget *widget)
 {
     if (m_titleBar == nullptr || widget == nullptr) {
@@ -188,6 +210,16 @@ ThemeManager::ThemeMode FramelessWindow::themeMode() const
 QColor FramelessWindow::accentColor() const
 {
     return m_themeManager.accentColor();
+}
+
+ThemeManager::BackgroundMode FramelessWindow::backgroundMode() const
+{
+    return m_themeManager.backgroundMode();
+}
+
+QString FramelessWindow::backgroundImagePath() const
+{
+    return m_themeManager.backgroundImagePath();
 }
 
 void FramelessWindow::initWindow()
