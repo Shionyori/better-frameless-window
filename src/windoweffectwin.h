@@ -9,7 +9,8 @@ public:
         None,
         MicaSystem,
         MicaLegacy,
-        Acrylic
+        Acrylic,
+        Aero
     };
 
     struct VisualEffectOptions {
@@ -17,6 +18,7 @@ public:
         bool backdropEnabled = true;
         bool roundedCornersEnabled = true;
         bool immersiveDarkModeEnabled = true;
+        bool aeroBlurEnabled = true;
         bool useDarkMode = false;
         bool maximized = false;
         bool minimized = false;
@@ -29,9 +31,19 @@ public:
     void applyShadow(void *hwnd, bool enabled, bool maximized, bool minimized) const;
     void applyRoundedCorners(void *hwnd, bool enabled, bool maximized, bool minimized) const;
     void applyImmersiveDarkMode(void *hwnd, bool enabled, bool useDarkMode) const;
-    void applyBackdropEffects(void *hwnd, bool enabled, bool useDarkMode, bool maximized, bool minimized) const;
+    void applyBackdropEffects(void *hwnd,
+                              bool enabled,
+                              bool useDarkMode,
+                              bool maximized,
+                              bool minimized,
+                              bool aeroBlurEnabled) const;
     void applyBorderColor(void *hwnd, const QColor &borderColor) const;
 
 private:
-    BackdropMode selectBackdropMode(void *hwnd, bool enabled, bool maximized, bool minimized) const;
+    BackdropMode selectBackdropMode(void *hwnd,
+                                    bool enabled,
+                                    bool maximized,
+                                    bool minimized,
+                                    bool aeroBlurEnabled) const;
+    void applyAeroBlur(void *hwnd, bool enabled) const;
 };

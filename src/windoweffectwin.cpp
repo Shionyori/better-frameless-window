@@ -153,7 +153,12 @@ void WindowEffectWin::applyVisualEffects(void *hwnd, const VisualEffectOptions &
     applyShadow(hwnd, options.shadowEnabled, options.maximized, options.minimized);
     applyRoundedCorners(hwnd, options.roundedCornersEnabled, options.maximized, options.minimized);
     applyImmersiveDarkMode(hwnd, options.immersiveDarkModeEnabled, options.useDarkMode);
-    applyBackdropEffects(hwnd, options.backdropEnabled, options.useDarkMode, options.maximized, options.minimized);
+    applyBackdropEffects(hwnd,
+                         options.backdropEnabled,
+                         options.useDarkMode,
+                         options.maximized,
+                         options.minimized,
+                         options.aeroBlurEnabled);
     applyBorderColor(hwnd, options.borderColor);
 #else
     (void) hwnd;
@@ -239,7 +244,11 @@ void WindowEffectWin::applyImmersiveDarkMode(void *hwnd, bool enabled, bool useD
 #endif
 }
 
-WindowEffectWin::BackdropMode WindowEffectWin::selectBackdropMode(void *hwnd, bool enabled, bool maximized, bool minimized) const
+WindowEffectWin::BackdropMode WindowEffectWin::selectBackdropMode(void *hwnd,
+                                                                  bool enabled,
+                                                                  bool maximized,
+                                                                  bool minimized,
+                                                                  bool aeroBlurEnabled) const
 {
 #ifdef Q_OS_WIN
     if (!enabled || hwnd == nullptr || minimized || maximized) {
@@ -258,17 +267,27 @@ WindowEffectWin::BackdropMode WindowEffectWin::selectBackdropMode(void *hwnd, bo
     if (build >= 17763 && getSetWindowCompositionAttribute() != nullptr) {
         return BackdropMode::Acrylic;
     }
+
+    if (aeroBlurEnabled && build >= 7600 && build < 9200) {
+        return BackdropMode::Aero;
+    }
 #else
     (void) hwnd;
     (void) enabled;
     (void) maximized;
     (void) minimized;
+    (void) aeroBlurEnabled;
 #endif
 
     return BackdropMode::None;
 }
 
-void WindowEffectWin::applyBackdropEffects(void *hwnd, bool enabled, bool useDarkMode, bool maximized, bool minimized) const
+void WindowEffectWin::applyBackdropEffects(void *hwnd,
+                                           bool enabled,
+                                           bool useDarkMode,
+                                           bool maximized,
+                                           bool minimized,
+                                           bool aeroBlurEnabled) const
 {
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
@@ -276,7 +295,7 @@ void WindowEffectWin::applyBackdropEffects(void *hwnd, bool enabled, bool useDar
         return;
     }
 
-    BackdropMode mode = selectBackdropMode(hwnd, enabled, maximized, minimized);
+    BackdropMode mode = selectBackdropMode(hwnd, enabled, maximized, minimized, aeroBlurEnabled);
     if (mode == BackdropMode::MicaSystem) {
         const DWORD backdrop = DWMSBT_MAINWINDOW;
         const HRESULT hr = DwmSetWindowAttribute(win,
@@ -289,6 +308,8 @@ void WindowEffectWin::applyBackdropEffects(void *hwnd, bool enabled, bool useDar
                                   DWMWA_MICA_EFFECT,
                                   &disableLegacyMica,
                                   sizeof(disableLegacyMica));
+            applyAcrylicAccent(win, false, useDarkMode);
+            applyAeroBlur(hwnd, false);
             return;
         }
 
@@ -312,12 +333,38 @@ void WindowEffectWin::applyBackdropEffects(void *hwnd, bool enabled, bool useDar
     } else {
         applyAcrylicAccent(win, false, useDarkMode);
     }
+
+    applyAeroBlur(hwnd, mode == BackdropMode::Aero);
 #else
     (void) hwnd;
     (void) enabled;
     (void) useDarkMode;
     (void) maximized;
     (void) minimized;
+    (void) aeroBlurEnabled;
+#endif
+}
+
+void WindowEffectWin::applyAeroBlur(void *hwnd, bool enabled) const
+{
+#ifdef Q_OS_WIN
+    const HWND win = static_cast<HWND>(hwnd);
+    if (win == nullptr) {
+        return;
+    }
+
+    BOOL compositionEnabled = FALSE;
+    if (FAILED(DwmIsCompositionEnabled(&compositionEnabled)) || !compositionEnabled) {
+        return;
+    }
+
+    DWM_BLURBEHIND blur{};
+    blur.dwFlags = DWM_BB_ENABLE;
+    blur.fEnable = enabled ? TRUE : FALSE;
+    DwmEnableBlurBehindWindow(win, &blur);
+#else
+    (void) hwnd;
+    (void) enabled;
 #endif
 }
 

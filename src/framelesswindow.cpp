@@ -35,6 +35,7 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_backdropEnabled(true)
     , m_roundedCornersEnabled(true)
     , m_immersiveDarkModeEnabled(true)
+    , m_aeroBlurEnabled(true)
 {
     initWindow();
     initLayout();
@@ -82,6 +83,16 @@ void FramelessWindow::setImmersiveDarkModeEnabled(bool enabled)
     applyVisualEffects();
 }
 
+void FramelessWindow::setAeroBlurEnabled(bool enabled)
+{
+    if (m_aeroBlurEnabled == enabled) {
+        return;
+    }
+
+    m_aeroBlurEnabled = enabled;
+    applyVisualEffects();
+}
+
 bool FramelessWindow::isShadowEnabled() const
 {
     return m_shadowEnabled;
@@ -100,6 +111,11 @@ bool FramelessWindow::isRoundedCornersEnabled() const
 bool FramelessWindow::isImmersiveDarkModeEnabled() const
 {
     return m_immersiveDarkModeEnabled;
+}
+
+bool FramelessWindow::isAeroBlurEnabled() const
+{
+    return m_aeroBlurEnabled;
 }
 
 void FramelessWindow::initWindow()
@@ -685,6 +701,7 @@ void FramelessWindow::applyVisualEffects()
     options.backdropEnabled = m_backdropEnabled;
     options.roundedCornersEnabled = m_roundedCornersEnabled;
     options.immersiveDarkModeEnabled = m_immersiveDarkModeEnabled;
+    options.aeroBlurEnabled = m_aeroBlurEnabled;
     options.useDarkMode = shouldUseDarkMode();
     options.maximized = isMaximized();
     options.minimized = isMinimized();

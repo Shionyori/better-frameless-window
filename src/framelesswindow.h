@@ -20,10 +20,12 @@ public:
     void setBackdropEnabled(bool enabled);
     void setRoundedCornersEnabled(bool enabled);
     void setImmersiveDarkModeEnabled(bool enabled);
+    void setAeroBlurEnabled(bool enabled);
     bool isShadowEnabled() const;
     bool isBackdropEnabled() const;
     bool isRoundedCornersEnabled() const;
     bool isImmersiveDarkModeEnabled() const;
+    bool isAeroBlurEnabled() const;
 
 protected:
     bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
@@ -73,5 +75,6 @@ private:
     bool m_backdropEnabled;
     bool m_roundedCornersEnabled;
     bool m_immersiveDarkModeEnabled;
+    bool m_aeroBlurEnabled;
     WindowEffectWin m_windowEffect;
 };
