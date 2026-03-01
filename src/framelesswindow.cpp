@@ -26,6 +26,14 @@
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
 #include <windowsx.h>
+
+#ifndef WM_NCUAHDRAWCAPTION
+#define WM_NCUAHDRAWCAPTION 0x00AE
+#endif
+
+#ifndef WM_NCUAHDRAWFRAME
+#define WM_NCUAHDRAWFRAME 0x00AF
+#endif
 #endif
 
 FramelessWindow::FramelessWindow(QWidget *parent)
@@ -242,9 +250,20 @@ bool FramelessWindow::handleNativeWindowsMessage(void *message, qintptr *result)
     switch (msg->message) {
     case WM_NCHITTEST:
         return handleNcHitTestMessage(static_cast<qintptr>(msg->lParam), result);
+    case WM_NCPAINT:
+    case WM_NCUAHDRAWCAPTION:
+    case WM_NCUAHDRAWFRAME:
+        *result = 0;
+        return true;
+    case WM_NCACTIVATE:
+        *result = TRUE;
+        return true;
     case WM_NCLBUTTONDOWN:
     case WM_NCLBUTTONDBLCLK:
-        return handleNcButtonMessage(static_cast<quintptr>(msg->wParam), result);
+    case WM_NCLBUTTONUP:
+        return handleNcButtonMessage(msg->message,
+                                     static_cast<quintptr>(msg->wParam),
+                                     result);
     case WM_NCMOUSELEAVE:
     case WM_MOUSELEAVE:
     case WM_CAPTURECHANGED:
@@ -287,14 +306,29 @@ bool FramelessWindow::handleNcHitTestMessage(qintptr lParam, qintptr *result)
     return false;
 }
 
-bool FramelessWindow::handleNcButtonMessage(quintptr wParam, qintptr *result)
+bool FramelessWindow::handleNcButtonMessage(quint32 messageId, quintptr wParam, qintptr *result)
 {
-    if (wParam != HTMAXBUTTON) {
+    if (wParam != HTMAXBUTTON && wParam != HTMINBUTTON && wParam != HTCLOSE) {
         return false;
     }
 
+    if (messageId == WM_NCLBUTTONUP) {
+        *result = 0;
+        return true;
+    }
+
     clearMaximizeButtonNativeHover();
-    toggleMaximizeRestore();
+
+    if (messageId == WM_NCLBUTTONDOWN) {
+        if (wParam == HTMAXBUTTON) {
+            toggleMaximizeRestore();
+        } else if (wParam == HTMINBUTTON) {
+            showMinimized();
+        } else if (wParam == HTCLOSE) {
+            close();
+        }
+    }
+
     *result = 0;
     return true;
 }
@@ -489,11 +523,16 @@ int FramelessWindow::hitTest(const QPoint &globalPos) const
     const QRect nativeWindowRect(left, top, right - left + 1, bottom - top + 1);
     const QPoint localPos = WinUtils::toLocalPos(globalPos, nativeWindowRect, logicalWidth, logicalHeight);
 
-    if (WinUtils::isOnMaximizeButton(m_titleBar, this, localPos)) {
+    const WinUtils::TitleBarButtonType buttonType = WinUtils::titleBarButtonTypeAt(m_titleBar, this, localPos);
+    if (buttonType == WinUtils::TitleBarButtonType::Maximize) {
         if (GetKeyState(VK_LBUTTON) < 0) {
             return HTCLIENT;
         }
         return HTMAXBUTTON;
+    }
+
+    if (buttonType != WinUtils::TitleBarButtonType::None) {
+        return HTCLIENT;
     }
 
     const bool onTitleBarCaptionArea = WinUtils::isOnTitleBarCaptionArea(m_titleBar, this, localPos);

@@ -72,7 +72,7 @@ private:
 #ifdef Q_OS_WIN
     bool handleNativeWindowsMessage(void *message, qintptr *result);
     bool handleNcHitTestMessage(qintptr lParam, qintptr *result);
-    bool handleNcButtonMessage(quintptr wParam, qintptr *result);
+    bool handleNcButtonMessage(quint32 messageId, quintptr wParam, qintptr *result);
     bool handleGetMinMaxInfoMessage(void *lParam, qintptr *result);
     bool handleNcRightButtonUpMessage(quintptr wParam, qintptr lParam, qintptr *result);
     void clearMaximizeButtonNativeHover();

@@ -12,6 +12,8 @@
 
 namespace {
 constexpr auto kMaximizeButtonObjectName = "TitleBarMaximizeButton";
+constexpr auto kMinimizeButtonObjectName = "TitleBarMinimizeButton";
+constexpr auto kCloseButtonObjectName = "TitleBarCloseButton";
 }
 
 namespace WinUtils {
@@ -122,14 +124,36 @@ void syncNativeWindowStyles(void *hwnd, bool includeExStyle)
 
 bool isOnMaximizeButton(const TitleBar *titleBar, const QWidget *hostWidget, const QPoint &localPos)
 {
+    return titleBarButtonTypeAt(titleBar, hostWidget, localPos) == TitleBarButtonType::Maximize;
+}
+
+TitleBarButtonType titleBarButtonTypeAt(const TitleBar *titleBar, const QWidget *hostWidget, const QPoint &localPos)
+{
     if (titleBar == nullptr || hostWidget == nullptr || !titleBar->geometry().contains(localPos)) {
-        return false;
+        return TitleBarButtonType::None;
     }
 
     const QPoint titleBarPos = titleBar->mapFrom(hostWidget, localPos);
     QWidget *hovered = titleBar->childAt(titleBarPos);
     const auto *button = qobject_cast<QPushButton *>(hovered);
-    return button != nullptr && button->objectName() == QString::fromLatin1(kMaximizeButtonObjectName);
+    if (button == nullptr) {
+        return TitleBarButtonType::None;
+    }
+
+    const QString objectName = button->objectName();
+    if (objectName == QString::fromLatin1(kMinimizeButtonObjectName)) {
+        return TitleBarButtonType::Minimize;
+    }
+
+    if (objectName == QString::fromLatin1(kMaximizeButtonObjectName)) {
+        return TitleBarButtonType::Maximize;
+    }
+
+    if (objectName == QString::fromLatin1(kCloseButtonObjectName)) {
+        return TitleBarButtonType::Close;
+    }
+
+    return TitleBarButtonType::Other;
 }
 
 bool isOnTitleBarCaptionArea(const TitleBar *titleBar, const QWidget *hostWidget, const QPoint &localPos)

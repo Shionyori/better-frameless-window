@@ -9,10 +9,19 @@ class QWidget;
 
 namespace WinUtils {
 
+enum class TitleBarButtonType {
+	None,
+	Minimize,
+	Maximize,
+	Close,
+	Other
+};
+
 void setMaximizeButtonNativeHover(TitleBar *titleBar, bool hovered);
 QPoint toLocalPos(const QPoint &globalPos, const QRect &nativeWindowRect, int logicalWidth, int logicalHeight);
 int hitFromEdges(Qt::Edges edges);
 void syncNativeWindowStyles(void *hwnd, bool includeExStyle);
+TitleBarButtonType titleBarButtonTypeAt(const TitleBar *titleBar, const QWidget *hostWidget, const QPoint &localPos);
 bool isOnMaximizeButton(const TitleBar *titleBar, const QWidget *hostWidget, const QPoint &localPos);
 bool isOnTitleBarCaptionArea(const TitleBar *titleBar, const QWidget *hostWidget, const QPoint &localPos);
 
