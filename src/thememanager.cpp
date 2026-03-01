@@ -12,6 +12,34 @@ QString cssUrlFromLocalPath(const QString &path)
 {
     return QUrl::fromLocalFile(path).toString(QUrl::FullyEncoded);
 }
+
+QString buildWindowBackgroundRule(ThemeManager::BackgroundMode mode,
+                                  bool dark,
+                                  const QColor &windowBg,
+                                  const QString &backgroundImagePath)
+{
+    QString windowBackgroundRule = QStringLiteral("background-color: %1;").arg(colorToCss(windowBg));
+
+    if (mode == ThemeManager::BackgroundMode::Gradient) {
+        const QColor gradStart = dark ? windowBg.lighter(120) : windowBg.lighter(106);
+        const QColor gradEnd = dark ? windowBg.darker(125) : windowBg.darker(108);
+        windowBackgroundRule = QStringLiteral(
+            "background-color: %1;"
+            "background-image: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %2, stop:1 %3);")
+                                   .arg(colorToCss(windowBg),
+                                        colorToCss(gradStart),
+                                        colorToCss(gradEnd));
+    } else if (mode == ThemeManager::BackgroundMode::Image && !backgroundImagePath.trimmed().isEmpty()) {
+        windowBackgroundRule = QStringLiteral(
+            "background-color: %1;"
+            "background-image: url(\"%2\");"
+            "background-repeat: no-repeat;"
+            "background-position: center;")
+                                   .arg(colorToCss(windowBg), cssUrlFromLocalPath(backgroundImagePath));
+    }
+
+    return windowBackgroundRule;
+}
 }
 
 void ThemeManager::setThemeMode(ThemeMode mode)
@@ -76,24 +104,10 @@ QString ThemeManager::buildStyleSheet() const
     const QColor accentHover = m_accentColor;
     const QColor closeHover = QColor(232, 17, 35);
 
-    QString windowBackgroundRule = QStringLiteral("background-color: %1;").arg(colorToCss(windowBg));
-    if (m_backgroundMode == BackgroundMode::Gradient) {
-        const QColor gradStart = dark ? windowBg.lighter(120) : windowBg.lighter(106);
-        const QColor gradEnd = dark ? windowBg.darker(125) : windowBg.darker(108);
-        windowBackgroundRule = QStringLiteral(
-            "background-color: %1;"
-            "background-image: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %2, stop:1 %3);")
-                                   .arg(colorToCss(windowBg),
-                                        colorToCss(gradStart),
-                                        colorToCss(gradEnd));
-    } else if (m_backgroundMode == BackgroundMode::Image && !m_backgroundImagePath.trimmed().isEmpty()) {
-        windowBackgroundRule = QStringLiteral(
-            "background-color: %1;"
-            "background-image: url(\"%2\");"
-            "background-repeat: no-repeat;"
-            "background-position: center;")
-                                   .arg(colorToCss(windowBg), cssUrlFromLocalPath(m_backgroundImagePath));
-    }
+    const QString windowBackgroundRule = buildWindowBackgroundRule(m_backgroundMode,
+                                                                   dark,
+                                                                   windowBg,
+                                                                   m_backgroundImagePath);
 
     return QStringLiteral(R"(
         #FramelessWindow {

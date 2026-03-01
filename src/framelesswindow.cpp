@@ -13,7 +13,6 @@
 #include <QObject>
 #include <QPainter>
 #include <QColor>
-#include <QPalette>
 #include <QPushButton>
 #include <QScopedValueRollback>
 #include <QScreen>
@@ -227,6 +226,7 @@ void FramelessWindow::initWindow()
     setWindowFlags(Qt::FramelessWindowHint | Qt::Window | Qt::WindowSystemMenuHint | Qt::WindowMinMaxButtonsHint);
     setMinimumSize(480, 320);
     resize(960, 640);
+    setAttribute(Qt::WA_StyledBackground, true);
 
     setObjectName("FramelessWindow");
     applyTheme();
@@ -415,7 +415,7 @@ bool FramelessWindow::nativeEvent(const QByteArray &eventType, void *message, qi
 
 void FramelessWindow::paintEvent(QPaintEvent *event)
 {
-    QWidget::paintEvent(event);
+    Q_UNUSED(event)
 
     QPainter painter(this);
     QStyleOption opt;
