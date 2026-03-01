@@ -51,17 +51,21 @@ protected:
     bool tryStartSystemResizeAtGlobalPos(const QPoint &globalPos);
     void ensureNativeResizeStyle();
     void syncNativeWindowFrame();
-    void applyRoundedCorners();
-    void applyNativeShadow();
-    void applyImmersiveDarkMode();
-    void applyBackdropEffects();
     void applyVisualEffects();
-    void applyBorderColor();
     bool shouldUseDarkMode() const;
     QColor preferredBorderColor() const;
     Qt::CursorShape cursorForEdges(Qt::Edges edges) const;
 
 private:
+#ifdef Q_OS_WIN
+    bool handleNativeWindowsMessage(void *message, qintptr *result);
+    bool handleNcHitTestMessage(qintptr lParam, qintptr *result);
+    bool handleNcButtonMessage(quintptr wParam, qintptr *result);
+    bool handleGetMinMaxInfoMessage(void *lParam, qintptr *result);
+    bool handleNcRightButtonUpMessage(quintptr wParam, qintptr lParam, qintptr *result);
+    void clearMaximizeButtonNativeHover();
+#endif
+
     TitleBar *m_titleBar;
     QLabel *m_contentLabel;
     QVBoxLayout *m_layout;

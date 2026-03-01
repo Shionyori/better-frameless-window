@@ -174,85 +174,116 @@ bool FramelessWindow::nativeEvent(const QByteArray &eventType, void *message, qi
         return QWidget::nativeEvent(eventType, message, result);
     }
 
+    if (handleNativeWindowsMessage(message, result)) {
+        return true;
+    }
+
+    return QWidget::nativeEvent(eventType, message, result);
+}
+
+bool FramelessWindow::handleNativeWindowsMessage(void *message, qintptr *result)
+{
     const MSG *msg = static_cast<MSG *>(message);
+    if (msg == nullptr) {
+        return false;
+    }
 
     switch (msg->message) {
-    case WM_NCHITTEST: {
-        const QPoint globalPos(GET_X_LPARAM(msg->lParam), GET_Y_LPARAM(msg->lParam));
-        const int hit = hitTest(globalPos);
-
-        WinUtils::setMaximizeButtonNativeHover(m_titleBar, hit == HTMAXBUTTON);
-
-        if (hit != HTCLIENT) {
-            *result = hit;
-            return true;
-        }
-        break;
-    }
+    case WM_NCHITTEST:
+        return handleNcHitTestMessage(static_cast<qintptr>(msg->lParam), result);
     case WM_NCLBUTTONDOWN:
-        if (msg->wParam == HTMAXBUTTON) {
-            WinUtils::setMaximizeButtonNativeHover(m_titleBar, false);
-            toggleMaximizeRestore();
-            *result = 0;
-            return true;
-        }
-        break;
     case WM_NCLBUTTONDBLCLK:
-        if (msg->wParam == HTMAXBUTTON) {
-            WinUtils::setMaximizeButtonNativeHover(m_titleBar, false);
-            toggleMaximizeRestore();
-            *result = 0;
-            return true;
-        }
-        break;
+        return handleNcButtonMessage(static_cast<quintptr>(msg->wParam), result);
     case WM_NCMOUSELEAVE:
     case WM_MOUSELEAVE:
-        WinUtils::setMaximizeButtonNativeHover(m_titleBar, false);
-        break;
     case WM_CAPTURECHANGED:
     case WM_KILLFOCUS:
     case WM_SIZE:
-        WinUtils::setMaximizeButtonNativeHover(m_titleBar, false);
-        break;
+        clearMaximizeButtonNativeHover();
+        return false;
     case WM_ACTIVATE:
         if (LOWORD(msg->wParam) == WA_INACTIVE) {
-            WinUtils::setMaximizeButtonNativeHover(m_titleBar, false);
+            clearMaximizeButtonNativeHover();
         }
-        break;
+        return false;
     case WM_NCCALCSIZE:
         if (msg->wParam == TRUE) {
             *result = 0;
             return true;
         }
-        break;
-    case WM_GETMINMAXINFO: {
-        auto *mmi = reinterpret_cast<MINMAXINFO *>(msg->lParam);
-        const QScreen *screen = windowHandle() ? windowHandle()->screen() : QGuiApplication::primaryScreen();
-        if (screen != nullptr) {
-            const QRect available = screen->availableGeometry();
-            const QRect screenGeometry = screen->geometry();
-            mmi->ptMaxPosition.x = available.x() - screenGeometry.x();
-            mmi->ptMaxPosition.y = available.y() - screenGeometry.y();
-            mmi->ptMaxSize.x = available.width();
-            mmi->ptMaxSize.y = available.height();
-        }
-        *result = 0;
+        return false;
+    case WM_GETMINMAXINFO:
+        return handleGetMinMaxInfoMessage(reinterpret_cast<void *>(msg->lParam), result);
+    case WM_NCRBUTTONUP:
+        return handleNcRightButtonUpMessage(static_cast<quintptr>(msg->wParam), static_cast<qintptr>(msg->lParam), result);
+    default:
+        return false;
+    }
+}
+
+bool FramelessWindow::handleNcHitTestMessage(qintptr lParam, qintptr *result)
+{
+    const QPoint globalPos(GET_X_LPARAM(static_cast<LPARAM>(lParam)), GET_Y_LPARAM(static_cast<LPARAM>(lParam)));
+    const int hit = hitTest(globalPos);
+
+    WinUtils::setMaximizeButtonNativeHover(m_titleBar, hit == HTMAXBUTTON);
+
+    if (hit != HTCLIENT) {
+        *result = hit;
         return true;
     }
-    case WM_NCRBUTTONUP: {
-        if (msg->wParam == HTCAPTION || msg->wParam == HTSYSMENU) {
-            const QPoint globalPos(GET_X_LPARAM(msg->lParam), GET_Y_LPARAM(msg->lParam));
-            showSystemMenu(globalPos);
-            *result = 0;
-            return true;
-        }
-        break;
-    }
-    default:
-        break;
+
+    return false;
+}
+
+bool FramelessWindow::handleNcButtonMessage(quintptr wParam, qintptr *result)
+{
+    if (wParam != HTMAXBUTTON) {
+        return false;
     }
 
-    return QWidget::nativeEvent(eventType, message, result);
+    clearMaximizeButtonNativeHover();
+    toggleMaximizeRestore();
+    *result = 0;
+    return true;
+}
+
+bool FramelessWindow::handleGetMinMaxInfoMessage(void *lParam, qintptr *result)
+{
+    auto *mmi = reinterpret_cast<MINMAXINFO *>(lParam);
+    if (mmi == nullptr) {
+        return false;
+    }
+
+    const QScreen *screen = windowHandle() ? windowHandle()->screen() : QGuiApplication::primaryScreen();
+    if (screen != nullptr) {
+        const QRect available = screen->availableGeometry();
+        const QRect screenGeometry = screen->geometry();
+        mmi->ptMaxPosition.x = available.x() - screenGeometry.x();
+        mmi->ptMaxPosition.y = available.y() - screenGeometry.y();
+        mmi->ptMaxSize.x = available.width();
+        mmi->ptMaxSize.y = available.height();
+    }
+
+    *result = 0;
+    return true;
+}
+
+bool FramelessWindow::handleNcRightButtonUpMessage(quintptr wParam, qintptr lParam, qintptr *result)
+{
+    if (wParam != HTCAPTION && wParam != HTSYSMENU) {
+        return false;
+    }
+
+    const QPoint globalPos(GET_X_LPARAM(static_cast<LPARAM>(lParam)), GET_Y_LPARAM(static_cast<LPARAM>(lParam)));
+    showSystemMenu(globalPos);
+    *result = 0;
+    return true;
+}
+
+void FramelessWindow::clearMaximizeButtonNativeHover()
+{
+    WinUtils::setMaximizeButtonNativeHover(m_titleBar, false);
 }
 #else
 bool FramelessWindow::nativeEvent(const QByteArray &eventType, void *message, qintptr *result)
@@ -647,42 +678,6 @@ void FramelessWindow::syncNativeWindowFrame()
 #endif
 }
 
-void FramelessWindow::applyRoundedCorners()
-{
-    void *hwnd = reinterpret_cast<void *>(winId());
-    m_windowEffect.applyRoundedCorners(hwnd,
-                                       m_roundedCornersEnabled,
-                                       isMaximized(),
-                                       isMinimized());
-}
-
-void FramelessWindow::applyNativeShadow()
-{
-    void *hwnd = reinterpret_cast<void *>(winId());
-    m_windowEffect.applyShadow(hwnd,
-                               m_shadowEnabled,
-                               isMaximized(),
-                               isMinimized());
-}
-
-void FramelessWindow::applyImmersiveDarkMode()
-{
-    void *hwnd = reinterpret_cast<void *>(winId());
-    m_windowEffect.applyImmersiveDarkMode(hwnd,
-                                          m_immersiveDarkModeEnabled,
-                                          shouldUseDarkMode());
-}
-
-void FramelessWindow::applyBackdropEffects()
-{
-    void *hwnd = reinterpret_cast<void *>(winId());
-    m_windowEffect.applyBackdropEffects(hwnd,
-                                        m_backdropEnabled,
-                                        shouldUseDarkMode(),
-                                        isMaximized(),
-                                        isMinimized());
-}
-
 void FramelessWindow::applyVisualEffects()
 {
     WindowEffectWin::VisualEffectOptions options;
@@ -703,12 +698,6 @@ bool FramelessWindow::shouldUseDarkMode() const
 {
     const QColor windowColor = palette().color(QPalette::Window);
     return windowColor.lightness() < 128;
-}
-
-void FramelessWindow::applyBorderColor()
-{
-    void *hwnd = reinterpret_cast<void *>(winId());
-    m_windowEffect.applyBorderColor(hwnd, preferredBorderColor());
 }
 
 QColor FramelessWindow::preferredBorderColor() const
