@@ -14,6 +14,7 @@
 #include <QColor>
 #include <QPalette>
 #include <QPushButton>
+#include <QScopedValueRollback>
 #include <QScreen>
 #include <QShowEvent>
 #include <QStyle>
@@ -36,6 +37,7 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_roundedCornersEnabled(true)
     , m_immersiveDarkModeEnabled(true)
     , m_aeroBlurEnabled(true)
+    , m_applyingTheme(false)
 {
     initWindow();
     initLayout();
@@ -93,6 +95,47 @@ void FramelessWindow::setAeroBlurEnabled(bool enabled)
     applyVisualEffects();
 }
 
+void FramelessWindow::setThemeMode(ThemeManager::ThemeMode mode)
+{
+    if (m_themeManager.themeMode() == mode) {
+        return;
+    }
+
+    m_themeManager.setThemeMode(mode);
+    applyTheme();
+    applyVisualEffects();
+}
+
+void FramelessWindow::setAccentColor(const QColor &accentColor)
+{
+    if (!accentColor.isValid() || m_themeManager.accentColor() == accentColor) {
+        return;
+    }
+
+    m_themeManager.setAccentColor(accentColor);
+    applyTheme();
+    applyVisualEffects();
+}
+
+void FramelessWindow::addTitleBarWidget(QWidget *widget)
+{
+    if (m_titleBar == nullptr || widget == nullptr) {
+        return;
+    }
+
+    m_titleBar->addCenterWidget(widget);
+    widget->installEventFilter(this);
+}
+
+void FramelessWindow::clearTitleBarWidgets()
+{
+    if (m_titleBar == nullptr) {
+        return;
+    }
+
+    m_titleBar->clearCenterWidgets();
+}
+
 bool FramelessWindow::isShadowEnabled() const
 {
     return m_shadowEnabled;
@@ -118,6 +161,16 @@ bool FramelessWindow::isAeroBlurEnabled() const
     return m_aeroBlurEnabled;
 }
 
+ThemeManager::ThemeMode FramelessWindow::themeMode() const
+{
+    return m_themeManager.themeMode();
+}
+
+QColor FramelessWindow::accentColor() const
+{
+    return m_themeManager.accentColor();
+}
+
 void FramelessWindow::initWindow()
 {
     setWindowFlags(Qt::FramelessWindowHint | Qt::Window | Qt::WindowSystemMenuHint | Qt::WindowMinMaxButtonsHint);
@@ -125,37 +178,7 @@ void FramelessWindow::initWindow()
     resize(960, 640);
 
     setObjectName("FramelessWindow");
-    setStyleSheet(R"(
-        #FramelessWindow {
-            background-color: #f3f4f6;
-            border: 1px solid #b9c0ca;
-        }
-        TitleBar {
-            background-color: #ffffff;
-            border-bottom: 1px solid #c7ced8;
-        }
-        #TitleBarLabel {
-            color: #222;
-            font-weight: 600;
-        }
-        #TitleBarMinimizeButton,
-        #TitleBarMaximizeButton,
-        #TitleBarCloseButton {
-            border: none;
-            background: transparent;
-            color: #222;
-            font-size: 14px;
-        }
-        #TitleBarMinimizeButton:hover,
-        #TitleBarMaximizeButton:hover,
-        #TitleBarMaximizeButton[nativeHover="true"] {
-            background: #e8e8e8;
-        }
-        #TitleBarCloseButton:hover {
-            background: #e81123;
-            color: white;
-        }
-    )");
+    applyTheme();
 }
 
 void FramelessWindow::initLayout()
@@ -166,8 +189,8 @@ void FramelessWindow::initLayout()
 
     m_titleBar = new TitleBar(this);
     m_contentLabel = new QLabel("Content Area\nDrag title bar to move\nDrag edges to resize", this);
+    m_contentLabel->setObjectName("ContentLabel");
     m_contentLabel->setAlignment(Qt::AlignCenter);
-    m_contentLabel->setStyleSheet("font-size: 18px; color: #444;");
 
     m_layout->addWidget(m_titleBar);
     m_layout->addWidget(m_contentLabel, 1);
@@ -375,6 +398,16 @@ void FramelessWindow::initMouseTracking()
     }
 }
 
+void FramelessWindow::applyTheme()
+{
+    if (m_applyingTheme) {
+        return;
+    }
+
+    QScopedValueRollback<bool> applyingGuard(m_applyingTheme, true);
+    setStyleSheet(m_themeManager.buildStyleSheet());
+}
+
 void FramelessWindow::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
@@ -560,6 +593,15 @@ void FramelessWindow::toggleMaximizeRestore()
     WinUtils::setMaximizeButtonNativeHover(m_titleBar, false);
 
     const HWND hwnd = reinterpret_cast<HWND>(winId());
+    if (hwnd == nullptr) {
+        if (isMaximized()) {
+            showNormal();
+        } else {
+            showMaximized();
+        }
+        return;
+    }
+
     const WPARAM command = isMaximized() ? SC_RESTORE : SC_MAXIMIZE;
     PostMessage(hwnd, WM_SYSCOMMAND, command, 0);
 #else
@@ -584,6 +626,10 @@ void FramelessWindow::showSystemMenu(const QPoint &globalPos)
     Q_UNUSED(globalPos)
 
     const HWND hwnd = reinterpret_cast<HWND>(winId());
+    if (hwnd == nullptr) {
+        return;
+    }
+
     HMENU menu = GetSystemMenu(hwnd, FALSE);
     if (menu == nullptr) {
         return;
@@ -696,6 +742,10 @@ void FramelessWindow::syncNativeWindowFrame()
 
 void FramelessWindow::applyVisualEffects()
 {
+    if (windowHandle() == nullptr) {
+        return;
+    }
+
     WindowEffectWin::VisualEffectOptions options;
     options.shadowEnabled = m_shadowEnabled;
     options.backdropEnabled = m_backdropEnabled;
@@ -708,29 +758,26 @@ void FramelessWindow::applyVisualEffects()
     options.borderColor = preferredBorderColor();
 
     void *hwnd = reinterpret_cast<void *>(winId());
+    if (hwnd == nullptr) {
+        return;
+    }
+
     m_windowEffect.applyVisualEffects(hwnd, options);
 }
 
 bool FramelessWindow::shouldUseDarkMode() const
 {
-    const QColor windowColor = palette().color(QPalette::Window);
-    return windowColor.lightness() < 128;
+    return m_themeManager.isDarkMode();
 }
 
 QColor FramelessWindow::preferredBorderColor() const
 {
-    const QPalette pal = palette();
-    QColor border = pal.color(QPalette::Mid);
-
-    if (shouldUseDarkMode()) {
-        border = border.lighter(120);
+    const QColor accent = m_themeManager.accentColor();
+    if (!accent.isValid()) {
+        return QColor(185, 192, 202);
     }
 
-    if (!border.isValid()) {
-        border = QColor(185, 192, 202);
-    }
-
-    return border;
+    return shouldUseDarkMode() ? accent.lighter(125) : accent.darker(115);
 }
 
 Qt::CursorShape FramelessWindow::cursorForEdges(Qt::Edges edges) const

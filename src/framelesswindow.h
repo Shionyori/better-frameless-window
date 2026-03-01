@@ -1,5 +1,6 @@
 #pragma once
 
+#include "thememanager.h"
 #include "windoweffectwin.h"
 
 #include <QWidget>
@@ -21,11 +22,17 @@ public:
     void setRoundedCornersEnabled(bool enabled);
     void setImmersiveDarkModeEnabled(bool enabled);
     void setAeroBlurEnabled(bool enabled);
+    void setThemeMode(ThemeManager::ThemeMode mode);
+    void setAccentColor(const QColor &accentColor);
+    void addTitleBarWidget(QWidget *widget);
+    void clearTitleBarWidgets();
     bool isShadowEnabled() const;
     bool isBackdropEnabled() const;
     bool isRoundedCornersEnabled() const;
     bool isImmersiveDarkModeEnabled() const;
     bool isAeroBlurEnabled() const;
+    ThemeManager::ThemeMode themeMode() const;
+    QColor accentColor() const;
 
 protected:
     bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
@@ -40,6 +47,7 @@ protected:
     void initWindow();
     void initLayout();
     void initMouseTracking();
+    void applyTheme();
     int hitTest(const QPoint &globalPos) const;
     int resizeBorderThickness() const;
     Qt::Edges edgesForLocalPos(const QPoint &localPos) const;
@@ -76,5 +84,7 @@ private:
     bool m_roundedCornersEnabled;
     bool m_immersiveDarkModeEnabled;
     bool m_aeroBlurEnabled;
+    bool m_applyingTheme;
+    ThemeManager m_themeManager;
     WindowEffectWin m_windowEffect;
 };

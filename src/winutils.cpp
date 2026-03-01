@@ -71,22 +71,43 @@ void syncNativeWindowStyles(void *hwnd, bool includeExStyle)
         return;
     }
 
+    SetLastError(0);
     LONG_PTR style = GetWindowLongPtr(win, GWL_STYLE);
+    if (style == 0 && GetLastError() != 0) {
+        return;
+    }
+
     if (includeExStyle) {
         style &= ~static_cast<LONG_PTR>(WS_POPUP);
     }
     style |= WS_OVERLAPPED | WS_THICKFRAME | WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU;
-    SetWindowLongPtr(win, GWL_STYLE, style);
 
-    if (includeExStyle) {
-        LONG_PTR exStyle = GetWindowLongPtr(win, GWL_EXSTYLE);
-        exStyle &= ~static_cast<LONG_PTR>(WS_EX_TOOLWINDOW);
-        exStyle |= WS_EX_APPWINDOW;
-        SetWindowLongPtr(win, GWL_EXSTYLE, exStyle);
+    SetLastError(0);
+    if (SetWindowLongPtr(win, GWL_STYLE, style) == 0 && GetLastError() != 0) {
+        return;
     }
 
-    SetWindowPos(win, nullptr, 0, 0, 0, 0,
-                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    if (includeExStyle) {
+        SetLastError(0);
+        LONG_PTR exStyle = GetWindowLongPtr(win, GWL_EXSTYLE);
+        if (exStyle == 0 && GetLastError() != 0) {
+            return;
+        }
+
+        exStyle &= ~static_cast<LONG_PTR>(WS_EX_TOOLWINDOW);
+        exStyle |= WS_EX_APPWINDOW;
+
+        SetLastError(0);
+        if (SetWindowLongPtr(win, GWL_EXSTYLE, exStyle) == 0 && GetLastError() != 0) {
+            return;
+        }
+    }
+
+    const BOOL updated = SetWindowPos(win, nullptr, 0, 0, 0, 0,
+                                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    if (updated == FALSE) {
+        return;
+    }
 #else
     Q_UNUSED(hwnd)
     Q_UNUSED(includeExStyle)

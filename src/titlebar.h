@@ -5,6 +5,7 @@
 class QLabel;
 class QPushButton;
 class QMouseEvent;
+class QHBoxLayout;
 
 class TitleBar : public QWidget
 {
@@ -15,6 +16,8 @@ public:
     int heightHint() const;
     void setMaximized(bool maximized);
     void setMaximizeButtonNativeHover(bool hovered);
+    void addCenterWidget(QWidget *widget);
+    void clearCenterWidgets();
 
 signals:
     void minimizeRequested();
@@ -33,6 +36,9 @@ protected:
 private:
     bool isOnControlButton(const QPoint &pos) const;
 
+    QHBoxLayout *m_layout;
+    QWidget *m_centerContainer;
+    QHBoxLayout *m_centerLayout;
     QLabel *m_titleLabel;
     QPushButton *m_minimizeButton;
     QPushButton *m_maximizeButton;

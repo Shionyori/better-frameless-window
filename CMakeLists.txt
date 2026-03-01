@@ -37,6 +37,8 @@ target_sources(${TARGET_NAME} PRIVATE
     src/windoweffectwin.h
     src/winutils.cpp
     src/winutils.h
+    src/thememanager.cpp
+    src/thememanager.h
 )
 
 # Link Qt6 libraries to the executable

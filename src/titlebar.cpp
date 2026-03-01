@@ -9,6 +9,9 @@
 
 TitleBar::TitleBar(QWidget *parent)
     : QWidget(parent)
+    , m_layout(new QHBoxLayout(this))
+    , m_centerContainer(new QWidget(this))
+    , m_centerLayout(new QHBoxLayout(m_centerContainer))
     , m_titleLabel(new QLabel("Better Frameless Window", this))
     , m_minimizeButton(new QPushButton("-", this))
     , m_maximizeButton(new QPushButton("□", this))
@@ -18,9 +21,12 @@ TitleBar::TitleBar(QWidget *parent)
 {
     setFixedHeight(36);
 
-    auto *layout = new QHBoxLayout(this);
-    layout->setContentsMargins(10, 0, 6, 0);
-    layout->setSpacing(4);
+    m_layout->setContentsMargins(10, 0, 6, 0);
+    m_layout->setSpacing(4);
+
+    m_centerContainer->setObjectName("TitleBarCenterContainer");
+    m_centerLayout->setContentsMargins(0, 0, 0, 0);
+    m_centerLayout->setSpacing(6);
 
     m_titleLabel->setObjectName("TitleBarLabel");
     m_minimizeButton->setObjectName("TitleBarMinimizeButton");
@@ -33,15 +39,44 @@ TitleBar::TitleBar(QWidget *parent)
         button->setFlat(true);
     }
 
-    layout->addWidget(m_titleLabel);
-    layout->addStretch();
-    layout->addWidget(m_minimizeButton);
-    layout->addWidget(m_maximizeButton);
-    layout->addWidget(m_closeButton);
+    m_layout->addWidget(m_titleLabel);
+    m_layout->addWidget(m_centerContainer, 0);
+    m_layout->addStretch();
+    m_layout->addWidget(m_minimizeButton);
+    m_layout->addWidget(m_maximizeButton);
+    m_layout->addWidget(m_closeButton);
 
     connect(m_minimizeButton, &QPushButton::clicked, this, &TitleBar::minimizeRequested);
     connect(m_maximizeButton, &QPushButton::clicked, this, &TitleBar::maximizeRestoreRequested);
     connect(m_closeButton, &QPushButton::clicked, this, &TitleBar::closeRequested);
+}
+
+void TitleBar::addCenterWidget(QWidget *widget)
+{
+    if (widget == nullptr) {
+        return;
+    }
+
+    widget->setParent(m_centerContainer);
+    widget->setMouseTracking(true);
+    m_centerLayout->addWidget(widget);
+}
+
+void TitleBar::clearCenterWidgets()
+{
+    while (m_centerLayout->count() > 0) {
+        QLayoutItem *item = m_centerLayout->takeAt(0);
+        if (item == nullptr) {
+            continue;
+        }
+
+        QWidget *widget = item->widget();
+        if (widget != nullptr) {
+            widget->deleteLater();
+        }
+
+        delete item;
+    }
 }
 
 bool TitleBar::isOnControlButton(const QPoint &pos) const

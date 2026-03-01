@@ -1,0 +1,28 @@
+#pragma once
+
+#include <QColor>
+#include <QString>
+
+class ThemeManager
+{
+public:
+    enum class ThemeMode {
+        Light,
+        Dark
+    };
+
+    ThemeManager() = default;
+
+    void setThemeMode(ThemeMode mode);
+    ThemeMode themeMode() const;
+
+    void setAccentColor(const QColor &accentColor);
+    QColor accentColor() const;
+
+    bool isDarkMode() const;
+    QString buildStyleSheet() const;
+
+private:
+    ThemeMode m_themeMode = ThemeMode::Light;
+    QColor m_accentColor = QColor(0, 120, 215);
+};
