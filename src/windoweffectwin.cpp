@@ -47,6 +47,24 @@
 #endif
 
 namespace {
+QString backdropModeToString(WindowEffectWin::BackdropMode mode)
+{
+    switch (mode) {
+    case WindowEffectWin::BackdropMode::None:
+        return QStringLiteral("None");
+    case WindowEffectWin::BackdropMode::MicaSystem:
+        return QStringLiteral("MicaSystem");
+    case WindowEffectWin::BackdropMode::MicaLegacy:
+        return QStringLiteral("MicaLegacy");
+    case WindowEffectWin::BackdropMode::Acrylic:
+        return QStringLiteral("Acrylic");
+    case WindowEffectWin::BackdropMode::Aero:
+        return QStringLiteral("Aero");
+    }
+
+    return QStringLiteral("Unknown");
+}
+
 enum ACCENT_STATE {
     ACCENT_DISABLED = 0,
     ACCENT_ENABLE_GRADIENT = 1,
@@ -103,10 +121,10 @@ void applyAcrylicAccent(HWND hwnd, bool enable, bool useDarkMode)
     if (enable) {
         accent.AccentState = ACCENT_ENABLE_ACRYLICBLURBEHIND;
         accent.AccentFlags = 2;
-        const int alpha = 0xCC;
-        const int red = useDarkMode ? 0x20 : 0xF3;
-        const int green = useDarkMode ? 0x20 : 0xF4;
-        const int blue = useDarkMode ? 0x20 : 0xF6;
+        const int alpha = useDarkMode ? 0x66 : 0x7A;
+        const int red = useDarkMode ? 0x12 : 0xF3;
+        const int green = useDarkMode ? 0x12 : 0xF4;
+        const int blue = useDarkMode ? 0x12 : 0xF6;
         accent.GradientColor = (alpha << 24) | (blue << 16) | (green << 8) | red;
     } else {
         accent.AccentState = ACCENT_DISABLED;
@@ -132,7 +150,8 @@ void WindowEffectWin::applyVisualEffects(void *hwnd, const VisualEffectOptions &
                          options.useDarkMode,
                          options.maximized,
                          options.minimized,
-                         options.aeroBlurEnabled);
+                         options.aeroBlurEnabled,
+                         options.backdropPreference);
     applyBorderColor(hwnd, options.borderColor);
 #else
     (void) hwnd;
@@ -227,7 +246,8 @@ WindowEffectWin::BackdropMode WindowEffectWin::selectBackdropMode(void *hwnd,
                                                                   bool enabled,
                                                                   bool maximized,
                                                                   bool minimized,
-                                                                  bool aeroBlurEnabled) const
+                                                                  bool aeroBlurEnabled,
+                                                                  BackdropPreference backdropPreference) const
 {
 #ifdef Q_OS_WIN
     if (!enabled || hwnd == nullptr || minimized || maximized) {
@@ -235,6 +255,39 @@ WindowEffectWin::BackdropMode WindowEffectWin::selectBackdropMode(void *hwnd,
     }
 
     const WinUtils::WindowsCapabilities caps = WinUtils::detectWindowsCapabilities();
+    if (backdropPreference != BackdropPreference::Auto) {
+        switch (backdropPreference) {
+        case BackdropPreference::None:
+            return BackdropMode::None;
+        case BackdropPreference::MicaSystem:
+            if (caps.supportsSystemBackdrop) {
+                return BackdropMode::MicaSystem;
+            }
+            Diagnostics::logWarning(QStringLiteral("selectBackdropMode: requested MicaSystem not supported, fallback to Auto chain"));
+            break;
+        case BackdropPreference::MicaLegacy:
+            if (caps.supportsLegacyMica) {
+                return BackdropMode::MicaLegacy;
+            }
+            Diagnostics::logWarning(QStringLiteral("selectBackdropMode: requested MicaLegacy not supported, fallback to Auto chain"));
+            break;
+        case BackdropPreference::Acrylic:
+            if (caps.supportsAcrylic && getSetWindowCompositionAttribute() != nullptr) {
+                return BackdropMode::Acrylic;
+            }
+            Diagnostics::logWarning(QStringLiteral("selectBackdropMode: requested Acrylic not supported, fallback to Auto chain"));
+            break;
+        case BackdropPreference::Aero:
+            if (aeroBlurEnabled && caps.supportsAeroBlur) {
+                return BackdropMode::Aero;
+            }
+            Diagnostics::logWarning(QStringLiteral("selectBackdropMode: requested Aero not supported, fallback to Auto chain"));
+            break;
+        case BackdropPreference::Auto:
+            break;
+        }
+    }
+
     if (caps.supportsSystemBackdrop) {
         return BackdropMode::MicaSystem;
     }
@@ -266,7 +319,8 @@ void WindowEffectWin::applyBackdropEffects(void *hwnd,
                                            bool useDarkMode,
                                            bool maximized,
                                            bool minimized,
-                                           bool aeroBlurEnabled) const
+                                           bool aeroBlurEnabled,
+                                           BackdropPreference backdropPreference) const
 {
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
@@ -275,7 +329,17 @@ void WindowEffectWin::applyBackdropEffects(void *hwnd,
         return;
     }
 
-    BackdropMode mode = selectBackdropMode(hwnd, enabled, maximized, minimized, aeroBlurEnabled);
+    const WinUtils::WindowsCapabilities caps = WinUtils::detectWindowsCapabilities();
+    const bool acrylicAvailable = caps.supportsAcrylic && getSetWindowCompositionAttribute() != nullptr;
+
+    BackdropMode mode = selectBackdropMode(hwnd,
+                                           enabled,
+                                           maximized,
+                                           minimized,
+                                           aeroBlurEnabled,
+                                           backdropPreference);
+    Diagnostics::logWarning(QStringLiteral("applyBackdropEffects: resolved mode = %1")
+                                .arg(backdropModeToString(mode)));
     if (mode == BackdropMode::MicaSystem) {
         const DWORD backdrop = DWMSBT_MAINWINDOW;
         const HRESULT hr = DwmSetWindowAttribute(win,
@@ -303,11 +367,31 @@ void WindowEffectWin::applyBackdropEffects(void *hwnd,
                           &noneBackdrop,
                           sizeof(noneBackdrop));
 
-    const BOOL enableLegacyMica = (mode == BackdropMode::MicaLegacy) ? TRUE : FALSE;
-    DwmSetWindowAttribute(win,
-                          DWMWA_MICA_EFFECT,
-                          &enableLegacyMica,
-                          sizeof(enableLegacyMica));
+    if (mode == BackdropMode::MicaLegacy) {
+        const BOOL enableLegacyMica = TRUE;
+        const HRESULT legacyHr = DwmSetWindowAttribute(win,
+                                                       DWMWA_MICA_EFFECT,
+                                                       &enableLegacyMica,
+                                                       sizeof(enableLegacyMica));
+        if (FAILED(legacyHr)) {
+            Diagnostics::logWarning(QStringLiteral("applyBackdropEffects: DWMWA_MICA_EFFECT failed, fallback to next available backdrop"));
+            if (acrylicAvailable) {
+                mode = BackdropMode::Acrylic;
+            } else if (aeroBlurEnabled && caps.supportsAeroBlur) {
+                mode = BackdropMode::Aero;
+            } else {
+                mode = BackdropMode::None;
+            }
+        }
+    }
+
+    const BOOL disableLegacyMica = FALSE;
+    if (mode != BackdropMode::MicaLegacy) {
+        DwmSetWindowAttribute(win,
+                              DWMWA_MICA_EFFECT,
+                              &disableLegacyMica,
+                              sizeof(disableLegacyMica));
+    }
 
     if (mode == BackdropMode::Acrylic) {
         applyAcrylicAccent(win, true, useDarkMode);
@@ -323,6 +407,7 @@ void WindowEffectWin::applyBackdropEffects(void *hwnd,
     (void) maximized;
     (void) minimized;
     (void) aeroBlurEnabled;
+    (void) backdropPreference;
 #endif
 }
 

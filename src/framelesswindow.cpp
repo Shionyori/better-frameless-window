@@ -4,10 +4,8 @@
 #include "winutils.h"
 #include "titlebar.h"
 
-#include <QApplication>
 #include <QEvent>
 #include <QGuiApplication>
-#include <QLabel>
 #include <QLayout>
 #include <QMouseEvent>
 #include <QObject>
@@ -38,10 +36,12 @@
 FramelessWindow::FramelessWindow(QWidget *parent)
     : QWidget(parent)
     , m_titleBar(nullptr)
-    , m_contentLabel(nullptr)
+    , m_contentPanel(nullptr)
+    , m_userContentWidget(nullptr)
     , m_layout(nullptr)
     , m_shadowEnabled(true)
     , m_backdropEnabled(true)
+    , m_backdropPreference(WindowEffectWin::BackdropPreference::Auto)
     , m_roundedCornersEnabled(true)
     , m_immersiveDarkModeEnabled(true)
     , m_aeroBlurEnabled(true)
@@ -70,6 +70,18 @@ void FramelessWindow::setBackdropEnabled(bool enabled)
     }
 
     m_backdropEnabled = enabled;
+    applyTheme();
+    applyVisualEffects();
+}
+
+void FramelessWindow::setBackdropPreference(WindowEffectWin::BackdropPreference preference)
+{
+    if (m_backdropPreference == preference) {
+        return;
+    }
+
+    m_backdropPreference = preference;
+    applyTheme();
     applyVisualEffects();
 }
 
@@ -100,6 +112,7 @@ void FramelessWindow::setAeroBlurEnabled(bool enabled)
     }
 
     m_aeroBlurEnabled = enabled;
+    applyTheme();
     applyVisualEffects();
 }
 
@@ -147,6 +160,75 @@ void FramelessWindow::setBackgroundImagePath(const QString &imagePath)
     }
 }
 
+void FramelessWindow::setCentralWidget(QWidget *widget)
+{
+    setContentWidget(widget);
+}
+
+QWidget *FramelessWindow::centralWidget() const
+{
+    return contentWidget();
+}
+
+QWidget *FramelessWindow::takeCentralWidget()
+{
+    return takeContentWidget();
+}
+
+void FramelessWindow::setContentWidget(QWidget *widget)
+{
+    if (m_contentPanel == nullptr) {
+        return;
+    }
+
+    QLayout *contentLayout = m_contentPanel->layout();
+    if (contentLayout == nullptr) {
+        return;
+    }
+
+    if (m_userContentWidget == widget) {
+        return;
+    }
+
+    if (m_userContentWidget != nullptr) {
+        detachContentEventFilters(m_userContentWidget);
+        contentLayout->removeWidget(m_userContentWidget);
+        m_userContentWidget->setParent(nullptr);
+    }
+
+    m_userContentWidget = widget;
+    if (m_userContentWidget == nullptr) {
+        return;
+    }
+
+    m_userContentWidget->setParent(m_contentPanel);
+    attachContentEventFilters(m_userContentWidget);
+    contentLayout->addWidget(m_userContentWidget);
+}
+
+QWidget *FramelessWindow::contentWidget() const
+{
+    return m_userContentWidget;
+}
+
+QWidget *FramelessWindow::takeContentWidget()
+{
+    if (m_contentPanel == nullptr || m_userContentWidget == nullptr) {
+        return nullptr;
+    }
+
+    QLayout *contentLayout = m_contentPanel->layout();
+    if (contentLayout != nullptr) {
+        contentLayout->removeWidget(m_userContentWidget);
+    }
+
+    QWidget *currentContent = m_userContentWidget;
+    detachContentEventFilters(currentContent);
+    currentContent->setParent(nullptr);
+    m_userContentWidget = nullptr;
+    return currentContent;
+}
+
 void FramelessWindow::addTitleBarWidget(QWidget *widget)
 {
     if (m_titleBar == nullptr || widget == nullptr) {
@@ -179,6 +261,11 @@ bool FramelessWindow::isShadowEnabled() const
 bool FramelessWindow::isBackdropEnabled() const
 {
     return m_backdropEnabled;
+}
+
+WindowEffectWin::BackdropPreference FramelessWindow::backdropPreference() const
+{
+    return m_backdropPreference;
 }
 
 bool FramelessWindow::isRoundedCornersEnabled() const
@@ -239,12 +326,14 @@ void FramelessWindow::initLayout()
     m_layout->setContentsMargins(0, 0, 0, 0);
 
     m_titleBar = new TitleBar(this);
-    m_contentLabel = new QLabel("Content Area\nDrag title bar to move\nDrag edges to resize", this);
-    m_contentLabel->setObjectName("ContentLabel");
-    m_contentLabel->setAlignment(Qt::AlignCenter);
+    m_contentPanel = new QWidget(this);
+
+    auto *contentLayout = new QVBoxLayout(m_contentPanel);
+    contentLayout->setContentsMargins(0, 0, 0, 0);
+    contentLayout->setSpacing(0);
 
     m_layout->addWidget(m_titleBar);
-    m_layout->addWidget(m_contentLabel, 1);
+    m_layout->addWidget(m_contentPanel, 1);
 
     initMouseTracking();
 
@@ -427,6 +516,7 @@ void FramelessWindow::changeEvent(QEvent *event)
 {
     QWidget::changeEvent(event);
     if (event->type() == QEvent::WindowStateChange) {
+        applyTheme();
         syncNativeWindowFrame();
         applyVisualEffects();
         updateMaximizeButtonState();
@@ -438,10 +528,15 @@ void FramelessWindow::changeEvent(QEvent *event)
 
 bool FramelessWindow::eventFilter(QObject *watched, QEvent *event)
 {
+    QWidget *watchedWidget = qobject_cast<QWidget *>(watched);
+
     if (event->type() == QEvent::MouseButtonPress) {
+        const bool inContentPanel = watchedWidget != nullptr
+                                    && m_contentPanel != nullptr
+                                    && (watchedWidget == m_contentPanel || m_contentPanel->isAncestorOf(watchedWidget));
         const bool canInitiateResize = watched == this
                                        || watched == m_titleBar
-                                       || watched == m_contentLabel;
+                                       || inContentPanel;
         if (!canInitiateResize || qobject_cast<QPushButton *>(watched) != nullptr) {
             return QWidget::eventFilter(watched, event);
         }
@@ -484,7 +579,9 @@ void FramelessWindow::applyTheme()
     }
 
     QScopedValueRollback<bool> applyingGuard(m_applyingTheme, true);
-    setStyleSheet(m_themeManager.buildStyleSheet());
+    const bool useTranslucentBackground = shouldUseTranslucentBackground();
+    setAttribute(Qt::WA_TranslucentBackground, useTranslucentBackground);
+    setStyleSheet(m_themeManager.buildStyleSheet(useTranslucentBackground));
 }
 
 void FramelessWindow::showEvent(QShowEvent *event)
@@ -837,6 +934,7 @@ void FramelessWindow::applyVisualEffects()
     WindowEffectWin::VisualEffectOptions options;
     options.shadowEnabled = m_shadowEnabled;
     options.backdropEnabled = m_backdropEnabled;
+    options.backdropPreference = m_backdropPreference;
     options.roundedCornersEnabled = m_roundedCornersEnabled;
     options.immersiveDarkModeEnabled = m_immersiveDarkModeEnabled;
     options.aeroBlurEnabled = m_aeroBlurEnabled;
@@ -857,6 +955,40 @@ void FramelessWindow::applyVisualEffects()
 bool FramelessWindow::shouldUseDarkMode() const
 {
     return m_themeManager.isDarkMode();
+}
+
+bool FramelessWindow::shouldUseTranslucentBackground() const
+{
+#ifdef Q_OS_WIN
+    if (!m_backdropEnabled || isMaximized() || isMinimized()) {
+        return false;
+    }
+
+    const WinUtils::WindowsCapabilities caps = WinUtils::detectWindowsCapabilities();
+    const bool autoChainAvailable = caps.supportsSystemBackdrop
+                                    || caps.supportsLegacyMica
+                                    || caps.supportsAcrylic
+                                    || (m_aeroBlurEnabled && caps.supportsAeroBlur);
+
+    switch (m_backdropPreference) {
+    case WindowEffectWin::BackdropPreference::Auto:
+        return autoChainAvailable;
+    case WindowEffectWin::BackdropPreference::None:
+        return false;
+    case WindowEffectWin::BackdropPreference::MicaSystem:
+        return caps.supportsSystemBackdrop ? true : autoChainAvailable;
+    case WindowEffectWin::BackdropPreference::MicaLegacy:
+        return caps.supportsLegacyMica ? true : autoChainAvailable;
+    case WindowEffectWin::BackdropPreference::Acrylic:
+        return caps.supportsAcrylic ? true : autoChainAvailable;
+    case WindowEffectWin::BackdropPreference::Aero:
+        return (m_aeroBlurEnabled && caps.supportsAeroBlur) ? true : autoChainAvailable;
+    }
+
+    return false;
+#else
+    return false;
+#endif
 }
 
 QColor FramelessWindow::preferredBorderColor() const
@@ -888,4 +1020,33 @@ Qt::CursorShape FramelessWindow::cursorForEdges(Qt::Edges edges) const
     }
 
     return Qt::ArrowCursor;
+}
+
+void FramelessWindow::attachContentEventFilters(QWidget *widget)
+{
+    if (widget == nullptr) {
+        return;
+    }
+
+    widget->setMouseTracking(true);
+    widget->installEventFilter(this);
+
+    const auto children = widget->findChildren<QWidget *>();
+    for (QWidget *child : children) {
+        child->setMouseTracking(true);
+        child->installEventFilter(this);
+    }
+}
+
+void FramelessWindow::detachContentEventFilters(QWidget *widget)
+{
+    if (widget == nullptr) {
+        return;
+    }
+
+    const auto children = widget->findChildren<QWidget *>();
+    for (QWidget *child : children) {
+        child->removeEventFilter(this);
+    }
+    widget->removeEventFilter(this);
 }

@@ -16,8 +16,17 @@ QString cssUrlFromLocalPath(const QString &path)
 QString buildWindowBackgroundRule(ThemeManager::BackgroundMode mode,
                                   bool dark,
                                   const QColor &windowBg,
+                                  bool transparentWindowBackground,
                                   const QString &backgroundImagePath)
 {
+    if (transparentWindowBackground) {
+        const QString hitTestSafeColor = dark
+                                             ? QStringLiteral("rgba(0, 0, 0, 1)")
+                                             : QStringLiteral("rgba(255, 255, 255, 1)");
+        return QStringLiteral("background-color: %1; background-image: none;")
+            .arg(hitTestSafeColor);
+    }
+
     QString windowBackgroundRule = QStringLiteral("background-color: %1;").arg(colorToCss(windowBg));
 
     if (mode == ThemeManager::BackgroundMode::Gradient) {
@@ -89,7 +98,7 @@ bool ThemeManager::isDarkMode() const
     return m_themeMode == ThemeMode::Dark;
 }
 
-QString ThemeManager::buildStyleSheet() const
+QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
 {
     const bool dark = isDarkMode();
 
@@ -107,6 +116,7 @@ QString ThemeManager::buildStyleSheet() const
     const QString windowBackgroundRule = buildWindowBackgroundRule(m_backgroundMode,
                                                                    dark,
                                                                    windowBg,
+                                                                   transparentWindowBackground,
                                                                    m_backgroundImagePath);
 
     return QStringLiteral(R"(

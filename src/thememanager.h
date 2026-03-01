@@ -32,7 +32,7 @@ public:
     QString backgroundImagePath() const;
 
     bool isDarkMode() const;
-    QString buildStyleSheet() const;
+    QString buildStyleSheet(bool transparentWindowBackground = false) const;
 
 private:
     ThemeMode m_themeMode = ThemeMode::Light;

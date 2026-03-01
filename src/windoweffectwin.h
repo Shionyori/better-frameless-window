@@ -5,6 +5,15 @@
 class WindowEffectWin
 {
 public:
+    enum class BackdropPreference {
+        Auto,
+        None,
+        MicaSystem,
+        MicaLegacy,
+        Acrylic,
+        Aero
+    };
+
     enum class BackdropMode {
         None,
         MicaSystem,
@@ -19,6 +28,7 @@ public:
         bool roundedCornersEnabled = true;
         bool immersiveDarkModeEnabled = true;
         bool aeroBlurEnabled = true;
+        BackdropPreference backdropPreference = BackdropPreference::Auto;
         bool useDarkMode = false;
         bool maximized = false;
         bool minimized = false;
@@ -36,7 +46,8 @@ public:
                               bool useDarkMode,
                               bool maximized,
                               bool minimized,
-                              bool aeroBlurEnabled) const;
+                              bool aeroBlurEnabled,
+                              BackdropPreference backdropPreference) const;
     void applyBorderColor(void *hwnd, const QColor &borderColor) const;
 
 private:
@@ -44,6 +55,7 @@ private:
                                     bool enabled,
                                     bool maximized,
                                     bool minimized,
-                                    bool aeroBlurEnabled) const;
+                                    bool aeroBlurEnabled,
+                                    BackdropPreference backdropPreference) const;
     void applyAeroBlur(void *hwnd, bool enabled) const;
 };

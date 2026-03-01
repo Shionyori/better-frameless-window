@@ -6,7 +6,6 @@
 #include <QWidget>
 
 class QVBoxLayout;
-class QLabel;
 class TitleBar;
 class QColor;
 class QString;
@@ -20,6 +19,7 @@ public:
 
     void setShadowEnabled(bool enabled);
     void setBackdropEnabled(bool enabled);
+    void setBackdropPreference(WindowEffectWin::BackdropPreference preference);
     void setRoundedCornersEnabled(bool enabled);
     void setImmersiveDarkModeEnabled(bool enabled);
     void setAeroBlurEnabled(bool enabled);
@@ -27,11 +27,20 @@ public:
     void setAccentColor(const QColor &accentColor);
     void setBackgroundMode(ThemeManager::BackgroundMode mode);
     void setBackgroundImagePath(const QString &imagePath);
+
+    void setCentralWidget(QWidget *widget);
+    QWidget *centralWidget() const;
+    QWidget *takeCentralWidget();
+
+    void setContentWidget(QWidget *widget);
+    QWidget *contentWidget() const;
+    QWidget *takeContentWidget();
     void addTitleBarWidget(QWidget *widget);
     void clearTitleBarWidgets();
     void setDiagnosticsEnabled(bool enabled);
     bool isShadowEnabled() const;
     bool isBackdropEnabled() const;
+    WindowEffectWin::BackdropPreference backdropPreference() const;
     bool isRoundedCornersEnabled() const;
     bool isImmersiveDarkModeEnabled() const;
     bool isAeroBlurEnabled() const;
@@ -69,11 +78,15 @@ protected:
     void ensureNativeResizeStyle();
     void syncNativeWindowFrame();
     void applyVisualEffects();
+    bool shouldUseTranslucentBackground() const;
     bool shouldUseDarkMode() const;
     QColor preferredBorderColor() const;
     Qt::CursorShape cursorForEdges(Qt::Edges edges) const;
 
 private:
+    void attachContentEventFilters(QWidget *widget);
+    void detachContentEventFilters(QWidget *widget);
+
 #ifdef Q_OS_WIN
     bool handleNativeWindowsMessage(void *message, qintptr *result);
     bool handleNcHitTestMessage(qintptr lParam, qintptr *result);
@@ -84,10 +97,12 @@ private:
 #endif
 
     TitleBar *m_titleBar;
-    QLabel *m_contentLabel;
+    QWidget *m_contentPanel;
+    QWidget *m_userContentWidget;
     QVBoxLayout *m_layout;
     bool m_shadowEnabled;
     bool m_backdropEnabled;
+    WindowEffectWin::BackdropPreference m_backdropPreference;
     bool m_roundedCornersEnabled;
     bool m_immersiveDarkModeEnabled;
     bool m_aeroBlurEnabled;

@@ -1,29 +1,48 @@
 # better-frameless-window
 
-# features to be realized:
-1. 去除原生窗口边框
-2. 自定义标题栏组件
-3. 标题栏拖拽移动窗口
-4. 窗口边缘调整大小
-5. 窗口四角调整大小
-6. 最小化按钮功能
-7. 最大化与还原按钮功能
-8. 关闭按钮功能
-9. 双击标题栏最大化与还原
-10. 右键标题栏系统菜单
-11. Windows 贴靠布局支持
-12. Windows 贴靠辅助支持
-13. DWM 原生阴影
-14. Windows 11 原生圆角
-15. 云母效果支持
-16. 亚克力模糊效果支持
-17. 深色与浅色模式自适应
-18. 窗口边框强调色设置
-19. 任务栏图标显示
-20. 任务栏缩略图预览
-21. Alt+Tab 切换支持
-22. Alt+Space 系统菜单快捷键支持
-23. HiDPI 高分屏适配
-24. 多显示器适配
-25. 全屏模式支持
-26. 窗口焦点管理
+一个可复用的 **Qt6 Windows 无边框基础窗口**，只提供窗口壳能力：
+- 去原生边框 + 自定义标题栏
+- 标题栏拖拽、双击最大化/还原、右键系统菜单
+- 8 向边缘缩放、HiDPI 命中修正
+- Win10/11 视觉能力（阴影、圆角、深色、Mica/Acrylic）及降级
+
+项目不内置业务 UI。你可以把它当作基础窗体，在内容区挂载你自己的页面。
+
+## 最小接入
+
+```cpp
+#include <QApplication>
+#include <QLabel>
+#include "framelesswindow.h"
+
+int main(int argc, char *argv[])
+{
+	QApplication app(argc, argv);
+
+	FramelessWindow window;
+	auto *page = new QLabel("Your App Content");
+	page->setAlignment(Qt::AlignCenter);
+	window.setContentWidget(page);
+
+	window.show();
+	return app.exec();
+}
+```
+
+## 基础 API
+
+- `setCentralWidget(QWidget*)` / `centralWidget()` / `takeCentralWidget()`：主内容区接口（推荐，语义对齐 `QMainWindow`）。
+- `setContentWidget(QWidget*)` / `contentWidget()` / `takeContentWidget()`：与 `centralWidget` 等价的兼容接口。
+- `addTitleBarWidget(QWidget*)`：向标题栏中部插入自定义控件。
+- `clearTitleBarWidgets()`：清空标题栏插槽控件。
+- `setThemeMode(...)` / `setAccentColor(...)`：主题与强调色。
+- `setBackdropPreference(...)`：特效模式偏好，支持 `Auto / None / MicaSystem / MicaLegacy / Acrylic / Aero`。
+	- 当指定模式在当前系统不可用时，会自动回退到 `Auto` 可用链（除 `None`）。
+- `setShadowEnabled(...)` / `setBackdropEnabled(...)` / `setRoundedCornersEnabled(...)` / `setImmersiveDarkModeEnabled(...)` / `setAeroBlurEnabled(...)`：视觉能力开关。
+
+## 构建
+
+```bash
+cmake --preset windows-msvc-local-debug
+cmake --build --preset windows-msvc-local-debug
+```
