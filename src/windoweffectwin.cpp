@@ -1,6 +1,7 @@
 #include "windoweffectwin.h"
 
 #include "diagnostics.h"
+#include "winutils.h"
 
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
@@ -72,35 +73,6 @@ struct WINDOWCOMPOSITIONATTRIBDATA {
 };
 
 using SetWindowCompositionAttributePtr = BOOL(WINAPI *)(HWND, WINDOWCOMPOSITIONATTRIBDATA *);
-
-DWORD windowsBuildNumber()
-{
-    static DWORD cachedBuild = 0;
-    static bool initialized = false;
-    if (initialized) {
-        return cachedBuild;
-    }
-
-    initialized = true;
-    using RtlGetVersionPtr = LONG(WINAPI *)(PRTL_OSVERSIONINFOW);
-    HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
-    if (ntdll == nullptr) {
-        return cachedBuild;
-    }
-
-    const auto rtlGetVersion = reinterpret_cast<RtlGetVersionPtr>(GetProcAddress(ntdll, "RtlGetVersion"));
-    if (rtlGetVersion == nullptr) {
-        return cachedBuild;
-    }
-
-    RTL_OSVERSIONINFOW ver{};
-    ver.dwOSVersionInfoSize = sizeof(ver);
-    if (rtlGetVersion(&ver) == 0) {
-        cachedBuild = ver.dwBuildNumber;
-    }
-
-    return cachedBuild;
-}
 
 SetWindowCompositionAttributePtr getSetWindowCompositionAttribute()
 {
@@ -262,20 +234,20 @@ WindowEffectWin::BackdropMode WindowEffectWin::selectBackdropMode(void *hwnd,
         return BackdropMode::None;
     }
 
-    const DWORD build = windowsBuildNumber();
-    if (build >= 22621) {
+    const WinUtils::WindowsCapabilities caps = WinUtils::detectWindowsCapabilities();
+    if (caps.supportsSystemBackdrop) {
         return BackdropMode::MicaSystem;
     }
 
-    if (build >= 22000) {
+    if (caps.supportsLegacyMica) {
         return BackdropMode::MicaLegacy;
     }
 
-    if (build >= 17763 && getSetWindowCompositionAttribute() != nullptr) {
+    if (caps.supportsAcrylic && getSetWindowCompositionAttribute() != nullptr) {
         return BackdropMode::Acrylic;
     }
 
-    if (aeroBlurEnabled && build >= 7600 && build < 9200) {
+    if (aeroBlurEnabled && caps.supportsAeroBlur) {
         return BackdropMode::Aero;
     }
 #else

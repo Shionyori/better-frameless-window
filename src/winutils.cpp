@@ -122,6 +122,58 @@ void syncNativeWindowStyles(void *hwnd, bool includeExStyle)
 #endif
 }
 
+uint32_t windowsBuildNumber()
+{
+#ifdef Q_OS_WIN
+    static uint32_t cachedBuild = 0;
+    static bool initialized = false;
+    if (initialized) {
+        return cachedBuild;
+    }
+
+    initialized = true;
+
+    using RtlGetVersionPtr = LONG(WINAPI *)(PRTL_OSVERSIONINFOW);
+    HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+    if (ntdll == nullptr) {
+        return cachedBuild;
+    }
+
+    const auto rtlGetVersion = reinterpret_cast<RtlGetVersionPtr>(GetProcAddress(ntdll, "RtlGetVersion"));
+    if (rtlGetVersion == nullptr) {
+        return cachedBuild;
+    }
+
+    RTL_OSVERSIONINFOW ver{};
+    ver.dwOSVersionInfoSize = sizeof(ver);
+    if (rtlGetVersion(&ver) == 0) {
+        cachedBuild = static_cast<uint32_t>(ver.dwBuildNumber);
+    }
+
+    return cachedBuild;
+#else
+    return 0;
+#endif
+}
+
+WindowsCapabilities detectWindowsCapabilities()
+{
+    WindowsCapabilities caps;
+
+#ifdef Q_OS_WIN
+    caps.isWindows = true;
+    caps.buildNumber = windowsBuildNumber();
+    caps.supportsImmersiveDarkMode = caps.buildNumber >= 17763;
+    caps.supportsRoundedCorners = caps.buildNumber >= 22000;
+    caps.supportsSystemBackdrop = caps.buildNumber >= 22621;
+    caps.supportsLegacyMica = caps.buildNumber >= 22000;
+    caps.supportsAcrylic = caps.buildNumber >= 17763;
+    caps.supportsAeroBlur = caps.buildNumber >= 7600 && caps.buildNumber < 9200;
+#endif
+
+    return caps;
+}
+
 bool isOnMaximizeButton(const TitleBar *titleBar, const QWidget *hostWidget, const QPoint &localPos)
 {
     return titleBarButtonTypeAt(titleBar, hostWidget, localPos) == TitleBarButtonType::Maximize;
