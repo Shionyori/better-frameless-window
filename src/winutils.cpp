@@ -185,6 +185,29 @@ TitleBarButtonType titleBarButtonTypeAt(const TitleBar *titleBar, const QWidget 
         return TitleBarButtonType::None;
     }
 
+    auto hitByGeometry = [titleBar, hostWidget, localPos](const QString &name) -> bool {
+        const QPushButton *button = titleBar->findChild<QPushButton *>(name);
+        if (button == nullptr || !button->isVisible()) {
+            return false;
+        }
+
+        const QPoint topLeft = button->mapTo(hostWidget, QPoint(0, 0));
+        const QRect rectInHost(topLeft, button->size());
+        return rectInHost.contains(localPos);
+    };
+
+    if (hitByGeometry(QString::fromLatin1(kMinimizeButtonObjectName))) {
+        return TitleBarButtonType::Minimize;
+    }
+
+    if (hitByGeometry(QString::fromLatin1(kMaximizeButtonObjectName))) {
+        return TitleBarButtonType::Maximize;
+    }
+
+    if (hitByGeometry(QString::fromLatin1(kCloseButtonObjectName))) {
+        return TitleBarButtonType::Close;
+    }
+
     const QPoint titleBarPos = titleBar->mapFrom(hostWidget, localPos);
     QWidget *hovered = titleBar->childAt(titleBarPos);
     const auto *button = qobject_cast<QPushButton *>(hovered);

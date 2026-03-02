@@ -125,6 +125,10 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
             %1
             border: none;
         }
+        #FramelessContentPanel {
+            background: transparent;
+            border: none;
+        }
         TitleBar {
             background-color: %2;
             border-bottom: 1px solid %3;

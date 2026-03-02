@@ -24,6 +24,7 @@
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
 #include <windowsx.h>
+#include <dwmapi.h>
 
 #ifndef WM_NCUAHDRAWCAPTION
 #define WM_NCUAHDRAWCAPTION 0x00AE
@@ -49,17 +50,6 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_applyingTheme(false)
     , m_lastAppliedStyleSheet()
     , m_lastTranslucentBackground(false)
-    , m_visualEffectsStateCached(false)
-    , m_lastVisualShadowEnabled(false)
-    , m_lastVisualBackdropEnabled(false)
-    , m_lastVisualBackdropPreference(WindowEffectWin::BackdropPreference::Auto)
-    , m_lastVisualRoundedCornersEnabled(false)
-    , m_lastVisualImmersiveDarkModeEnabled(false)
-    , m_lastVisualAeroBlurEnabled(false)
-    , m_lastVisualUseDarkMode(false)
-    , m_lastVisualMaximized(false)
-    , m_lastVisualMinimized(false)
-    , m_lastVisualBorderColor()
     , m_loggedNullWindowHandle(false)
     , m_pendingStateVisualRefresh(false)
 {
@@ -343,6 +333,8 @@ void FramelessWindow::initLayout()
 
     m_titleBar = new TitleBar(this);
     m_contentPanel = new QWidget(this);
+    m_contentPanel->setObjectName("FramelessContentPanel");
+    m_contentPanel->setAttribute(Qt::WA_TranslucentBackground, true);
 
     auto *contentLayout = new QVBoxLayout(m_contentPanel);
     contentLayout->setContentsMargins(0, 0, 0, 0);
@@ -386,7 +378,21 @@ bool FramelessWindow::handleNativeWindowsMessage(void *message, qintptr *result)
 
     switch (msg->message) {
     case WM_NCHITTEST:
+    {
+        const HWND hwnd = reinterpret_cast<HWND>(winId());
+        if (hwnd != nullptr) {
+            LRESULT dwmResult = 0;
+            if (DwmDefWindowProc(hwnd,
+                                 msg->message,
+                                 msg->wParam,
+                                 msg->lParam,
+                                 &dwmResult)) {
+                *result = static_cast<qintptr>(dwmResult);
+                return true;
+            }
+        }
         return handleNcHitTestMessage(static_cast<qintptr>(msg->lParam), result);
+    }
     case WM_NCPAINT:
     case WM_NCUAHDRAWCAPTION:
     case WM_NCUAHDRAWFRAME:
@@ -405,8 +411,18 @@ bool FramelessWindow::handleNativeWindowsMessage(void *message, qintptr *result)
     case WM_MOUSELEAVE:
     case WM_CAPTURECHANGED:
     case WM_KILLFOCUS:
+        clearMaximizeButtonNativeHover();
+        return false;
     case WM_SIZE:
         clearMaximizeButtonNativeHover();
+        syncNativeWindowFrame();
+        if (msg->wParam == SIZE_RESTORED) {
+            QTimer::singleShot(50, this, [this]() {
+                scheduleStateVisualRefresh();
+            });
+        } else if (msg->wParam == SIZE_MAXIMIZED) {
+            scheduleStateVisualRefresh();
+        }
         return false;
     case WM_ACTIVATE:
         if (LOWORD(msg->wParam) == WA_INACTIVE) {
@@ -533,6 +549,22 @@ void FramelessWindow::changeEvent(QEvent *event)
     QWidget::changeEvent(event);
     if (event->type() == QEvent::WindowStateChange) {
         scheduleStateVisualRefresh();
+        QTimer::singleShot(200, this, [this]() {
+            if (!isVisible()) {
+                return;
+            }
+#ifdef Q_OS_WIN
+            const HWND hwndInsurance = reinterpret_cast<HWND>(winId());
+            if (hwndInsurance != nullptr) {
+                SetWindowPos(hwndInsurance, nullptr, 0, 0, 0, 0,
+                             SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+                if (m_backdropEnabled
+                    && m_backdropPreference == WindowEffectWin::BackdropPreference::Acrylic) {
+                    applyVisualEffects();
+                }
+            }
+#endif
+        });
     } else if (event->type() == QEvent::ActivationChange) {
         if (isActiveWindow()) {
             scheduleStateVisualRefresh();
@@ -550,23 +582,82 @@ void FramelessWindow::scheduleStateVisualRefresh()
     }
 
     m_pendingStateVisualRefresh = true;
-    QTimer::singleShot(0, this, [this]() {
+
+    const bool shouldBeTranslucent = shouldUseTranslucentBackground();
+    const bool needsReset = shouldBeTranslucent;
+
+    if (needsReset) {
+        setAttribute(Qt::WA_TranslucentBackground, false);
+
+#ifdef Q_OS_WIN
+        const HWND hwnd = reinterpret_cast<HWND>(winId());
+        if (hwnd != nullptr) {
+            m_windowEffect.applyBackdropEffects(reinterpret_cast<void *>(hwnd),
+                                                false,
+                                                shouldUseDarkMode(),
+                                                isMaximized(),
+                                                isMinimized(),
+                                                m_aeroBlurEnabled,
+                                                m_backdropPreference);
+            SetWindowPos(hwnd,
+                         nullptr,
+                         0,
+                         0,
+                         0,
+                         0,
+                         SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+        }
+#endif
+    }
+
+    QTimer::singleShot(50, this, [this, shouldBeTranslucent, needsReset]() {
+        if (shouldBeTranslucent) {
+            setAttribute(Qt::WA_TranslucentBackground, true);
+        }
+
         m_pendingStateVisualRefresh = false;
         applyTheme();
         syncNativeWindowFrame();
-        m_visualEffectsStateCached = false;
         applyVisualEffects();
         updateMaximizeButtonState();
+        if (needsReset) {
+            forceNativeDwmRefresh();
+        }
+        update();
 
-        QTimer::singleShot(30, this, [this]() {
+        QTimer::singleShot(150, this, [this, shouldBeTranslucent]() {
             if (!isVisible()) {
                 return;
             }
 
+            if (shouldBeTranslucent != testAttribute(Qt::WA_TranslucentBackground)) {
+                setAttribute(Qt::WA_TranslucentBackground, shouldBeTranslucent);
+            }
+
             applyTheme();
             syncNativeWindowFrame();
-            m_visualEffectsStateCached = false;
             applyVisualEffects();
+            forceNativeDwmRefresh();
+            update();
+            repaint();
+
+            QTimer::singleShot(100, this, [this]() {
+                if (!isVisible()) {
+                    return;
+                }
+
+                update();
+                repaint();
+#ifdef Q_OS_WIN
+                const HWND hwnd = reinterpret_cast<HWND>(winId());
+                if (hwnd != nullptr) {
+                    RedrawWindow(hwnd,
+                                 nullptr,
+                                 nullptr,
+                                 RDW_INVALIDATE | RDW_UPDATENOW | RDW_FRAME | RDW_ALLCHILDREN);
+                }
+#endif
+            });
         });
     });
 }
@@ -638,11 +729,30 @@ void FramelessWindow::applyTheme()
 void FramelessWindow::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
-    applyTheme();
     ensureNativeResizeStyle();
-    syncNativeWindowFrame();
-    m_visualEffectsStateCached = false;
-    applyVisualEffects();
+    scheduleStateVisualRefresh();
+}
+
+void FramelessWindow::forceNativeDwmRefresh()
+{
+#ifdef Q_OS_WIN
+    const HWND hwnd = reinterpret_cast<HWND>(winId());
+    if (hwnd == nullptr) {
+        return;
+    }
+
+    SetWindowPos(hwnd,
+                 nullptr,
+                 0,
+                 0,
+                 0,
+                 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    RedrawWindow(hwnd,
+                 nullptr,
+                 nullptr,
+                 RDW_INVALIDATE | RDW_UPDATENOW | RDW_FRAME | RDW_ALLCHILDREN);
+#endif
 }
 
 void FramelessWindow::mousePressEvent(QMouseEvent *event)
@@ -837,8 +947,65 @@ void FramelessWindow::toggleMaximizeRestore()
         return;
     }
 
+    const bool wasTranslucentBefore = testAttribute(Qt::WA_TranslucentBackground);
+    if (wasTranslucentBefore) {
+        m_windowEffect.applyBackdropEffects(reinterpret_cast<void *>(hwnd),
+                                            false,
+                                            shouldUseDarkMode(),
+                                            isMaximized(),
+                                            isMinimized(),
+                                            m_aeroBlurEnabled,
+                                            m_backdropPreference);
+        setAttribute(Qt::WA_TranslucentBackground, false);
+        SetWindowPos(hwnd,
+                     nullptr,
+                     0,
+                     0,
+                     0,
+                     0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    }
+
     const WPARAM command = isMaximized() ? SC_RESTORE : SC_MAXIMIZE;
-    PostMessage(hwnd, WM_SYSCOMMAND, command, 0);
+    SendMessage(hwnd, WM_SYSCOMMAND, command, 0);
+
+    if (wasTranslucentBefore) {
+        QTimer::singleShot(300, this, [this]() {
+            if (!isVisible()) {
+                return;
+            }
+
+            if (shouldUseTranslucentBackground() && !testAttribute(Qt::WA_TranslucentBackground)) {
+                setAttribute(Qt::WA_TranslucentBackground, true);
+            }
+            applyTheme();
+            syncNativeWindowFrame();
+            applyVisualEffects();
+            const HWND refreshHwnd = reinterpret_cast<HWND>(winId());
+            if (refreshHwnd != nullptr) {
+                SetWindowPos(refreshHwnd, nullptr, 0, 0, 0, 0,
+                             SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+                RedrawWindow(refreshHwnd,
+                             nullptr,
+                             nullptr,
+                             RDW_INVALIDATE | RDW_UPDATENOW | RDW_FRAME | RDW_ALLCHILDREN);
+            }
+
+            QTimer::singleShot(100, this, [this]() {
+                if (!isVisible() || !shouldUseTranslucentBackground()) {
+                    return;
+                }
+
+                if (!testAttribute(Qt::WA_TranslucentBackground)) {
+                    setAttribute(Qt::WA_TranslucentBackground, true);
+                }
+
+                applyVisualEffects();
+                update();
+                repaint();
+            });
+        });
+    }
 #else
     if (isMaximized()) {
         showNormal();
@@ -967,7 +1134,11 @@ void FramelessWindow::syncNativeWindowFrame()
 {
 #ifdef Q_OS_WIN
     void *hwnd = reinterpret_cast<void *>(winId());
-    WinUtils::syncNativeWindowStyles(hwnd, false);
+    // Use full style sync (including ex-style and WS_POPUP cleanup) every time.
+    // WA_TranslucentBackground/state transitions may recreate or mutate native
+    // styles, and partial sync can leave the window in a popup-like state where
+    // Snap Layout (HTMAXBUTTON path) and DWM effects become inconsistent.
+    WinUtils::syncNativeWindowStyles(hwnd, true);
 #endif
 }
 
@@ -982,6 +1153,13 @@ void FramelessWindow::applyVisualEffects()
     }
 
     m_loggedNullWindowHandle = false;
+
+    // Sync WA_TranslucentBackground with expected state before applying native effects.
+    // Guards against direct applyVisualEffects() calls that bypass applyTheme().
+    const bool shouldBeTranslucent = shouldUseTranslucentBackground();
+    if (shouldBeTranslucent != testAttribute(Qt::WA_TranslucentBackground)) {
+        setAttribute(Qt::WA_TranslucentBackground, shouldBeTranslucent);
+    }
 
     WindowEffectWin::VisualEffectOptions options;
     options.shadowEnabled = m_shadowEnabled;
@@ -1002,18 +1180,6 @@ void FramelessWindow::applyVisualEffects()
     }
 
     m_windowEffect.applyVisualEffects(hwnd, options);
-
-    m_visualEffectsStateCached = true;
-    m_lastVisualShadowEnabled = options.shadowEnabled;
-    m_lastVisualBackdropEnabled = options.backdropEnabled;
-    m_lastVisualBackdropPreference = options.backdropPreference;
-    m_lastVisualRoundedCornersEnabled = options.roundedCornersEnabled;
-    m_lastVisualImmersiveDarkModeEnabled = options.immersiveDarkModeEnabled;
-    m_lastVisualAeroBlurEnabled = options.aeroBlurEnabled;
-    m_lastVisualUseDarkMode = options.useDarkMode;
-    m_lastVisualMaximized = options.maximized;
-    m_lastVisualMinimized = options.minimized;
-    m_lastVisualBorderColor = options.borderColor;
 }
 
 bool FramelessWindow::shouldUseDarkMode() const

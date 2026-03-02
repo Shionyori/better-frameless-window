@@ -77,6 +77,7 @@ protected:
     bool tryStartSystemResizeAtGlobalPos(const QPoint &globalPos);
     void ensureNativeResizeStyle();
     void syncNativeWindowFrame();
+    void forceNativeDwmRefresh();
     void applyVisualEffects();
     void scheduleStateVisualRefresh();
     bool shouldUseTranslucentBackground() const;
@@ -110,17 +111,6 @@ private:
     bool m_applyingTheme;
     QString m_lastAppliedStyleSheet;
     bool m_lastTranslucentBackground;
-    bool m_visualEffectsStateCached;
-    bool m_lastVisualShadowEnabled;
-    bool m_lastVisualBackdropEnabled;
-    WindowEffectWin::BackdropPreference m_lastVisualBackdropPreference;
-    bool m_lastVisualRoundedCornersEnabled;
-    bool m_lastVisualImmersiveDarkModeEnabled;
-    bool m_lastVisualAeroBlurEnabled;
-    bool m_lastVisualUseDarkMode;
-    bool m_lastVisualMaximized;
-    bool m_lastVisualMinimized;
-    QColor m_lastVisualBorderColor;
     bool m_loggedNullWindowHandle;
     bool m_pendingStateVisualRefresh;
     ThemeManager m_themeManager;

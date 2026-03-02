@@ -134,7 +134,16 @@ void applyAcrylicAccent(HWND hwnd, bool enable, bool useDarkMode)
     data.Attrib = WCA_ACCENT_POLICY;
     data.pvData = &accent;
     data.cbData = sizeof(accent);
-    setWindowCompositionAttribute(hwnd, &data);
+    const BOOL ok = setWindowCompositionAttribute(hwnd, &data);
+    if (ok && enable) {
+        SetWindowPos(hwnd,
+                     nullptr,
+                     0,
+                     0,
+                     0,
+                     0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    }
 }
 }
 #endif
@@ -176,13 +185,29 @@ void WindowEffectWin::applyShadow(void *hwnd, bool enabled, bool maximized, bool
 
     const bool enableShadow = enabled && !maximized && !minimized;
     const DWMNCRENDERINGPOLICY policy = enableShadow ? DWMNCRP_ENABLED : DWMNCRP_DISABLED;
-    DwmSetWindowAttribute(win,
-                          DWMWA_NCRENDERING_POLICY,
-                          &policy,
-                          sizeof(policy));
+    static bool ncRenderingPolicyValid = true;
+    if (ncRenderingPolicyValid) {
+        const HRESULT policyHr = DwmSetWindowAttribute(win,
+                                                       DWMWA_NCRENDERING_POLICY,
+                                                       &policy,
+                                                       sizeof(policy));
+        if (FAILED(policyHr)) {
+            ncRenderingPolicyValid = false;
+            Diagnostics::logWarning(QStringLiteral("applyShadow: DWMWA_NCRENDERING_POLICY failed (hr=0x%1), disable subsequent calls")
+                                        .arg(QString::number(static_cast<qulonglong>(policyHr), 16)));
+        }
+    }
 
     const MARGINS margins = enableShadow ? MARGINS{1, 1, 1, 1} : MARGINS{0, 0, 0, 0};
-    DwmExtendFrameIntoClientArea(win, &margins);
+    static bool extendFrameValid = true;
+    if (extendFrameValid) {
+        const HRESULT marginsHr = DwmExtendFrameIntoClientArea(win, &margins);
+        if (FAILED(marginsHr)) {
+            extendFrameValid = false;
+            Diagnostics::logWarning(QStringLiteral("applyShadow: DwmExtendFrameIntoClientArea failed (hr=0x%1), disable subsequent calls")
+                                        .arg(QString::number(static_cast<qulonglong>(marginsHr), 16)));
+        }
+    }
 #else
     (void) hwnd;
     (void) enabled;
@@ -363,25 +388,15 @@ void WindowEffectWin::applyBackdropEffects(void *hwnd,
 
     Q_UNUSED(maximized)
 
+    if (minimized) {
+        applyAcrylicAccent(win, false, useDarkMode);
+        applyAeroBlur(hwnd, false);
+        return;
+    }
+
     const WinUtils::WindowsCapabilities caps = WinUtils::detectWindowsCapabilities();
     const bool acrylicAvailable = caps.supportsAcrylic && getSetWindowCompositionAttribute() != nullptr;
     const bool wantsBackdrop = enabled && !minimized && backdropPreference != BackdropPreference::None;
-
-    if (caps.supportsSystemBackdrop) {
-        const DWORD noneBackdrop = DWMSBT_NONE;
-        DwmSetWindowAttribute(win,
-                              DWMWA_SYSTEMBACKDROP_TYPE,
-                              &noneBackdrop,
-                              sizeof(noneBackdrop));
-    }
-
-    if (caps.supportsLegacyMica) {
-        const BOOL disableLegacyMica = FALSE;
-        DwmSetWindowAttribute(win,
-                              DWMWA_MICA_EFFECT,
-                              &disableLegacyMica,
-                              sizeof(disableLegacyMica));
-    }
 
     if (!wantsBackdrop) {
         applyAcrylicAccent(win, false, useDarkMode);
@@ -398,15 +413,9 @@ void WindowEffectWin::applyBackdropEffects(void *hwnd,
     if (acrylicAvailable) {
         applyAcrylicAccent(win, true, useDarkMode);
         applyAeroBlur(hwnd, false);
+        // Extra RedrawWindow to ensure DWM immediately resolves the Acrylic layer
+        RedrawWindow(win, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_FRAME | RDW_ALLCHILDREN);
         return;
-    }
-
-    if (caps.supportsSystemBackdrop) {
-        const DWORD backdrop = DWMSBT_MAINWINDOW;
-        DwmSetWindowAttribute(win,
-                              DWMWA_SYSTEMBACKDROP_TYPE,
-                              &backdrop,
-                              sizeof(backdrop));
     }
 
     applyAcrylicAccent(win, false, useDarkMode);
