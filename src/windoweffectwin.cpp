@@ -121,10 +121,10 @@ void applyAcrylicAccent(HWND hwnd, bool enable, bool useDarkMode)
     if (enable) {
         accent.AccentState = ACCENT_ENABLE_ACRYLICBLURBEHIND;
         accent.AccentFlags = 2;
-        const int alpha = useDarkMode ? 0x66 : 0x7A;
-        const int red = useDarkMode ? 0x12 : 0xF3;
-        const int green = useDarkMode ? 0x12 : 0xF4;
-        const int blue = useDarkMode ? 0x12 : 0xF6;
+        const int alpha = useDarkMode ? 0x74 : 0x88;
+        const int red = useDarkMode ? 0x18 : 0xF0;
+        const int green = useDarkMode ? 0x18 : 0xF0;
+        const int blue = useDarkMode ? 0x18 : 0xF0;
         accent.GradientColor = (alpha << 24) | (blue << 16) | (green << 8) | red;
     } else {
         accent.AccentState = ACCENT_DISABLED;
@@ -200,12 +200,22 @@ void WindowEffectWin::applyRoundedCorners(void *hwnd, bool enabled, bool maximiz
         return;
     }
 
+    static bool roundedCornersAttributeValid = true;
+    if (!roundedCornersAttributeValid) {
+        return;
+    }
+
     const bool enableRoundedCorners = enabled && !maximized && !minimized;
     const DWORD corner = enableRoundedCorners ? DWMWCP_ROUND : DWMWCP_DONOTROUND;
-    DwmSetWindowAttribute(win,
-                          DWMWA_WINDOW_CORNER_PREFERENCE,
-                          &corner,
-                          sizeof(corner));
+    const HRESULT hr = DwmSetWindowAttribute(win,
+                                             DWMWA_WINDOW_CORNER_PREFERENCE,
+                                             &corner,
+                                             sizeof(corner));
+    if (FAILED(hr)) {
+        roundedCornersAttributeValid = false;
+        Diagnostics::logWarning(QStringLiteral("applyRoundedCorners: DWMWA_WINDOW_CORNER_PREFERENCE failed (hr=0x%1), disable subsequent calls")
+                                    .arg(QString::number(static_cast<qulonglong>(hr), 16)));
+    }
 #else
     (void) hwnd;
     (void) enabled;
@@ -223,17 +233,37 @@ void WindowEffectWin::applyImmersiveDarkMode(void *hwnd, bool enabled, bool useD
         return;
     }
 
+    static bool darkMode20Valid = true;
+    static bool darkMode19Valid = true;
+    if (!darkMode20Valid && !darkMode19Valid) {
+        return;
+    }
+
     const BOOL darkEnabled = (enabled && useDarkMode) ? TRUE : FALSE;
-    HRESULT result = DwmSetWindowAttribute(win,
-                                           DWMWA_USE_IMMERSIVE_DARK_MODE,
-                                           &darkEnabled,
-                                           sizeof(darkEnabled));
-    if (FAILED(result)) {
-        Diagnostics::logWarning(QStringLiteral("applyImmersiveDarkMode: DWMWA_USE_IMMERSIVE_DARK_MODE failed, fallback to legacy attribute"));
-        DwmSetWindowAttribute(win,
-                              DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
-                              &darkEnabled,
-                              sizeof(darkEnabled));
+    if (darkMode20Valid) {
+        const HRESULT result = DwmSetWindowAttribute(win,
+                                                     DWMWA_USE_IMMERSIVE_DARK_MODE,
+                                                     &darkEnabled,
+                                                     sizeof(darkEnabled));
+        if (SUCCEEDED(result)) {
+            return;
+        }
+
+        darkMode20Valid = false;
+        Diagnostics::logWarning(QStringLiteral("applyImmersiveDarkMode: DWMWA_USE_IMMERSIVE_DARK_MODE failed (hr=0x%1), fallback to legacy attribute")
+                                    .arg(QString::number(static_cast<qulonglong>(result), 16)));
+    }
+
+    if (darkMode19Valid) {
+        const HRESULT legacyResult = DwmSetWindowAttribute(win,
+                                                            DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
+                                                            &darkEnabled,
+                                                            sizeof(darkEnabled));
+        if (FAILED(legacyResult)) {
+            darkMode19Valid = false;
+            Diagnostics::logWarning(QStringLiteral("applyImmersiveDarkMode: legacy dark mode attribute failed (hr=0x%1), disable subsequent calls")
+                                        .arg(QString::number(static_cast<qulonglong>(legacyResult), 16)));
+        }
     }
 #else
     (void) hwnd;
@@ -250,7 +280,9 @@ WindowEffectWin::BackdropMode WindowEffectWin::selectBackdropMode(void *hwnd,
                                                                   BackdropPreference backdropPreference) const
 {
 #ifdef Q_OS_WIN
-    if (!enabled || hwnd == nullptr || minimized || maximized) {
+    Q_UNUSED(maximized)
+
+    if (!enabled || hwnd == nullptr || minimized) {
         return BackdropMode::None;
     }
 
@@ -329,77 +361,56 @@ void WindowEffectWin::applyBackdropEffects(void *hwnd,
         return;
     }
 
+    Q_UNUSED(maximized)
+
     const WinUtils::WindowsCapabilities caps = WinUtils::detectWindowsCapabilities();
     const bool acrylicAvailable = caps.supportsAcrylic && getSetWindowCompositionAttribute() != nullptr;
+    const bool wantsBackdrop = enabled && !minimized && backdropPreference != BackdropPreference::None;
 
-    BackdropMode mode = selectBackdropMode(hwnd,
-                                           enabled,
-                                           maximized,
-                                           minimized,
-                                           aeroBlurEnabled,
-                                           backdropPreference);
-    Diagnostics::logWarning(QStringLiteral("applyBackdropEffects: resolved mode = %1")
-                                .arg(backdropModeToString(mode)));
-    if (mode == BackdropMode::MicaSystem) {
-        const DWORD backdrop = DWMSBT_MAINWINDOW;
-        const HRESULT hr = DwmSetWindowAttribute(win,
-                                                 DWMWA_SYSTEMBACKDROP_TYPE,
-                                                 &backdrop,
-                                                 sizeof(backdrop));
-        if (SUCCEEDED(hr)) {
-            const BOOL disableLegacyMica = FALSE;
-            DwmSetWindowAttribute(win,
-                                  DWMWA_MICA_EFFECT,
-                                  &disableLegacyMica,
-                                  sizeof(disableLegacyMica));
-            applyAcrylicAccent(win, false, useDarkMode);
-            applyAeroBlur(hwnd, false);
-            return;
-        }
-
-        Diagnostics::logWarning(QStringLiteral("applyBackdropEffects: DWMWA_SYSTEMBACKDROP_TYPE failed, fallback to legacy Mica"));
-        mode = BackdropMode::MicaLegacy;
+    if (caps.supportsSystemBackdrop) {
+        const DWORD noneBackdrop = DWMSBT_NONE;
+        DwmSetWindowAttribute(win,
+                              DWMWA_SYSTEMBACKDROP_TYPE,
+                              &noneBackdrop,
+                              sizeof(noneBackdrop));
     }
 
-    const DWORD noneBackdrop = DWMSBT_NONE;
-    DwmSetWindowAttribute(win,
-                          DWMWA_SYSTEMBACKDROP_TYPE,
-                          &noneBackdrop,
-                          sizeof(noneBackdrop));
-
-    if (mode == BackdropMode::MicaLegacy) {
-        const BOOL enableLegacyMica = TRUE;
-        const HRESULT legacyHr = DwmSetWindowAttribute(win,
-                                                       DWMWA_MICA_EFFECT,
-                                                       &enableLegacyMica,
-                                                       sizeof(enableLegacyMica));
-        if (FAILED(legacyHr)) {
-            Diagnostics::logWarning(QStringLiteral("applyBackdropEffects: DWMWA_MICA_EFFECT failed, fallback to next available backdrop"));
-            if (acrylicAvailable) {
-                mode = BackdropMode::Acrylic;
-            } else if (aeroBlurEnabled && caps.supportsAeroBlur) {
-                mode = BackdropMode::Aero;
-            } else {
-                mode = BackdropMode::None;
-            }
-        }
-    }
-
-    const BOOL disableLegacyMica = FALSE;
-    if (mode != BackdropMode::MicaLegacy) {
+    if (caps.supportsLegacyMica) {
+        const BOOL disableLegacyMica = FALSE;
         DwmSetWindowAttribute(win,
                               DWMWA_MICA_EFFECT,
                               &disableLegacyMica,
                               sizeof(disableLegacyMica));
     }
 
-    if (mode == BackdropMode::Acrylic) {
-        applyAcrylicAccent(win, true, useDarkMode);
-    } else {
+    if (!wantsBackdrop) {
         applyAcrylicAccent(win, false, useDarkMode);
+        applyAeroBlur(hwnd, false);
+        return;
     }
 
-    applyAeroBlur(hwnd, mode == BackdropMode::Aero);
+    if (backdropPreference == BackdropPreference::Aero && aeroBlurEnabled && caps.supportsAeroBlur) {
+        applyAcrylicAccent(win, false, useDarkMode);
+        applyAeroBlur(hwnd, true);
+        return;
+    }
+
+    if (acrylicAvailable) {
+        applyAcrylicAccent(win, true, useDarkMode);
+        applyAeroBlur(hwnd, false);
+        return;
+    }
+
+    if (caps.supportsSystemBackdrop) {
+        const DWORD backdrop = DWMSBT_MAINWINDOW;
+        DwmSetWindowAttribute(win,
+                              DWMWA_SYSTEMBACKDROP_TYPE,
+                              &backdrop,
+                              sizeof(backdrop));
+    }
+
+    applyAcrylicAccent(win, false, useDarkMode);
+    applyAeroBlur(hwnd, false);
 #else
     (void) hwnd;
     (void) enabled;
@@ -444,11 +455,26 @@ void WindowEffectWin::applyBorderColor(void *hwnd, const QColor &borderColor) co
         return;
     }
 
+    static bool borderColorAttributeValid = true;
+    if (!borderColorAttributeValid) {
+        return;
+    }
+
+    const WinUtils::WindowsCapabilities caps = WinUtils::detectWindowsCapabilities();
+    if (!caps.supportsLegacyMica && !caps.supportsSystemBackdrop) {
+        return;
+    }
+
     const COLORREF colorRef = RGB(borderColor.red(), borderColor.green(), borderColor.blue());
-    DwmSetWindowAttribute(win,
-                          DWMWA_BORDER_COLOR,
-                          &colorRef,
-                          sizeof(colorRef));
+    const HRESULT hr = DwmSetWindowAttribute(win,
+                                             DWMWA_BORDER_COLOR,
+                                             &colorRef,
+                                             sizeof(colorRef));
+    if (FAILED(hr)) {
+        borderColorAttributeValid = false;
+        Diagnostics::logWarning(QStringLiteral("applyBorderColor: DWMWA_BORDER_COLOR failed (hr=0x%1), disable subsequent calls")
+                                    .arg(QString::number(static_cast<qulonglong>(hr), 16)));
+    }
 #else
     (void) hwnd;
     (void) borderColor;

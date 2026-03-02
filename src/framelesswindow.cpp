@@ -17,6 +17,7 @@
 #include <QShowEvent>
 #include <QStyle>
 #include <QStyleOption>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QWindow>
 
@@ -46,6 +47,21 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_immersiveDarkModeEnabled(true)
     , m_aeroBlurEnabled(true)
     , m_applyingTheme(false)
+    , m_lastAppliedStyleSheet()
+    , m_lastTranslucentBackground(false)
+    , m_visualEffectsStateCached(false)
+    , m_lastVisualShadowEnabled(false)
+    , m_lastVisualBackdropEnabled(false)
+    , m_lastVisualBackdropPreference(WindowEffectWin::BackdropPreference::Auto)
+    , m_lastVisualRoundedCornersEnabled(false)
+    , m_lastVisualImmersiveDarkModeEnabled(false)
+    , m_lastVisualAeroBlurEnabled(false)
+    , m_lastVisualUseDarkMode(false)
+    , m_lastVisualMaximized(false)
+    , m_lastVisualMinimized(false)
+    , m_lastVisualBorderColor()
+    , m_loggedNullWindowHandle(false)
+    , m_pendingStateVisualRefresh(false)
 {
     initWindow();
     initLayout();
@@ -516,14 +532,43 @@ void FramelessWindow::changeEvent(QEvent *event)
 {
     QWidget::changeEvent(event);
     if (event->type() == QEvent::WindowStateChange) {
-        applyTheme();
-        syncNativeWindowFrame();
-        applyVisualEffects();
-        updateMaximizeButtonState();
+        scheduleStateVisualRefresh();
+    } else if (event->type() == QEvent::ActivationChange) {
+        if (isActiveWindow()) {
+            scheduleStateVisualRefresh();
+        }
     } else if (event->type() == QEvent::ApplicationPaletteChange
                || event->type() == QEvent::PaletteChange) {
         applyVisualEffects();
     }
+}
+
+void FramelessWindow::scheduleStateVisualRefresh()
+{
+    if (m_pendingStateVisualRefresh) {
+        return;
+    }
+
+    m_pendingStateVisualRefresh = true;
+    QTimer::singleShot(0, this, [this]() {
+        m_pendingStateVisualRefresh = false;
+        applyTheme();
+        syncNativeWindowFrame();
+        m_visualEffectsStateCached = false;
+        applyVisualEffects();
+        updateMaximizeButtonState();
+
+        QTimer::singleShot(30, this, [this]() {
+            if (!isVisible()) {
+                return;
+            }
+
+            applyTheme();
+            syncNativeWindowFrame();
+            m_visualEffectsStateCached = false;
+            applyVisualEffects();
+        });
+    });
 }
 
 bool FramelessWindow::eventFilter(QObject *watched, QEvent *event)
@@ -581,14 +626,22 @@ void FramelessWindow::applyTheme()
     QScopedValueRollback<bool> applyingGuard(m_applyingTheme, true);
     const bool useTranslucentBackground = shouldUseTranslucentBackground();
     setAttribute(Qt::WA_TranslucentBackground, useTranslucentBackground);
-    setStyleSheet(m_themeManager.buildStyleSheet(useTranslucentBackground));
+    m_lastTranslucentBackground = useTranslucentBackground;
+
+    const QString styleSheet = m_themeManager.buildStyleSheet(useTranslucentBackground);
+    if (m_lastAppliedStyleSheet != styleSheet) {
+        setStyleSheet(styleSheet);
+        m_lastAppliedStyleSheet = styleSheet;
+    }
 }
 
 void FramelessWindow::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
+    applyTheme();
     ensureNativeResizeStyle();
     syncNativeWindowFrame();
+    m_visualEffectsStateCached = false;
     applyVisualEffects();
 }
 
@@ -805,8 +858,6 @@ void FramelessWindow::startSystemMove()
 void FramelessWindow::showSystemMenu(const QPoint &globalPos)
 {
 #ifdef Q_OS_WIN
-    Q_UNUSED(globalPos)
-
     const HWND hwnd = reinterpret_cast<HWND>(winId());
     if (hwnd == nullptr) {
         Diagnostics::logWarning(QStringLiteral("showSystemMenu: null HWND"));
@@ -820,9 +871,7 @@ void FramelessWindow::showSystemMenu(const QPoint &globalPos)
     }
 
     updateSystemMenuState(reinterpret_cast<void *>(menu));
-
-    POINT cursorPos{};
-    GetCursorPos(&cursorPos);
+    const POINT cursorPos{globalPos.x(), globalPos.y()};
 
     UINT flags = TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON;
     const int command = TrackPopupMenu(menu, flags, cursorPos.x, cursorPos.y, 0, hwnd, nullptr);
@@ -874,8 +923,6 @@ void FramelessWindow::updateMaximizeButtonState()
     }
 
     m_titleBar->setMaximized(isMaximized());
-
-    setWindowTitle(isMaximized() ? QStringLiteral("Better Frameless Window (Maximized)") : QStringLiteral("Better Frameless Window"));
 }
 
 void FramelessWindow::updateCursorForPosition(const QPoint &localPos)
@@ -927,9 +974,14 @@ void FramelessWindow::syncNativeWindowFrame()
 void FramelessWindow::applyVisualEffects()
 {
     if (windowHandle() == nullptr) {
-        Diagnostics::logWarning(QStringLiteral("applyVisualEffects skipped: windowHandle is null"));
+        if (!m_loggedNullWindowHandle) {
+            Diagnostics::logWarning(QStringLiteral("applyVisualEffects skipped: windowHandle is null"));
+            m_loggedNullWindowHandle = true;
+        }
         return;
     }
+
+    m_loggedNullWindowHandle = false;
 
     WindowEffectWin::VisualEffectOptions options;
     options.shadowEnabled = m_shadowEnabled;
@@ -950,6 +1002,18 @@ void FramelessWindow::applyVisualEffects()
     }
 
     m_windowEffect.applyVisualEffects(hwnd, options);
+
+    m_visualEffectsStateCached = true;
+    m_lastVisualShadowEnabled = options.shadowEnabled;
+    m_lastVisualBackdropEnabled = options.backdropEnabled;
+    m_lastVisualBackdropPreference = options.backdropPreference;
+    m_lastVisualRoundedCornersEnabled = options.roundedCornersEnabled;
+    m_lastVisualImmersiveDarkModeEnabled = options.immersiveDarkModeEnabled;
+    m_lastVisualAeroBlurEnabled = options.aeroBlurEnabled;
+    m_lastVisualUseDarkMode = options.useDarkMode;
+    m_lastVisualMaximized = options.maximized;
+    m_lastVisualMinimized = options.minimized;
+    m_lastVisualBorderColor = options.borderColor;
 }
 
 bool FramelessWindow::shouldUseDarkMode() const
@@ -960,7 +1024,7 @@ bool FramelessWindow::shouldUseDarkMode() const
 bool FramelessWindow::shouldUseTranslucentBackground() const
 {
 #ifdef Q_OS_WIN
-    if (!m_backdropEnabled || isMaximized() || isMinimized()) {
+    if (!m_backdropEnabled || isMinimized()) {
         return false;
     }
 
@@ -993,12 +1057,7 @@ bool FramelessWindow::shouldUseTranslucentBackground() const
 
 QColor FramelessWindow::preferredBorderColor() const
 {
-    const QColor accent = m_themeManager.accentColor();
-    if (!accent.isValid()) {
-        return QColor(185, 192, 202);
-    }
-
-    return shouldUseDarkMode() ? accent.lighter(125) : accent.darker(115);
+    return QColor();
 }
 
 Qt::CursorShape FramelessWindow::cursorForEdges(Qt::Edges edges) const

@@ -19,12 +19,13 @@ QString buildWindowBackgroundRule(ThemeManager::BackgroundMode mode,
                                   bool transparentWindowBackground,
                                   const QString &backgroundImagePath)
 {
+    Q_UNUSED(dark)
+    // Keep a stable translucent white layer for Acrylic in both normal and maximized states.
+    const QString translucentBase = QStringLiteral("rgba(255, 255, 255, 0.30)");
+
     if (transparentWindowBackground) {
-        const QString hitTestSafeColor = dark
-                                             ? QStringLiteral("rgba(0, 0, 0, 1)")
-                                             : QStringLiteral("rgba(255, 255, 255, 1)");
         return QStringLiteral("background-color: %1; background-image: none;")
-            .arg(hitTestSafeColor);
+            .arg(translucentBase);
     }
 
     QString windowBackgroundRule = QStringLiteral("background-color: %1;").arg(colorToCss(windowBg));
@@ -110,7 +111,7 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
     const QColor contentColor = dark ? QColor(210, 210, 210) : QColor(68, 68, 68);
     const QColor buttonHover = dark ? QColor(68, 68, 68) : QColor(232, 232, 232);
     const QColor buttonPressed = dark ? QColor(84, 84, 84) : QColor(216, 216, 216);
-    const QColor accentHover = m_accentColor;
+    const QColor disabledColor = textColor.lighter(160);
     const QColor closeHover = QColor(232, 17, 35);
 
     const QString windowBackgroundRule = buildWindowBackgroundRule(m_backgroundMode,
@@ -122,18 +123,18 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
     return QStringLiteral(R"(
         #FramelessWindow {
             %1
-            border: 1px solid %2;
+            border: none;
         }
         TitleBar {
-            background-color: %3;
-            border-bottom: 1px solid %4;
+            background-color: %2;
+            border-bottom: 1px solid %3;
         }
         #TitleBarLabel {
-            color: %5;
+            color: %4;
             font-weight: 600;
         }
         #ContentLabel {
-            color: %6;
+            color: %5;
             font-size: 18px;
         }
         #TitleBarMinimizeButton,
@@ -141,41 +142,40 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
         #TitleBarCloseButton {
             border: none;
             background: transparent;
-            color: %5;
+            color: %4;
             font-size: 14px;
         }
         #TitleBarMinimizeButton:hover,
         #TitleBarMaximizeButton:hover,
         #TitleBarMaximizeButton[nativeHover="true"] {
-            background: %7;
+            background: %6;
         }
         #TitleBarMinimizeButton:pressed,
         #TitleBarMaximizeButton:pressed {
-            background: %8;
+            background: %7;
         }
         #TitleBarMinimizeButton:disabled,
         #TitleBarMaximizeButton:disabled,
         #TitleBarCloseButton:disabled {
-            color: %9;
+            color: %8;
         }
         #TitleBarCloseButton:hover {
-            background: %10;
+            background: %9;
             color: white;
         }
         #TitleBarCloseButton:pressed {
-            background: %11;
+            background: %10;
             color: white;
         }
     )")
-        .arg(windowBackgroundRule,
-             colorToCss(windowBorder),
-             colorToCss(titleBg),
-             colorToCss(titleBorder),
-             colorToCss(textColor),
-             colorToCss(contentColor),
-             colorToCss(buttonHover),
-             colorToCss(buttonPressed),
-             colorToCss(accentHover),
-             colorToCss(closeHover),
-             colorToCss(closeHover.darker(115)));
+           .arg(windowBackgroundRule,
+               colorToCss(titleBg),
+               colorToCss(titleBorder),
+               colorToCss(textColor),
+               colorToCss(contentColor),
+               colorToCss(buttonHover),
+               colorToCss(buttonPressed),
+               colorToCss(disabledColor),
+               colorToCss(closeHover),
+               colorToCss(closeHover.darker(115)));
 }

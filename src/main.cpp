@@ -10,6 +10,9 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
 
     FramelessWindow window;
+    window.setDiagnosticsEnabled(true); // enable diagnostics logging for visual effect debugging
+    window.setThemeMode(ThemeManager::ThemeMode::Light);
+    window.setBackgroundMode(ThemeManager::BackgroundMode::Solid);
     window.setBackdropEnabled(true);
     window.setBackdropPreference(WindowEffectWin::BackdropPreference::Acrylic);
 
