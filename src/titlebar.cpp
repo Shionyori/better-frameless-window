@@ -87,6 +87,36 @@ void TitleBar::clearCenterWidgets()
     }
 }
 
+TitleBar::HitRegion TitleBar::hitRegionAt(const QPoint &pos) const
+{
+    if (!rect().contains(pos)) {
+        return HitRegion::None;
+    }
+
+    auto hitVisibleButton = [pos](const QPushButton *button) {
+        return button != nullptr && button->isVisible() && button->geometry().contains(pos);
+    };
+
+    if (hitVisibleButton(m_minimizeButton)) {
+        return HitRegion::MinimizeButton;
+    }
+
+    if (hitVisibleButton(m_maximizeButton)) {
+        return HitRegion::MaximizeButton;
+    }
+
+    if (hitVisibleButton(m_closeButton)) {
+        return HitRegion::CloseButton;
+    }
+
+    QWidget *hovered = childAt(pos);
+    if (qobject_cast<QPushButton *>(hovered) != nullptr) {
+        return HitRegion::OtherInteractive;
+    }
+
+    return HitRegion::Caption;
+}
+
 bool TitleBar::isOnControlButton(const QPoint &pos) const
 {
     QWidget *hovered = childAt(pos);

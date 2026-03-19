@@ -1,20 +1,10 @@
 #include "winutils.h"
 
 #include "diagnostics.h"
-#include "titlebar.h"
-
-#include <QPushButton>
-#include <QWidget>
 
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
 #endif
-
-namespace {
-constexpr auto kMaximizeButtonObjectName = "TitleBarMaximizeButton";
-constexpr auto kMinimizeButtonObjectName = "TitleBarMinimizeButton";
-constexpr auto kCloseButtonObjectName = "TitleBarCloseButton";
-}
 
 namespace WinUtils {
 
@@ -164,73 +154,6 @@ WindowsCapabilities detectWindowsCapabilities()
 #endif
 
     return caps;
-}
-
-bool isOnMaximizeButton(const TitleBar *titleBar, const QWidget *hostWidget, const QPoint &localPos)
-{
-    return titleBarButtonTypeAt(titleBar, hostWidget, localPos) == TitleBarButtonType::Maximize;
-}
-
-TitleBarButtonType titleBarButtonTypeAt(const TitleBar *titleBar, const QWidget *hostWidget, const QPoint &localPos)
-{
-    if (titleBar == nullptr || hostWidget == nullptr || !titleBar->geometry().contains(localPos)) {
-        return TitleBarButtonType::None;
-    }
-
-    auto hitByGeometry = [titleBar, hostWidget, localPos](const QString &name) -> bool {
-        const QPushButton *button = titleBar->findChild<QPushButton *>(name);
-        if (button == nullptr || !button->isVisible()) {
-            return false;
-        }
-
-        const QPoint topLeft = button->mapTo(hostWidget, QPoint(0, 0));
-        const QRect rectInHost(topLeft, button->size());
-        return rectInHost.contains(localPos);
-    };
-
-    if (hitByGeometry(QString::fromLatin1(kMinimizeButtonObjectName))) {
-        return TitleBarButtonType::Minimize;
-    }
-
-    if (hitByGeometry(QString::fromLatin1(kMaximizeButtonObjectName))) {
-        return TitleBarButtonType::Maximize;
-    }
-
-    if (hitByGeometry(QString::fromLatin1(kCloseButtonObjectName))) {
-        return TitleBarButtonType::Close;
-    }
-
-    const QPoint titleBarPos = titleBar->mapFrom(hostWidget, localPos);
-    QWidget *hovered = titleBar->childAt(titleBarPos);
-    const auto *button = qobject_cast<QPushButton *>(hovered);
-    if (button == nullptr) {
-        return TitleBarButtonType::None;
-    }
-
-    const QString objectName = button->objectName();
-    if (objectName == QString::fromLatin1(kMinimizeButtonObjectName)) {
-        return TitleBarButtonType::Minimize;
-    }
-
-    if (objectName == QString::fromLatin1(kMaximizeButtonObjectName)) {
-        return TitleBarButtonType::Maximize;
-    }
-
-    if (objectName == QString::fromLatin1(kCloseButtonObjectName)) {
-        return TitleBarButtonType::Close;
-    }
-
-    return TitleBarButtonType::Other;
-}
-
-bool isOnTitleBarCaptionArea(const TitleBar *titleBar, const QWidget *hostWidget, const QPoint &localPos)
-{
-    if (titleBar == nullptr || hostWidget == nullptr || !titleBar->geometry().contains(localPos)) {
-        return false;
-    }
-
-    QWidget *hovered = hostWidget->childAt(localPos);
-    return qobject_cast<QPushButton *>(hovered) == nullptr;
 }
 
 } // namespace WinUtils

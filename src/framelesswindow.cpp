@@ -1,6 +1,7 @@
 #include "framelesswindow.h"
 
 #include "diagnostics.h"
+#include "windowvisualstate.h"
 #include "winutils.h"
 #include "titlebar.h"
 
@@ -556,20 +557,17 @@ void FramelessWindow::flushStateVisualRefresh()
 
 quint64 FramelessWindow::currentVisualStateToken() const
 {
-    quint64 token = 0;
-    token |= static_cast<quint64>(isVisible()) << 0;
-    token |= static_cast<quint64>(isMaximized()) << 1;
-    token |= static_cast<quint64>(isMinimized()) << 2;
-    token |= static_cast<quint64>(isActiveWindow()) << 3;
-    token |= static_cast<quint64>(m_shadowEnabled) << 4;
-    token |= static_cast<quint64>(m_backdropEnabled) << 5;
-    token |= static_cast<quint64>(m_roundedCornersEnabled) << 6;
-    token |= static_cast<quint64>(m_immersiveDarkModeEnabled) << 7;
-    token |= static_cast<quint64>(shouldUseDarkMode()) << 8;
-    token |= static_cast<quint64>(shouldUseTranslucentBackground()) << 9;
-    token |= static_cast<quint64>(static_cast<int>(m_backdropPreference) & 0xF) << 10;
-    token |= static_cast<quint64>(static_cast<int>(m_themeManager.themeMode()) & 0x3) << 14;
-    return token;
+    return WindowVisualState::buildVisualStateToken(isVisible(),
+                                                    isMaximized(),
+                                                    isMinimized(),
+                                                    isActiveWindow(),
+                                                    m_shadowEnabled,
+                                                    m_backdropEnabled,
+                                                    m_roundedCornersEnabled,
+                                                    m_immersiveDarkModeEnabled,
+                                                    m_backdropPreference,
+                                                    m_themeManager.themeMode(),
+                                                    shouldUseTranslucentBackground());
 }
 
 bool FramelessWindow::eventFilter(QObject *watched, QEvent *event)
@@ -725,19 +723,25 @@ int FramelessWindow::hitTest(const QPoint &globalPos) const
     const QRect nativeWindowRect(left, top, right - left + 1, bottom - top + 1);
     const QPoint localPos = WinUtils::toLocalPos(globalPos, nativeWindowRect, logicalWidth, logicalHeight);
 
-    const WinUtils::TitleBarButtonType buttonType = WinUtils::titleBarButtonTypeAt(m_titleBar, this, localPos);
-    if (buttonType == WinUtils::TitleBarButtonType::Maximize) {
+    TitleBar::HitRegion titleBarHitRegion = TitleBar::HitRegion::None;
+    if (m_titleBar != nullptr && m_titleBar->geometry().contains(localPos)) {
+        titleBarHitRegion = m_titleBar->hitRegionAt(m_titleBar->mapFrom(this, localPos));
+    }
+
+    if (titleBarHitRegion == TitleBar::HitRegion::MaximizeButton) {
         if (GetKeyState(VK_LBUTTON) < 0) {
             return HTCLIENT;
         }
         return HTMAXBUTTON;
     }
 
-    if (buttonType != WinUtils::TitleBarButtonType::None) {
+    if (titleBarHitRegion == TitleBar::HitRegion::MinimizeButton
+        || titleBarHitRegion == TitleBar::HitRegion::CloseButton
+        || titleBarHitRegion == TitleBar::HitRegion::OtherInteractive) {
         return HTCLIENT;
     }
 
-    const bool onTitleBarCaptionArea = WinUtils::isOnTitleBarCaptionArea(m_titleBar, this, localPos);
+    const bool onTitleBarCaptionArea = titleBarHitRegion == TitleBar::HitRegion::Caption;
 
     if (isMaximized()) {
         return onTitleBarCaptionArea ? HTCAPTION : HTCLIENT;
@@ -1019,16 +1023,16 @@ void FramelessWindow::applyVisualEffects()
         setAttribute(Qt::WA_TranslucentBackground, shouldBeTranslucent);
     }
 
-    WindowEffectWin::VisualEffectOptions options;
-    options.shadowEnabled = m_shadowEnabled;
-    options.backdropEnabled = m_backdropEnabled;
-    options.backdropPreference = m_backdropPreference;
-    options.roundedCornersEnabled = m_roundedCornersEnabled;
-    options.immersiveDarkModeEnabled = m_immersiveDarkModeEnabled;
-    options.useDarkMode = shouldUseDarkMode();
-    options.maximized = isMaximized();
-    options.minimized = isMinimized();
-    options.borderColor = preferredBorderColor();
+    const WindowEffectWin::VisualEffectOptions options = WindowVisualState::buildVisualEffectOptions(
+        m_shadowEnabled,
+        m_backdropEnabled,
+        m_backdropPreference,
+        m_roundedCornersEnabled,
+        m_immersiveDarkModeEnabled,
+        m_themeManager.themeMode(),
+        isMaximized(),
+        isMinimized(),
+        preferredBorderColor());
 
     void *hwnd = reinterpret_cast<void *>(winId());
     if (hwnd == nullptr) {
@@ -1041,38 +1045,14 @@ void FramelessWindow::applyVisualEffects()
 
 bool FramelessWindow::shouldUseDarkMode() const
 {
-    return m_themeManager.isDarkMode();
+    return WindowVisualState::shouldUseDarkMode(m_themeManager.themeMode());
 }
 
 bool FramelessWindow::shouldUseTranslucentBackground() const
 {
-#ifdef Q_OS_WIN
-    if (!m_backdropEnabled || isMinimized()) {
-        return false;
-    }
-
-    const WinUtils::WindowsCapabilities caps = WinUtils::detectWindowsCapabilities();
-    const bool autoChainAvailable = caps.supportsSystemBackdrop
-                                    || caps.supportsLegacyMica
-                                    || caps.supportsAcrylic;
-
-    switch (m_backdropPreference) {
-    case WindowEffectWin::BackdropPreference::Auto:
-        return autoChainAvailable;
-    case WindowEffectWin::BackdropPreference::None:
-        return false;
-    case WindowEffectWin::BackdropPreference::MicaSystem:
-        return caps.supportsSystemBackdrop ? true : autoChainAvailable;
-    case WindowEffectWin::BackdropPreference::MicaLegacy:
-        return caps.supportsLegacyMica ? true : autoChainAvailable;
-    case WindowEffectWin::BackdropPreference::Acrylic:
-        return caps.supportsAcrylic ? true : autoChainAvailable;
-    }
-
-    return false;
-#else
-    return false;
-#endif
+    return WindowVisualState::shouldUseTranslucentBackground(m_backdropEnabled,
+                                                              isMinimized(),
+                                                              m_backdropPreference);
 }
 
 QColor FramelessWindow::preferredBorderColor() const

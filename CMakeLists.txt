@@ -35,6 +35,8 @@ target_sources(${TARGET_NAME} PRIVATE
     src/titlebar.h
     src/windoweffectwin.cpp
     src/windoweffectwin.h
+    src/windowvisualstate.cpp
+    src/windowvisualstate.h
     src/winutils.cpp
     src/winutils.h
     src/thememanager.cpp

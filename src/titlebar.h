@@ -11,12 +11,22 @@ class TitleBar : public QWidget
 {
     Q_OBJECT
 public:
+    enum class HitRegion {
+        None,
+        Caption,
+        MinimizeButton,
+        MaximizeButton,
+        CloseButton,
+        OtherInteractive
+    };
+
     explicit TitleBar(QWidget *parent = nullptr);
 
     int heightHint() const;
     void setMaximized(bool maximized);
     void addCenterWidget(QWidget *widget);
     void clearCenterWidgets();
+    HitRegion hitRegionAt(const QPoint &pos) const;
 
 signals:
     void minimizeRequested();

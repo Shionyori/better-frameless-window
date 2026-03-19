@@ -6,18 +6,7 @@
 
 #include <cstdint>
 
-class TitleBar;
-class QWidget;
-
 namespace WinUtils {
-
-enum class TitleBarButtonType {
-	None,
-	Minimize,
-	Maximize,
-	Close,
-	Other
-};
 
 struct WindowsCapabilities {
 	bool isWindows = false;
@@ -34,8 +23,5 @@ int hitFromEdges(Qt::Edges edges);
 void syncNativeWindowStyles(void *hwnd, bool includeExStyle);
 uint32_t windowsBuildNumber();
 WindowsCapabilities detectWindowsCapabilities();
-TitleBarButtonType titleBarButtonTypeAt(const TitleBar *titleBar, const QWidget *hostWidget, const QPoint &localPos);
-bool isOnMaximizeButton(const TitleBar *titleBar, const QWidget *hostWidget, const QPoint &localPos);
-bool isOnTitleBarCaptionArea(const TitleBar *titleBar, const QWidget *hostWidget, const QPoint &localPos);
 
 } // namespace WinUtils
