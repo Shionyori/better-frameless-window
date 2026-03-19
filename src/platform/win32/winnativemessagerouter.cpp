@@ -5,6 +5,7 @@
 
 #include <QGuiApplication>
 #include <QScreen>
+#include <QTimer>
 #include <QWindow>
 
 #ifdef Q_OS_WIN
@@ -151,11 +152,35 @@ bool NativeWindowsMessageRouter::handle(FramelessWindow &window, void *message, 
     case WM_KILLFOCUS:
         return false;
     case WM_SIZE:
+    {
+        const bool isMaximizedSize = msg->wParam == SIZE_MAXIMIZED;
+        const bool isRestoredSize = msg->wParam == SIZE_RESTORED;
+        const bool restoredFromMaximized = window.shouldStartRestoreTransitionFromSizeState(isMaximizedSize,
+                                                                                            isRestoredSize);
         window.syncNativeWindowFrame();
-        if (msg->wParam == SIZE_RESTORED || msg->wParam == SIZE_MAXIMIZED) {
+        if (restoredFromMaximized) {
+            window.beginBackdropTransitionGuard();
+            window.scheduleStateVisualRefresh();
+        } else if (isMaximizedSize) {
+            window.scheduleStateVisualRefresh();
+        } else if (isRestoredSize) {
             window.scheduleStateVisualRefresh();
         }
+
+        if (restoredFromMaximized) {
+            QTimer::singleShot(80, &window, [&window]() {
+                if (!window.isVisible()) {
+                    return;
+                }
+
+                // Early restore nudge: poke compositor and queue a refresh,
+                // while final backdrop rebind is handled by guard release.
+                window.scheduleStateVisualRefresh();
+                window.forceNativeDwmRefresh();
+            });
+        }
         return false;
+    }
     case WM_EXITSIZEMOVE:
     case WM_WINDOWPOSCHANGED:
     case WM_ACTIVATE:

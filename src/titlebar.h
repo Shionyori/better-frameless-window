@@ -45,8 +45,10 @@ protected:
 
 private:
     bool isOnControlButton(const QPoint &pos) const;
+    QPushButton *controlButtonAt(const QPoint &pos) const;
     void updateButtonVisualState(QPushButton *button, const char *state);
     void resetButtonVisualStates();
+    void syncButtonVisualStatesFromCursor();
 
     QHBoxLayout *m_layout;
     QWidget *m_centerContainer;
@@ -58,4 +60,5 @@ private:
     bool m_leftPressed;
     bool m_dragInitiated;
     QPoint m_pressPos;
+    bool m_visualMaximized;
 };

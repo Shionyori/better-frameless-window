@@ -35,6 +35,9 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_backdropPreference(WindowEffectWin::BackdropPreference::Auto)
     , m_roundedCornersEnabled(true)
     , m_immersiveDarkModeEnabled(true)
+    , m_backdropTransitionGuardActive(false)
+    , m_backdropTransitionEpoch(0)
+    , m_lastNativeSizeMaximized(false)
     , m_applyingTheme(false)
     , m_lastAppliedStyleSheet()
     , m_loggedNullWindowHandle(false)
@@ -364,6 +367,7 @@ void FramelessWindow::changeEvent(QEvent *event)
 {
     QWidget::changeEvent(event);
     if (event->type() == QEvent::WindowStateChange) {
+        m_lastNativeSizeMaximized = isMaximized();
         scheduleStateVisualRefresh();
     } else if (event->type() == QEvent::ActivationChange) {
         if (isActiveWindow()) {
@@ -390,7 +394,7 @@ quint64 FramelessWindow::currentVisualStateToken() const
                                                     m_backdropEnabled,
                                                     m_roundedCornersEnabled,
                                                     m_immersiveDarkModeEnabled,
-                                                    m_backdropPreference,
+                                                    effectiveBackdropPreference(),
                                                     m_themeManager.themeMode(),
                                                     shouldUseTranslucentBackground());
 }
@@ -602,6 +606,9 @@ void FramelessWindow::toggleMaximizeRestore()
             return;
         }
         scheduleStateVisualRefresh();
+        // Ensure compositor receives a concrete redraw after state transitions
+        // where visual tokens may already be stable.
+        forceNativeDwmRefresh();
     });
 #else
     if (isMaximized()) {
@@ -698,7 +705,7 @@ void FramelessWindow::applyVisualEffects()
     const WindowEffectWin::VisualEffectOptions options = WindowVisualState::buildVisualEffectOptions(
         m_shadowEnabled,
         m_backdropEnabled,
-        m_backdropPreference,
+        effectiveBackdropPreference(),
         m_roundedCornersEnabled,
         m_immersiveDarkModeEnabled,
         m_themeManager.themeMode(),
@@ -715,6 +722,97 @@ void FramelessWindow::applyVisualEffects()
     m_windowEffect.applyVisualEffects(hwnd, options);
 }
 
+void FramelessWindow::forceBackdropRebind()
+{
+    if (!m_backdropEnabled || windowHandle() == nullptr) {
+        return;
+    }
+
+    void *hwnd = reinterpret_cast<void *>(winId());
+    if (hwnd == nullptr) {
+        return;
+    }
+
+    const bool useDarkMode = shouldUseDarkMode();
+    const bool maximized = isMaximized();
+    const bool minimized = isMinimized();
+
+    // Force compositor to drop and re-attach backdrop material on restore edge.
+    m_windowEffect.applyBackdropEffects(hwnd,
+                                        false,
+                                        useDarkMode,
+                                        maximized,
+                                        minimized,
+                                        effectiveBackdropPreference());
+    m_windowEffect.applyBackdropEffects(hwnd,
+                                        true,
+                                        useDarkMode,
+                                        maximized,
+                                        minimized,
+                                        effectiveBackdropPreference());
+}
+
+bool FramelessWindow::shouldStartRestoreTransitionFromSizeState(bool isMaximizedState, bool isRestoredState)
+{
+    if (isMaximizedState) {
+        m_lastNativeSizeMaximized = true;
+        return false;
+    }
+
+    if (isRestoredState) {
+        const bool restoredFromMaximized = m_lastNativeSizeMaximized;
+        m_lastNativeSizeMaximized = false;
+        return restoredFromMaximized;
+    }
+
+    return false;
+}
+
+WindowEffectWin::BackdropPreference FramelessWindow::effectiveBackdropPreference() const
+{
+    if (m_backdropTransitionGuardActive) {
+        return WindowEffectWin::BackdropPreference::None;
+    }
+
+    return m_backdropPreference;
+}
+
+void FramelessWindow::beginBackdropTransitionGuard()
+{
+    if (!m_backdropEnabled) {
+        m_backdropTransitionGuardActive = false;
+        return;
+    }
+
+    m_backdropTransitionGuardActive = true;
+    const quint64 epoch = ++m_backdropTransitionEpoch;
+
+    // Keep backdrop off for a short transition window so DWM can settle
+    // before reapplying the target material.
+    QTimer::singleShot(160, this, [this, epoch]() {
+        if (epoch != m_backdropTransitionEpoch) {
+            return;
+        }
+
+        m_backdropTransitionGuardActive = false;
+        requestVisualRefresh();
+        forceBackdropRebind();
+        forceNativeDwmRefresh();
+
+        // Fallback pass: some DWM composition paths may drop the first
+        // restored-material bind. Re-apply once more after settle.
+        QTimer::singleShot(220, this, [this, epoch]() {
+            if (epoch != m_backdropTransitionEpoch || m_backdropTransitionGuardActive || !isVisible()) {
+                return;
+            }
+
+            requestVisualRefresh();
+            forceBackdropRebind();
+            forceNativeDwmRefresh();
+        });
+    });
+}
+
 bool FramelessWindow::shouldUseDarkMode() const
 {
     return WindowVisualState::shouldUseDarkMode(m_themeManager.themeMode());
@@ -724,7 +822,7 @@ bool FramelessWindow::shouldUseTranslucentBackground() const
 {
     return WindowVisualState::shouldUseTranslucentBackground(m_backdropEnabled,
                                                               isMinimized(),
-                                                              m_backdropPreference);
+                                                              effectiveBackdropPreference());
 }
 
 QColor FramelessWindow::preferredBorderColor() const

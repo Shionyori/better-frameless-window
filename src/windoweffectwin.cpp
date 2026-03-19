@@ -388,6 +388,23 @@ void WindowEffectWin::applyBackdropEffects(void *hwnd,
         }
     }
 
+    // Acrylic path already forces a redraw in applyAcrylicAccent.
+    // For Mica/SystemBackdrop toggles, force a lightweight native refresh so
+    // compositor updates immediately after maximize/restore transitions.
+    if (mode != BackdropMode::Acrylic) {
+        SetWindowPos(win,
+                     nullptr,
+                     0,
+                     0,
+                     0,
+                     0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+        RedrawWindow(win,
+                     nullptr,
+                     nullptr,
+                     RDW_INVALIDATE | RDW_UPDATENOW | RDW_FRAME | RDW_ALLCHILDREN);
+    }
+
 #else
     (void) hwnd;
     (void) enabled;

@@ -80,8 +80,12 @@ protected:
     Qt::CursorShape cursorForEdges(Qt::Edges edges) const;
 
 private:
+    bool shouldStartRestoreTransitionFromSizeState(bool isMaximizedState, bool isRestoredState);
+    WindowEffectWin::BackdropPreference effectiveBackdropPreference() const;
+    void beginBackdropTransitionGuard();
     void performVisualRefreshPass();
     void requestVisualRefresh();
+    void forceBackdropRebind();
     void attachContentEventFilters(QWidget *widget);
     void detachContentEventFilters(QWidget *widget);
     friend class NativeWindowsMessageRouter;
@@ -95,6 +99,9 @@ private:
     WindowEffectWin::BackdropPreference m_backdropPreference;
     bool m_roundedCornersEnabled;
     bool m_immersiveDarkModeEnabled;
+    bool m_backdropTransitionGuardActive;
+    quint64 m_backdropTransitionEpoch;
+    bool m_lastNativeSizeMaximized;
     bool m_applyingTheme;
     QString m_lastAppliedStyleSheet;
     bool m_loggedNullWindowHandle;

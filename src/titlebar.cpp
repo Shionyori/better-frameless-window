@@ -20,8 +20,10 @@ TitleBar::TitleBar(QWidget *parent)
     , m_closeButton(new QPushButton("×", this))
     , m_leftPressed(false)
     , m_dragInitiated(false)
+    , m_visualMaximized(false)
 {
     setFixedHeight(36);
+    setMouseTracking(true);
 
     m_layout->setContentsMargins(10, 0, 6, 0);
     m_layout->setSpacing(4);
@@ -39,6 +41,8 @@ TitleBar::TitleBar(QWidget *parent)
     for (auto *button : buttons) {
         button->setFixedSize(32, 28);
         button->setFlat(true);
+        button->setMouseTracking(true);
+        button->setAttribute(Qt::WA_Hover, true);
         button->installEventFilter(this);
     }
 
@@ -119,8 +123,24 @@ TitleBar::HitRegion TitleBar::hitRegionAt(const QPoint &pos) const
 
 bool TitleBar::isOnControlButton(const QPoint &pos) const
 {
-    QWidget *hovered = childAt(pos);
-    return hovered != nullptr && qobject_cast<QPushButton *>(hovered) != nullptr;
+    return controlButtonAt(pos) != nullptr;
+}
+
+QPushButton *TitleBar::controlButtonAt(const QPoint &pos) const
+{
+    if (m_minimizeButton != nullptr && m_minimizeButton->isVisible() && m_minimizeButton->geometry().contains(pos)) {
+        return m_minimizeButton;
+    }
+
+    if (m_maximizeButton != nullptr && m_maximizeButton->isVisible() && m_maximizeButton->geometry().contains(pos)) {
+        return m_maximizeButton;
+    }
+
+    if (m_closeButton != nullptr && m_closeButton->isVisible() && m_closeButton->geometry().contains(pos)) {
+        return m_closeButton;
+    }
+
+    return nullptr;
 }
 
 int TitleBar::heightHint() const
@@ -137,28 +157,15 @@ bool TitleBar::eventFilter(QObject *watched, QEvent *event)
 
     switch (event->type()) {
     case QEvent::Enter:
-        if (button->isEnabled()) {
-            updateButtonVisualState(button, "hover");
-        }
-        break;
+    case QEvent::HoverEnter:
     case QEvent::Leave:
-        updateButtonVisualState(button, button->isEnabled() ? "normal" : "disabled");
-        break;
+    case QEvent::HoverLeave:
     case QEvent::MouseButtonPress:
-        if (button->isEnabled()) {
-            updateButtonVisualState(button, "pressed");
-        }
-        break;
     case QEvent::MouseButtonRelease:
-        if (button->isEnabled()) {
-            updateButtonVisualState(button,
-                                    button->rect().contains(button->mapFromGlobal(QCursor::pos()))
-                                        ? "hover"
-                                        : "normal");
-        }
-        break;
+    case QEvent::HoverMove:
+    case QEvent::MouseMove:
     case QEvent::EnabledChange:
-        updateButtonVisualState(button, button->isEnabled() ? "normal" : "disabled");
+        syncButtonVisualStatesFromCursor();
         break;
     default:
         break;
@@ -179,19 +186,55 @@ void TitleBar::updateButtonVisualState(QPushButton *button, const char *state)
     }
 
     button->setProperty("btnState", stateValue);
+    button->style()->unpolish(button);
     button->style()->polish(button);
     button->update();
 }
 
 void TitleBar::resetButtonVisualStates()
 {
-    updateButtonVisualState(m_minimizeButton, m_minimizeButton->isEnabled() ? "normal" : "disabled");
-    updateButtonVisualState(m_maximizeButton, m_maximizeButton->isEnabled() ? "normal" : "disabled");
-    updateButtonVisualState(m_closeButton, m_closeButton->isEnabled() ? "normal" : "disabled");
+    syncButtonVisualStatesFromCursor();
+}
+
+void TitleBar::syncButtonVisualStatesFromCursor()
+{
+    const QList<QPushButton *> buttons = {m_minimizeButton, m_maximizeButton, m_closeButton};
+    for (QPushButton *button : buttons) {
+        if (button == nullptr) {
+            continue;
+        }
+
+        updateButtonVisualState(button, button->isEnabled() ? "normal" : "disabled");
+    }
+
+    const QPoint localPos = mapFromGlobal(QCursor::pos());
+    if (!rect().contains(localPos)) {
+        return;
+    }
+
+    QPushButton *hoveredButton = controlButtonAt(localPos);
+    if (hoveredButton == nullptr || !hoveredButton->isEnabled()) {
+        return;
+    }
+
+    if (QApplication::mouseButtons().testFlag(Qt::LeftButton)) {
+        updateButtonVisualState(hoveredButton, "pressed");
+    } else {
+        updateButtonVisualState(hoveredButton, "hover");
+    }
 }
 
 void TitleBar::setMaximized(bool maximized)
 {
+    if (m_visualMaximized == maximized
+        && m_minimizeButton->isEnabled()
+        && m_maximizeButton->isEnabled()
+        && m_closeButton->isEnabled()) {
+        syncButtonVisualStatesFromCursor();
+        return;
+    }
+
+    m_visualMaximized = maximized;
     m_minimizeButton->setEnabled(true);
     m_maximizeButton->setEnabled(true);
     m_closeButton->setEnabled(true);
@@ -239,6 +282,8 @@ void TitleBar::mousePressEvent(QMouseEvent *event)
 
 void TitleBar::mouseMoveEvent(QMouseEvent *event)
 {
+    syncButtonVisualStatesFromCursor();
+
     if (!m_leftPressed || (event->buttons() & Qt::LeftButton) == 0) {
         QWidget::mouseMoveEvent(event);
         return;
@@ -260,6 +305,7 @@ void TitleBar::mouseReleaseEvent(QMouseEvent *event)
     if (event->button() == Qt::LeftButton) {
         m_leftPressed = false;
         m_dragInitiated = false;
+        syncButtonVisualStatesFromCursor();
         event->accept();
         return;
     }
@@ -273,6 +319,8 @@ void TitleBar::leaveEvent(QEvent *event)
         m_leftPressed = false;
         m_dragInitiated = false;
     }
+
+    syncButtonVisualStatesFromCursor();
 
     QWidget::leaveEvent(event);
 }
