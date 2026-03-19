@@ -1,6 +1,7 @@
 #pragma once
 
 #include "thememanager.h"
+#include "visualrefreshcoordinator.h"
 #include "windoweffectwin.h"
 
 #include <QWidget>
@@ -73,7 +74,6 @@ protected:
     void forceNativeDwmRefresh();
     void applyVisualEffects();
     void scheduleStateVisualRefresh();
-    void flushStateVisualRefresh();
     quint64 currentVisualStateToken() const;
     bool shouldUseTranslucentBackground() const;
     bool shouldUseDarkMode() const;
@@ -98,9 +98,7 @@ private:
     QString m_lastAppliedStyleSheet;
     bool m_lastTranslucentBackground;
     bool m_loggedNullWindowHandle;
-    bool m_pendingStateVisualRefresh;
-    bool m_stateVisualRefreshDirty;
-    quint64 m_lastVisualStateToken;
+    VisualRefreshCoordinator m_visualRefreshCoordinator;
     ThemeManager m_themeManager;
     WindowEffectWin m_windowEffect;
 };

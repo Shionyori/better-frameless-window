@@ -40,10 +40,30 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_lastAppliedStyleSheet()
     , m_lastTranslucentBackground(false)
     , m_loggedNullWindowHandle(false)
-    , m_pendingStateVisualRefresh(false)
-    , m_stateVisualRefreshDirty(false)
-    , m_lastVisualStateToken(0)
+    , m_visualRefreshCoordinator(this)
 {
+    m_visualRefreshCoordinator.configure(
+        [this]() {
+            return currentVisualStateToken();
+        },
+        [this]() {
+            return isVisible();
+        },
+        [this]() {
+            applyTheme();
+            syncNativeWindowFrame();
+            applyVisualEffects();
+            updateMaximizeButtonState();
+        },
+        [this](quint64 previousToken, quint64 tokenBefore, quint64 tokenAfter) {
+            if (tokenAfter != previousToken || tokenAfter != tokenBefore) {
+                forceNativeDwmRefresh();
+            }
+        },
+        [this]() {
+            update();
+        });
+
     initWindow();
     initLayout();
 }
@@ -347,54 +367,7 @@ void FramelessWindow::changeEvent(QEvent *event)
 
 void FramelessWindow::scheduleStateVisualRefresh()
 {
-    m_stateVisualRefreshDirty = true;
-    if (m_pendingStateVisualRefresh) {
-        return;
-    }
-
-    m_pendingStateVisualRefresh = true;
-    QTimer::singleShot(0, this, [this]() {
-        flushStateVisualRefresh();
-    });
-}
-
-void FramelessWindow::flushStateVisualRefresh()
-{
-    m_pendingStateVisualRefresh = false;
-    if (!isVisible()) {
-        m_stateVisualRefreshDirty = false;
-        return;
-    }
-
-    bool needsReschedule = false;
-    for (int pass = 0; pass < 3; ++pass) {
-        const quint64 tokenBefore = currentVisualStateToken();
-        const quint64 previousToken = m_lastVisualStateToken;
-        m_stateVisualRefreshDirty = false;
-
-        applyTheme();
-        syncNativeWindowFrame();
-        applyVisualEffects();
-        updateMaximizeButtonState();
-
-        const quint64 tokenAfter = currentVisualStateToken();
-        if (tokenAfter != previousToken || tokenAfter != tokenBefore) {
-            forceNativeDwmRefresh();
-        }
-
-        m_lastVisualStateToken = tokenAfter;
-        update();
-
-        if (!m_stateVisualRefreshDirty && tokenAfter == tokenBefore) {
-            return;
-        }
-
-        needsReschedule = true;
-    }
-
-    if (needsReschedule) {
-        scheduleStateVisualRefresh();
-    }
+    m_visualRefreshCoordinator.requestRefresh();
 }
 
 quint64 FramelessWindow::currentVisualStateToken() const
