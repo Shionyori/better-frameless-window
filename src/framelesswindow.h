@@ -1,7 +1,7 @@
 #pragma once
 
 #include "thememanager.h"
-#include "visualrefreshcoordinator.h"
+#include "core/visualrefreshcoordinator.h"
 #include "windoweffectwin.h"
 
 #include <QWidget>

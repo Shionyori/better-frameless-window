@@ -35,18 +35,24 @@ target_sources(${TARGET_NAME} PRIVATE
     src/titlebar.h
     src/windoweffectwin.cpp
     src/windoweffectwin.h
-    src/windowvisualstate.cpp
-    src/windowvisualstate.h
-    src/winnativemessagerouter.cpp
-    src/winnativemessagerouter.h
-    src/visualrefreshcoordinator.cpp
-    src/visualrefreshcoordinator.h
+    src/core/windowvisualstate.cpp
+    src/core/windowvisualstate.h
+    src/platform/win32/winnativemessagerouter.cpp
+    src/platform/win32/winnativemessagerouter.h
+    src/core/visualrefreshcoordinator.cpp
+    src/core/visualrefreshcoordinator.h
+    src/platform/win32/windowhittestwin.cpp
+    src/platform/win32/windowhittestwin.h
     src/winutils.cpp
     src/winutils.h
     src/thememanager.cpp
     src/thememanager.h
     src/diagnostics.cpp
     src/diagnostics.h
+)
+
+target_include_directories(${TARGET_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 # Link Qt6 libraries to the executable
