@@ -37,6 +37,8 @@ target_sources(${TARGET_NAME} PRIVATE
     src/windoweffectwin.h
     src/windowvisualstate.cpp
     src/windowvisualstate.h
+    src/winnativemessagerouter.cpp
+    src/winnativemessagerouter.h
     src/winutils.cpp
     src/winutils.h
     src/thememanager.cpp

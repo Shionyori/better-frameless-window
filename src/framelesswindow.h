@@ -9,6 +9,7 @@ class QVBoxLayout;
 class TitleBar;
 class QColor;
 class QString;
+class NativeWindowsMessageRouter;
 
 class FramelessWindow : public QWidget
 {
@@ -82,14 +83,7 @@ protected:
 private:
     void attachContentEventFilters(QWidget *widget);
     void detachContentEventFilters(QWidget *widget);
-
-#ifdef Q_OS_WIN
-    bool handleNativeWindowsMessage(void *message, qintptr *result);
-    bool handleNcHitTestMessage(qintptr lParam, qintptr *result);
-    bool handleNcButtonMessage(quint32 messageId, quintptr wParam, qintptr *result);
-    bool handleGetMinMaxInfoMessage(void *lParam, qintptr *result);
-    bool handleNcRightButtonUpMessage(quintptr wParam, qintptr lParam, qintptr *result);
-#endif
+    friend class NativeWindowsMessageRouter;
 
     TitleBar *m_titleBar;
     QWidget *m_contentPanel;

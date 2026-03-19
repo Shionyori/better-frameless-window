@@ -2,11 +2,11 @@
 
 #include "diagnostics.h"
 #include "windowvisualstate.h"
+#include "winnativemessagerouter.h"
 #include "winutils.h"
 #include "titlebar.h"
 
 #include <QEvent>
-#include <QGuiApplication>
 #include <QLayout>
 #include <QMouseEvent>
 #include <QObject>
@@ -14,7 +14,6 @@
 #include <QColor>
 #include <QPushButton>
 #include <QScopedValueRollback>
-#include <QScreen>
 #include <QShowEvent>
 #include <QStyle>
 #include <QStyleOption>
@@ -24,16 +23,6 @@
 
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
-#include <windowsx.h>
-#include <dwmapi.h>
-
-#ifndef WM_NCUAHDRAWCAPTION
-#define WM_NCUAHDRAWCAPTION 0x00AE
-#endif
-
-#ifndef WM_NCUAHDRAWFRAME
-#define WM_NCUAHDRAWFRAME 0x00AF
-#endif
 #endif
 
 FramelessWindow::FramelessWindow(QWidget *parent)
@@ -315,159 +304,12 @@ bool FramelessWindow::nativeEvent(const QByteArray &eventType, void *message, qi
         return QWidget::nativeEvent(eventType, message, result);
     }
 
-    if (handleNativeWindowsMessage(message, result)) {
+    if (NativeWindowsMessageRouter::handle(*this, message, result)) {
         return true;
     }
 
     return QWidget::nativeEvent(eventType, message, result);
 }
-
-bool FramelessWindow::handleNativeWindowsMessage(void *message, qintptr *result)
-{
-    const MSG *msg = static_cast<MSG *>(message);
-    if (msg == nullptr) {
-        Diagnostics::logWarning(QStringLiteral("nativeEvent received null MSG pointer"));
-        return false;
-    }
-
-    switch (msg->message) {
-    case WM_NCHITTEST:
-    {
-        const HWND hwnd = reinterpret_cast<HWND>(winId());
-        if (hwnd != nullptr) {
-            LRESULT dwmResult = 0;
-            if (DwmDefWindowProc(hwnd,
-                                 msg->message,
-                                 msg->wParam,
-                                 msg->lParam,
-                                 &dwmResult)) {
-                *result = static_cast<qintptr>(dwmResult);
-                return true;
-            }
-        }
-        return handleNcHitTestMessage(static_cast<qintptr>(msg->lParam), result);
-    }
-    case WM_NCPAINT:
-    case WM_NCUAHDRAWCAPTION:
-    case WM_NCUAHDRAWFRAME:
-        *result = 0;
-        return true;
-    case WM_NCACTIVATE:
-        *result = TRUE;
-        return true;
-    case WM_NCLBUTTONDOWN:
-    case WM_NCLBUTTONDBLCLK:
-    case WM_NCLBUTTONUP:
-        return handleNcButtonMessage(msg->message,
-                                     static_cast<quintptr>(msg->wParam),
-                                     result);
-    case WM_NCMOUSELEAVE:
-    case WM_MOUSELEAVE:
-    case WM_CAPTURECHANGED:
-    case WM_KILLFOCUS:
-        return false;
-    case WM_SIZE:
-        syncNativeWindowFrame();
-        if (msg->wParam == SIZE_RESTORED) {
-            scheduleStateVisualRefresh();
-        } else if (msg->wParam == SIZE_MAXIMIZED) {
-            scheduleStateVisualRefresh();
-        }
-        return false;
-    case WM_EXITSIZEMOVE:
-    case WM_WINDOWPOSCHANGED:
-        scheduleStateVisualRefresh();
-        return false;
-    case WM_ACTIVATE:
-        scheduleStateVisualRefresh();
-        return false;
-    case WM_NCCALCSIZE:
-        if (msg->wParam == TRUE) {
-            *result = 0;
-            return true;
-        }
-        return false;
-    case WM_GETMINMAXINFO:
-        return handleGetMinMaxInfoMessage(reinterpret_cast<void *>(msg->lParam), result);
-    case WM_NCRBUTTONUP:
-        return handleNcRightButtonUpMessage(static_cast<quintptr>(msg->wParam), static_cast<qintptr>(msg->lParam), result);
-    default:
-        return false;
-    }
-}
-
-bool FramelessWindow::handleNcHitTestMessage(qintptr lParam, qintptr *result)
-{
-    const QPoint globalPos(GET_X_LPARAM(static_cast<LPARAM>(lParam)), GET_Y_LPARAM(static_cast<LPARAM>(lParam)));
-    const int hit = hitTest(globalPos);
-
-    if (hit != HTCLIENT) {
-        *result = hit;
-        return true;
-    }
-
-    return false;
-}
-
-bool FramelessWindow::handleNcButtonMessage(quint32 messageId, quintptr wParam, qintptr *result)
-{
-    if (wParam != HTMAXBUTTON && wParam != HTMINBUTTON && wParam != HTCLOSE) {
-        return false;
-    }
-
-    if (messageId == WM_NCLBUTTONUP) {
-        *result = 0;
-        return true;
-    }
-
-    if (messageId == WM_NCLBUTTONDOWN) {
-        if (wParam == HTMAXBUTTON) {
-            toggleMaximizeRestore();
-        } else if (wParam == HTMINBUTTON) {
-            showMinimized();
-        } else if (wParam == HTCLOSE) {
-            close();
-        }
-    }
-
-    *result = 0;
-    return true;
-}
-
-bool FramelessWindow::handleGetMinMaxInfoMessage(void *lParam, qintptr *result)
-{
-    auto *mmi = reinterpret_cast<MINMAXINFO *>(lParam);
-    if (mmi == nullptr) {
-        Diagnostics::logWarning(QStringLiteral("WM_GETMINMAXINFO received null MINMAXINFO"));
-        return false;
-    }
-
-    const QScreen *screen = windowHandle() ? windowHandle()->screen() : QGuiApplication::primaryScreen();
-    if (screen != nullptr) {
-        const QRect available = screen->availableGeometry();
-        const QRect screenGeometry = screen->geometry();
-        mmi->ptMaxPosition.x = available.x() - screenGeometry.x();
-        mmi->ptMaxPosition.y = available.y() - screenGeometry.y();
-        mmi->ptMaxSize.x = available.width();
-        mmi->ptMaxSize.y = available.height();
-    }
-
-    *result = 0;
-    return true;
-}
-
-bool FramelessWindow::handleNcRightButtonUpMessage(quintptr wParam, qintptr lParam, qintptr *result)
-{
-    if (wParam != HTCAPTION && wParam != HTSYSMENU) {
-        return false;
-    }
-
-    const QPoint globalPos(GET_X_LPARAM(static_cast<LPARAM>(lParam)), GET_Y_LPARAM(static_cast<LPARAM>(lParam)));
-    showSystemMenu(globalPos);
-    *result = 0;
-    return true;
-}
-
 #else
 bool FramelessWindow::nativeEvent(const QByteArray &eventType, void *message, qintptr *result)
 {
