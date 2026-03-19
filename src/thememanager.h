@@ -12,9 +12,7 @@ public:
     };
 
     enum class BackgroundMode {
-        Solid,
-        Gradient,
-        Image
+        Solid
     };
 
     ThemeManager() = default;
@@ -28,9 +26,6 @@ public:
     void setBackgroundMode(BackgroundMode mode);
     BackgroundMode backgroundMode() const;
 
-    void setBackgroundImagePath(const QString &imagePath);
-    QString backgroundImagePath() const;
-
     bool isDarkMode() const;
     QString buildStyleSheet(bool transparentWindowBackground = false) const;
 
@@ -38,5 +33,4 @@ private:
     ThemeMode m_themeMode = ThemeMode::Light;
     QColor m_accentColor = QColor(0, 120, 215);
     BackgroundMode m_backgroundMode = BackgroundMode::Solid;
-    QString m_backgroundImagePath;
 };

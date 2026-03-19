@@ -1,26 +1,15 @@
 #include "thememanager.h"
 
-#include <QUrl>
-
 namespace {
 QString colorToCss(const QColor &color)
 {
     return color.name(QColor::HexRgb);
 }
 
-QString cssUrlFromLocalPath(const QString &path)
+QString buildWindowBackgroundRule(const QColor &windowBg,
+                                  bool transparentWindowBackground)
 {
-    return QUrl::fromLocalFile(path).toString(QUrl::FullyEncoded);
-}
-
-QString buildWindowBackgroundRule(ThemeManager::BackgroundMode mode,
-                                  bool dark,
-                                  const QColor &windowBg,
-                                  bool transparentWindowBackground,
-                                  const QString &backgroundImagePath)
-{
-    Q_UNUSED(dark)
-    // Keep a stable translucent white layer for Acrylic in both normal and maximized states.
+    // Keep a stable translucent layer so Mica remains visible without introducing heavy blending artifacts.
     const QString translucentBase = QStringLiteral("rgba(255, 255, 255, 0.30)");
 
     if (transparentWindowBackground) {
@@ -28,27 +17,7 @@ QString buildWindowBackgroundRule(ThemeManager::BackgroundMode mode,
             .arg(translucentBase);
     }
 
-    QString windowBackgroundRule = QStringLiteral("background-color: %1;").arg(colorToCss(windowBg));
-
-    if (mode == ThemeManager::BackgroundMode::Gradient) {
-        const QColor gradStart = dark ? windowBg.lighter(120) : windowBg.lighter(106);
-        const QColor gradEnd = dark ? windowBg.darker(125) : windowBg.darker(108);
-        windowBackgroundRule = QStringLiteral(
-            "background-color: %1;"
-            "background-image: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %2, stop:1 %3);")
-                                   .arg(colorToCss(windowBg),
-                                        colorToCss(gradStart),
-                                        colorToCss(gradEnd));
-    } else if (mode == ThemeManager::BackgroundMode::Image && !backgroundImagePath.trimmed().isEmpty()) {
-        windowBackgroundRule = QStringLiteral(
-            "background-color: %1;"
-            "background-image: url(\"%2\");"
-            "background-repeat: no-repeat;"
-            "background-position: center;")
-                                   .arg(colorToCss(windowBg), cssUrlFromLocalPath(backgroundImagePath));
-    }
-
-    return windowBackgroundRule;
+    return QStringLiteral("background-color: %1;").arg(colorToCss(windowBg));
 }
 }
 
@@ -84,16 +53,6 @@ ThemeManager::BackgroundMode ThemeManager::backgroundMode() const
     return m_backgroundMode;
 }
 
-void ThemeManager::setBackgroundImagePath(const QString &imagePath)
-{
-    m_backgroundImagePath = imagePath;
-}
-
-QString ThemeManager::backgroundImagePath() const
-{
-    return m_backgroundImagePath;
-}
-
 bool ThemeManager::isDarkMode() const
 {
     return m_themeMode == ThemeMode::Dark;
@@ -114,11 +73,8 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
     const QColor disabledColor = textColor.lighter(160);
     const QColor closeHover = QColor(232, 17, 35);
 
-    const QString windowBackgroundRule = buildWindowBackgroundRule(m_backgroundMode,
-                                                                   dark,
-                                                                   windowBg,
-                                                                   transparentWindowBackground,
-                                                                   m_backgroundImagePath);
+    const QString windowBackgroundRule = buildWindowBackgroundRule(windowBg,
+                                                                   transparentWindowBackground);
 
     return QStringLiteral(R"(
         #FramelessWindow {
@@ -149,25 +105,24 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
             color: %4;
             font-size: 14px;
         }
-        #TitleBarMinimizeButton:hover,
-        #TitleBarMaximizeButton:hover,
-        #TitleBarMaximizeButton[nativeHover="true"] {
+        #TitleBarMinimizeButton[btnState="hover"],
+        #TitleBarMaximizeButton[btnState="hover"] {
             background: %6;
         }
-        #TitleBarMinimizeButton:pressed,
-        #TitleBarMaximizeButton:pressed {
+        #TitleBarMinimizeButton[btnState="pressed"],
+        #TitleBarMaximizeButton[btnState="pressed"] {
             background: %7;
         }
-        #TitleBarMinimizeButton:disabled,
-        #TitleBarMaximizeButton:disabled,
-        #TitleBarCloseButton:disabled {
+        #TitleBarMinimizeButton[btnState="disabled"],
+        #TitleBarMaximizeButton[btnState="disabled"],
+        #TitleBarCloseButton[btnState="disabled"] {
             color: %8;
         }
-        #TitleBarCloseButton:hover {
+        #TitleBarCloseButton[btnState="hover"] {
             background: %9;
             color: white;
         }
-        #TitleBarCloseButton:pressed {
+        #TitleBarCloseButton[btnState="pressed"] {
             background: %10;
             color: white;
         }

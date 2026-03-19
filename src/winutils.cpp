@@ -18,13 +18,6 @@ constexpr auto kCloseButtonObjectName = "TitleBarCloseButton";
 
 namespace WinUtils {
 
-void setMaximizeButtonNativeHover(TitleBar *titleBar, bool hovered)
-{
-    if (titleBar != nullptr) {
-        titleBar->setMaximizeButtonNativeHover(hovered);
-    }
-}
-
 QPoint toLocalPos(const QPoint &globalPos, const QRect &nativeWindowRect, int logicalWidth, int logicalHeight)
 {
     if (nativeWindowRect.isEmpty()) {
@@ -168,7 +161,6 @@ WindowsCapabilities detectWindowsCapabilities()
     caps.supportsSystemBackdrop = caps.buildNumber >= 22621;
     caps.supportsLegacyMica = caps.buildNumber >= 22000;
     caps.supportsAcrylic = caps.buildNumber >= 17763;
-    caps.supportsAeroBlur = caps.buildNumber >= 7600 && caps.buildNumber < 9200;
 #endif
 
     return caps;

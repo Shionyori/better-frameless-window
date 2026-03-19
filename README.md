@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 	FramelessWindow window;
 	auto *page = new QLabel("Your App Content");
 	page->setAlignment(Qt::AlignCenter);
-	window.setContentWidget(page);
+	window.setCentralWidget(page);
 
 	window.show();
 	return app.exec();
@@ -32,13 +32,17 @@ int main(int argc, char *argv[])
 ## 基础 API
 
 - `setCentralWidget(QWidget*)` / `centralWidget()` / `takeCentralWidget()`：主内容区接口（推荐，语义对齐 `QMainWindow`）。
-- `setContentWidget(QWidget*)` / `contentWidget()` / `takeContentWidget()`：与 `centralWidget` 等价的兼容接口。
 - `addTitleBarWidget(QWidget*)`：向标题栏中部插入自定义控件。
 - `clearTitleBarWidgets()`：清空标题栏插槽控件。
 - `setThemeMode(...)` / `setAccentColor(...)`：主题与强调色。
-- `setBackdropPreference(...)`：特效模式偏好，支持 `Auto / None / MicaSystem / MicaLegacy / Acrylic / Aero`。
+
+- `setBackdropPreference(...)`：特效模式偏好，支持 `Auto / None / MicaSystem / MicaLegacy / Acrylic`。
 	- 当指定模式在当前系统不可用时，会自动回退到 `Auto` 可用链（除 `None`）。
-- `setShadowEnabled(...)` / `setBackdropEnabled(...)` / `setRoundedCornersEnabled(...)` / `setImmersiveDarkModeEnabled(...)` / `setAeroBlurEnabled(...)`：视觉能力开关。
+- `setShadowEnabled(...)` / `setBackdropEnabled(...)` / `setRoundedCornersEnabled(...)` / `setImmersiveDarkModeEnabled(...)`：视觉能力开关。
+
+## 兼容性
+
+- 目标系统：Windows 10 / Windows 11
 
 ## 构建
 

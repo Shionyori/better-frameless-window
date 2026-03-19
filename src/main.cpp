@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
     window.setThemeMode(ThemeManager::ThemeMode::Light);
     window.setBackgroundMode(ThemeManager::BackgroundMode::Solid);
     window.setBackdropEnabled(true);
-    window.setBackdropPreference(WindowEffectWin::BackdropPreference::None);
+    window.setBackdropPreference(WindowEffectWin::BackdropPreference::Acrylic);
 
     // QWidget *businessPage = new QWidget();
     // businessPage->setAttribute(Qt::WA_TranslucentBackground, true);

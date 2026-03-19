@@ -10,16 +10,14 @@ public:
         None,
         MicaSystem,
         MicaLegacy,
-        Acrylic,
-        Aero
+        Acrylic
     };
 
     enum class BackdropMode {
         None,
         MicaSystem,
         MicaLegacy,
-        Acrylic,
-        Aero
+        Acrylic
     };
 
     struct VisualEffectOptions {
@@ -27,7 +25,6 @@ public:
         bool backdropEnabled = true;
         bool roundedCornersEnabled = true;
         bool immersiveDarkModeEnabled = true;
-        bool aeroBlurEnabled = true;
         BackdropPreference backdropPreference = BackdropPreference::Auto;
         bool useDarkMode = false;
         bool maximized = false;
@@ -46,16 +43,12 @@ public:
                               bool useDarkMode,
                               bool maximized,
                               bool minimized,
-                              bool aeroBlurEnabled,
                               BackdropPreference backdropPreference) const;
     void applyBorderColor(void *hwnd, const QColor &borderColor) const;
 
 private:
-    BackdropMode selectBackdropMode(void *hwnd,
-                                    bool enabled,
+    BackdropMode selectBackdropMode(bool enabled,
                                     bool maximized,
                                     bool minimized,
-                                    bool aeroBlurEnabled,
                                     BackdropPreference backdropPreference) const;
-    void applyAeroBlur(void *hwnd, bool enabled) const;
 };

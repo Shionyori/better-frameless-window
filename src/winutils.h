@@ -27,10 +27,8 @@ struct WindowsCapabilities {
 	bool supportsSystemBackdrop = false;
 	bool supportsLegacyMica = false;
 	bool supportsAcrylic = false;
-	bool supportsAeroBlur = false;
 };
 
-void setMaximizeButtonNativeHover(TitleBar *titleBar, bool hovered);
 QPoint toLocalPos(const QPoint &globalPos, const QRect &nativeWindowRect, int logicalWidth, int logicalHeight);
 int hitFromEdges(Qt::Edges edges);
 void syncNativeWindowStyles(void *hwnd, bool includeExStyle);

@@ -22,19 +22,13 @@ public:
     void setBackdropPreference(WindowEffectWin::BackdropPreference preference);
     void setRoundedCornersEnabled(bool enabled);
     void setImmersiveDarkModeEnabled(bool enabled);
-    void setAeroBlurEnabled(bool enabled);
     void setThemeMode(ThemeManager::ThemeMode mode);
     void setAccentColor(const QColor &accentColor);
     void setBackgroundMode(ThemeManager::BackgroundMode mode);
-    void setBackgroundImagePath(const QString &imagePath);
 
     void setCentralWidget(QWidget *widget);
     QWidget *centralWidget() const;
     QWidget *takeCentralWidget();
-
-    void setContentWidget(QWidget *widget);
-    QWidget *contentWidget() const;
-    QWidget *takeContentWidget();
     void addTitleBarWidget(QWidget *widget);
     void clearTitleBarWidgets();
     void setDiagnosticsEnabled(bool enabled);
@@ -43,12 +37,10 @@ public:
     WindowEffectWin::BackdropPreference backdropPreference() const;
     bool isRoundedCornersEnabled() const;
     bool isImmersiveDarkModeEnabled() const;
-    bool isAeroBlurEnabled() const;
     bool isDiagnosticsEnabled() const;
     ThemeManager::ThemeMode themeMode() const;
     QColor accentColor() const;
     ThemeManager::BackgroundMode backgroundMode() const;
-    QString backgroundImagePath() const;
 
 protected:
     bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
@@ -80,6 +72,8 @@ protected:
     void forceNativeDwmRefresh();
     void applyVisualEffects();
     void scheduleStateVisualRefresh();
+    void flushStateVisualRefresh();
+    quint64 currentVisualStateToken() const;
     bool shouldUseTranslucentBackground() const;
     bool shouldUseDarkMode() const;
     QColor preferredBorderColor() const;
@@ -95,7 +89,6 @@ private:
     bool handleNcButtonMessage(quint32 messageId, quintptr wParam, qintptr *result);
     bool handleGetMinMaxInfoMessage(void *lParam, qintptr *result);
     bool handleNcRightButtonUpMessage(quintptr wParam, qintptr lParam, qintptr *result);
-    void clearMaximizeButtonNativeHover();
 #endif
 
     TitleBar *m_titleBar;
@@ -107,12 +100,13 @@ private:
     WindowEffectWin::BackdropPreference m_backdropPreference;
     bool m_roundedCornersEnabled;
     bool m_immersiveDarkModeEnabled;
-    bool m_aeroBlurEnabled;
     bool m_applyingTheme;
     QString m_lastAppliedStyleSheet;
     bool m_lastTranslucentBackground;
     bool m_loggedNullWindowHandle;
     bool m_pendingStateVisualRefresh;
+    bool m_stateVisualRefreshDirty;
+    quint64 m_lastVisualStateToken;
     ThemeManager m_themeManager;
     WindowEffectWin m_windowEffect;
 };

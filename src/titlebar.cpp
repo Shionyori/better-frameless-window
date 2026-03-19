@@ -1,10 +1,12 @@
 #include "titlebar.h"
 
 #include <QApplication>
+#include <QCursor>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QEvent>
 #include <QStyle>
 
 TitleBar::TitleBar(QWidget *parent)
@@ -37,7 +39,13 @@ TitleBar::TitleBar(QWidget *parent)
     for (auto *button : buttons) {
         button->setFixedSize(32, 28);
         button->setFlat(true);
+        button->installEventFilter(this);
     }
+
+    m_minimizeButton->setProperty("btnRole", "min");
+    m_maximizeButton->setProperty("btnRole", "max");
+    m_closeButton->setProperty("btnRole", "close");
+    resetButtonVisualStates();
 
     m_layout->addWidget(m_titleLabel);
     m_layout->addWidget(m_centerContainer, 0);
@@ -90,16 +98,66 @@ int TitleBar::heightHint() const
     return height();
 }
 
-void TitleBar::setMaximizeButtonNativeHover(bool hovered)
+bool TitleBar::eventFilter(QObject *watched, QEvent *event)
 {
-    if (m_maximizeButton->property("nativeHover").toBool() == hovered) {
+    auto *button = qobject_cast<QPushButton *>(watched);
+    if (button == nullptr) {
+        return QWidget::eventFilter(watched, event);
+    }
+
+    switch (event->type()) {
+    case QEvent::Enter:
+        if (button->isEnabled()) {
+            updateButtonVisualState(button, "hover");
+        }
+        break;
+    case QEvent::Leave:
+        updateButtonVisualState(button, button->isEnabled() ? "normal" : "disabled");
+        break;
+    case QEvent::MouseButtonPress:
+        if (button->isEnabled()) {
+            updateButtonVisualState(button, "pressed");
+        }
+        break;
+    case QEvent::MouseButtonRelease:
+        if (button->isEnabled()) {
+            updateButtonVisualState(button,
+                                    button->rect().contains(button->mapFromGlobal(QCursor::pos()))
+                                        ? "hover"
+                                        : "normal");
+        }
+        break;
+    case QEvent::EnabledChange:
+        updateButtonVisualState(button, button->isEnabled() ? "normal" : "disabled");
+        break;
+    default:
+        break;
+    }
+
+    return QWidget::eventFilter(watched, event);
+}
+
+void TitleBar::updateButtonVisualState(QPushButton *button, const char *state)
+{
+    if (button == nullptr) {
         return;
     }
 
-    m_maximizeButton->setProperty("nativeHover", hovered);
-    m_maximizeButton->style()->unpolish(m_maximizeButton);
-    m_maximizeButton->style()->polish(m_maximizeButton);
-    m_maximizeButton->update();
+    const QString stateValue = QString::fromLatin1(state);
+    if (button->property("btnState").toString() == stateValue) {
+        return;
+    }
+
+    button->setProperty("btnState", stateValue);
+    button->style()->polish(button);
+    button->update();
+}
+
+void TitleBar::resetButtonVisualStates()
+{
+    updateButtonVisualState(m_minimizeButton, m_minimizeButton->isEnabled() ? "normal" : "disabled");
+    updateButtonVisualState(m_maximizeButton, m_maximizeButton->isEnabled() ? "normal" : "disabled");
+    updateButtonVisualState(m_closeButton, m_closeButton->isEnabled() ? "normal" : "disabled");
 }
 
 void TitleBar::setMaximized(bool maximized)
@@ -107,8 +165,8 @@ void TitleBar::setMaximized(bool maximized)
     m_minimizeButton->setEnabled(true);
     m_maximizeButton->setEnabled(true);
     m_closeButton->setEnabled(true);
-    setMaximizeButtonNativeHover(false);
     m_maximizeButton->setText(maximized ? "❐" : "□");
+    resetButtonVisualStates();
 }
 
 void TitleBar::mouseDoubleClickEvent(QMouseEvent *event)

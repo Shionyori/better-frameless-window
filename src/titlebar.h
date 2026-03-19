@@ -15,7 +15,6 @@ public:
 
     int heightHint() const;
     void setMaximized(bool maximized);
-    void setMaximizeButtonNativeHover(bool hovered);
     void addCenterWidget(QWidget *widget);
     void clearCenterWidgets();
 
@@ -27,6 +26,7 @@ signals:
     void systemMenuRequested(const QPoint &globalPos);
 
 protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
     void mouseDoubleClickEvent(QMouseEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
@@ -35,6 +35,8 @@ protected:
 
 private:
     bool isOnControlButton(const QPoint &pos) const;
+    void updateButtonVisualState(QPushButton *button, const char *state);
+    void resetButtonVisualStates();
 
     QHBoxLayout *m_layout;
     QWidget *m_centerContainer;
