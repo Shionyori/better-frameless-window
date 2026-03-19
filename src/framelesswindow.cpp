@@ -2,9 +2,11 @@
 
 #include "diagnostics.h"
 #include "core/windowvisualstate.h"
+#include "platform/win32/windowcommandwin.h"
+#include "platform/win32/systemmenuwin.h"
 #include "platform/win32/windowhittestwin.h"
+#include "platform/win32/windowframewin.h"
 #include "platform/win32/winnativemessagerouter.h"
-#include "winutils.h"
 #include "titlebar.h"
 
 #include <QEvent>
@@ -22,10 +24,6 @@
 #include <QVBoxLayout>
 #include <QWindow>
 
-#ifdef Q_OS_WIN
-#include <qt_windows.h>
-#endif
-
 FramelessWindow::FramelessWindow(QWidget *parent)
     : QWidget(parent)
     , m_titleBar(nullptr)
@@ -39,7 +37,6 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_immersiveDarkModeEnabled(true)
     , m_applyingTheme(false)
     , m_lastAppliedStyleSheet()
-    , m_lastTranslucentBackground(false)
     , m_loggedNullWindowHandle(false)
     , m_visualRefreshCoordinator(this)
 {
@@ -51,10 +48,7 @@ FramelessWindow::FramelessWindow(QWidget *parent)
             return isVisible();
         },
         [this]() {
-            applyTheme();
-            syncNativeWindowFrame();
-            applyVisualEffects();
-            updateMaximizeButtonState();
+            performVisualRefreshPass();
         },
         [this](quint64 previousToken, quint64 tokenBefore, quint64 tokenAfter) {
             if (tokenAfter != previousToken || tokenAfter != tokenBefore) {
@@ -78,7 +72,7 @@ void FramelessWindow::setShadowEnabled(bool enabled)
     }
 
     m_shadowEnabled = enabled;
-    applyVisualEffects();
+    requestVisualRefresh();
 }
 
 void FramelessWindow::setBackdropEnabled(bool enabled)
@@ -88,8 +82,7 @@ void FramelessWindow::setBackdropEnabled(bool enabled)
     }
 
     m_backdropEnabled = enabled;
-    applyTheme();
-    applyVisualEffects();
+    requestVisualRefresh();
 }
 
 void FramelessWindow::setBackdropPreference(WindowEffectWin::BackdropPreference preference)
@@ -99,8 +92,7 @@ void FramelessWindow::setBackdropPreference(WindowEffectWin::BackdropPreference 
     }
 
     m_backdropPreference = preference;
-    applyTheme();
-    applyVisualEffects();
+    requestVisualRefresh();
 }
 
 void FramelessWindow::setRoundedCornersEnabled(bool enabled)
@@ -110,7 +102,7 @@ void FramelessWindow::setRoundedCornersEnabled(bool enabled)
     }
 
     m_roundedCornersEnabled = enabled;
-    applyVisualEffects();
+    requestVisualRefresh();
 }
 
 void FramelessWindow::setImmersiveDarkModeEnabled(bool enabled)
@@ -120,7 +112,7 @@ void FramelessWindow::setImmersiveDarkModeEnabled(bool enabled)
     }
 
     m_immersiveDarkModeEnabled = enabled;
-    applyVisualEffects();
+    requestVisualRefresh();
 }
 
 void FramelessWindow::setThemeMode(ThemeManager::ThemeMode mode)
@@ -130,8 +122,7 @@ void FramelessWindow::setThemeMode(ThemeManager::ThemeMode mode)
     }
 
     m_themeManager.setThemeMode(mode);
-    applyTheme();
-    applyVisualEffects();
+    requestVisualRefresh();
 }
 
 void FramelessWindow::setAccentColor(const QColor &accentColor)
@@ -141,8 +132,7 @@ void FramelessWindow::setAccentColor(const QColor &accentColor)
     }
 
     m_themeManager.setAccentColor(accentColor);
-    applyTheme();
-    applyVisualEffects();
+    requestVisualRefresh();
 }
 
 void FramelessWindow::setBackgroundMode(ThemeManager::BackgroundMode mode)
@@ -152,7 +142,26 @@ void FramelessWindow::setBackgroundMode(ThemeManager::BackgroundMode mode)
     }
 
     m_themeManager.setBackgroundMode(mode);
+    requestVisualRefresh();
+}
+
+void FramelessWindow::requestVisualRefresh()
+{
+    if (!isVisible()) {
+        performVisualRefreshPass();
+        update();
+        return;
+    }
+
+    scheduleStateVisualRefresh();
+}
+
+void FramelessWindow::performVisualRefreshPass()
+{
     applyTheme();
+    syncNativeWindowFrame();
+    applyVisualEffects();
+    updateMaximizeButtonState();
 }
 
 void FramelessWindow::setCentralWidget(QWidget *widget)
@@ -441,7 +450,6 @@ void FramelessWindow::applyTheme()
     QScopedValueRollback<bool> applyingGuard(m_applyingTheme, true);
     const bool useTranslucentBackground = shouldUseTranslucentBackground();
     setAttribute(Qt::WA_TranslucentBackground, useTranslucentBackground);
-    m_lastTranslucentBackground = useTranslucentBackground;
 
     const QString styleSheet = m_themeManager.buildStyleSheet(useTranslucentBackground);
     if (m_lastAppliedStyleSheet != styleSheet) {
@@ -459,24 +467,7 @@ void FramelessWindow::showEvent(QShowEvent *event)
 
 void FramelessWindow::forceNativeDwmRefresh()
 {
-#ifdef Q_OS_WIN
-    const HWND hwnd = reinterpret_cast<HWND>(winId());
-    if (hwnd == nullptr) {
-        return;
-    }
-
-    SetWindowPos(hwnd,
-                 nullptr,
-                 0,
-                 0,
-                 0,
-                 0,
-                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-    RedrawWindow(hwnd,
-                 nullptr,
-                 nullptr,
-                 RDW_INVALIDATE | RDW_UPDATENOW | RDW_FRAME | RDW_ALLCHILDREN);
-#endif
+    WindowFrameWin::forceDwmRefresh(reinterpret_cast<void *>(winId()));
 }
 
 void FramelessWindow::mousePressEvent(QMouseEvent *event)
@@ -538,21 +529,12 @@ int FramelessWindow::hitTest(const QPoint &globalPos) const
     return WindowHitTestWin::nonClientHitTest(context, globalPos);
 #endif
 
-    return HTCLIENT;
+    return 0;
 }
 
 int FramelessWindow::resizeBorderThickness() const
 {
-#ifdef Q_OS_WIN
-    const HWND hwnd = reinterpret_cast<HWND>(winId());
-    const UINT dpi = hwnd ? GetDpiForWindow(hwnd) : 96;
-    const int frame = GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi);
-    const int padded = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
-    const int nativeBorder = frame + padded;
-    return qBound(4, nativeBorder, 6);
-#else
-    return 4;
-#endif
+    return WindowHitTestWin::resizeBorderThickness(reinterpret_cast<void *>(winId()));
 }
 
 Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
@@ -604,8 +586,7 @@ Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
 void FramelessWindow::toggleMaximizeRestore()
 {
 #ifdef Q_OS_WIN
-    const HWND hwnd = reinterpret_cast<HWND>(winId());
-    if (hwnd == nullptr) {
+    if (!WindowCommandWin::toggleMaximizeRestore(reinterpret_cast<void *>(winId()), isMaximized())) {
         Diagnostics::logWarning(QStringLiteral("toggleMaximizeRestore: null HWND, fallback to QWidget state switch"));
         if (isMaximized()) {
             showNormal();
@@ -615,8 +596,6 @@ void FramelessWindow::toggleMaximizeRestore()
         return;
     }
 
-    const WPARAM command = isMaximized() ? SC_RESTORE : SC_MAXIMIZE;
-    SendMessage(hwnd, WM_SYSCOMMAND, command, 0);
     scheduleStateVisualRefresh();
     QTimer::singleShot(120, this, [this]() {
         if (!isVisible()) {
@@ -642,63 +621,10 @@ void FramelessWindow::startSystemMove()
 
 void FramelessWindow::showSystemMenu(const QPoint &globalPos)
 {
-#ifdef Q_OS_WIN
-    const HWND hwnd = reinterpret_cast<HWND>(winId());
-    if (hwnd == nullptr) {
-        Diagnostics::logWarning(QStringLiteral("showSystemMenu: null HWND"));
-        return;
-    }
-
-    HMENU menu = GetSystemMenu(hwnd, FALSE);
-    if (menu == nullptr) {
-        Diagnostics::logWarning(QStringLiteral("showSystemMenu: GetSystemMenu returned null"));
-        return;
-    }
-
-    updateSystemMenuState(reinterpret_cast<void *>(menu));
-    const POINT cursorPos{globalPos.x(), globalPos.y()};
-
-    UINT flags = TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON;
-    const int command = TrackPopupMenu(menu, flags, cursorPos.x, cursorPos.y, 0, hwnd, nullptr);
-    if (command != 0) {
-        const UINT sysCommand = static_cast<UINT>(command) & 0xFFF0;
-
-        if (sysCommand == SC_MOVE || sysCommand == SC_SIZE) {
-            ReleaseCapture();
-        }
-
-        SendMessage(hwnd, WM_SYSCOMMAND, static_cast<WPARAM>(sysCommand), 0);
-    }
-#else
-    Q_UNUSED(globalPos)
-#endif
-}
-
-void FramelessWindow::updateSystemMenuState(void *menuHandle) const
-{
-#ifdef Q_OS_WIN
-    if (menuHandle == nullptr) {
-        return;
-    }
-
-    HMENU menu = static_cast<HMENU>(menuHandle);
-    const bool maximized = isMaximized();
-    const bool minimized = isMinimized();
-
-    auto setItemEnabled = [menu](UINT item, bool enabled) {
-        EnableMenuItem(menu, item, MF_BYCOMMAND | (enabled ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)));
-    };
-
-    setItemEnabled(SC_RESTORE, maximized || minimized);
-    setItemEnabled(SC_MOVE, !maximized && !minimized);
-    setItemEnabled(SC_SIZE, !maximized && !minimized);
-    setItemEnabled(SC_MINIMIZE, !minimized);
-    setItemEnabled(SC_MAXIMIZE, !maximized);
-
-    DrawMenuBar(reinterpret_cast<HWND>(winId()));
-#else
-    Q_UNUSED(menuHandle)
-#endif
+    SystemMenuWin::WindowState state;
+    state.maximized = isMaximized();
+    state.minimized = isMinimized();
+    SystemMenuWin::showForWindow(reinterpret_cast<void *>(winId()), globalPos, state);
 }
 
 void FramelessWindow::updateMaximizeButtonState()
@@ -742,22 +668,12 @@ bool FramelessWindow::tryStartSystemResizeAtGlobalPos(const QPoint &globalPos)
 
 void FramelessWindow::ensureNativeResizeStyle()
 {
-#ifdef Q_OS_WIN
-    void *hwnd = reinterpret_cast<void *>(winId());
-    WinUtils::syncNativeWindowStyles(hwnd, true);
-#endif
+    WindowFrameWin::syncWindowFrame(reinterpret_cast<void *>(winId()));
 }
 
 void FramelessWindow::syncNativeWindowFrame()
 {
-#ifdef Q_OS_WIN
-    void *hwnd = reinterpret_cast<void *>(winId());
-    // Use full style sync (including ex-style and WS_POPUP cleanup) every time.
-    // WA_TranslucentBackground/state transitions may recreate or mutate native
-    // styles, and partial sync can leave the window in a popup-like state where
-    // Snap Layout (HTMAXBUTTON path) and DWM effects become inconsistent.
-    WinUtils::syncNativeWindowStyles(hwnd, true);
-#endif
+    WindowFrameWin::syncWindowFrame(reinterpret_cast<void *>(winId()));
 }
 
 void FramelessWindow::applyVisualEffects()

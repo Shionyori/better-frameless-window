@@ -64,7 +64,6 @@ protected:
     void toggleMaximizeRestore();
     void startSystemMove();
     void showSystemMenu(const QPoint &globalPos);
-    void updateSystemMenuState(void *menuHandle) const;
     void updateMaximizeButtonState();
     void updateCursorForPosition(const QPoint &localPos);
     bool tryStartSystemResizeAtLocalPos(const QPoint &localPos);
@@ -81,6 +80,8 @@ protected:
     Qt::CursorShape cursorForEdges(Qt::Edges edges) const;
 
 private:
+    void performVisualRefreshPass();
+    void requestVisualRefresh();
     void attachContentEventFilters(QWidget *widget);
     void detachContentEventFilters(QWidget *widget);
     friend class NativeWindowsMessageRouter;
@@ -96,7 +97,6 @@ private:
     bool m_immersiveDarkModeEnabled;
     bool m_applyingTheme;
     QString m_lastAppliedStyleSheet;
-    bool m_lastTranslucentBackground;
     bool m_loggedNullWindowHandle;
     VisualRefreshCoordinator m_visualRefreshCoordinator;
     ThemeManager m_themeManager;

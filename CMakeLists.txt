@@ -41,6 +41,12 @@ target_sources(${TARGET_NAME} PRIVATE
     src/platform/win32/winnativemessagerouter.h
     src/core/visualrefreshcoordinator.cpp
     src/core/visualrefreshcoordinator.h
+    src/platform/win32/systemmenuwin.cpp
+    src/platform/win32/systemmenuwin.h
+    src/platform/win32/windowcommandwin.cpp
+    src/platform/win32/windowcommandwin.h
+    src/platform/win32/windowframewin.cpp
+    src/platform/win32/windowframewin.h
     src/platform/win32/windowhittestwin.cpp
     src/platform/win32/windowhittestwin.h
     src/winutils.cpp

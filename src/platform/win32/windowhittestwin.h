@@ -23,6 +23,7 @@ struct Context {
     std::function<TitleRegion(const QPoint &)> titleRegionResolver;
 };
 
+int resizeBorderThickness(void *hwnd);
 int nonClientHitTest(const Context &context, const QPoint &globalPos);
 
 } // namespace WindowHitTestWin

@@ -10,6 +10,21 @@
 
 namespace WindowHitTestWin {
 
+int resizeBorderThickness(void *hwnd)
+{
+#ifdef Q_OS_WIN
+    const HWND win = static_cast<HWND>(hwnd);
+    const UINT dpi = win ? GetDpiForWindow(win) : 96;
+    const int frame = GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi);
+    const int padded = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+    const int nativeBorder = frame + padded;
+    return qBound(4, nativeBorder, 6);
+#else
+    Q_UNUSED(hwnd)
+    return 4;
+#endif
+}
+
 int nonClientHitTest(const Context &context, const QPoint &globalPos)
 {
 #ifdef Q_OS_WIN
