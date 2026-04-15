@@ -1,6 +1,6 @@
 # better-frameless-window
 
-一个**Qt6 Windows 无边框基础窗口**：
+**Qt6 Windows 无边框基础窗口**：
 - 去原生边框 + 自定义标题栏
 - 标题栏拖拽、双击最大化/还原、右键系统菜单
 - 8 向边缘缩放、HiDPI 命中修正
