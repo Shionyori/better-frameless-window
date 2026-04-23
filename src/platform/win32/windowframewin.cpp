@@ -35,7 +35,7 @@ void forceDwmRefresh(void *hwnd)
     RedrawWindow(win,
                  nullptr,
                  nullptr,
-                 RDW_INVALIDATE | RDW_UPDATENOW | RDW_FRAME | RDW_ALLCHILDREN);
+                 RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN);
 #else
     Q_UNUSED(hwnd)
 #endif

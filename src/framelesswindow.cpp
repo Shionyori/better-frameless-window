@@ -367,12 +367,24 @@ void FramelessWindow::changeEvent(QEvent *event)
 {
     QWidget::changeEvent(event);
     if (event->type() == QEvent::WindowStateChange) {
-        m_lastNativeSizeMaximized = isMaximized();
+        // Keep maximize/restore edge tracking owned by WM_SIZE handling.
+        // Mixing Qt-state writes here can clear the native transition flag
+        // before SIZE_RESTORED arrives, which may skip backdrop rebind guard.
         scheduleStateVisualRefresh();
     } else if (event->type() == QEvent::ActivationChange) {
         if (isActiveWindow()) {
             scheduleStateVisualRefresh();
         }
+    } else if (event->type() == QEvent::WinIdChange) {
+        ensureNativeResizeStyle();
+        scheduleStateVisualRefresh();
+        QTimer::singleShot(0, this, [this]() {
+            if (!isVisible()) {
+                return;
+            }
+
+            scheduleStateVisualRefresh();
+        });
     } else if (event->type() == QEvent::ApplicationPaletteChange
                || event->type() == QEvent::PaletteChange) {
         applyVisualEffects();
@@ -690,6 +702,12 @@ void FramelessWindow::applyVisualEffects()
             Diagnostics::logWarning(QStringLiteral("applyVisualEffects skipped: windowHandle is null"));
             m_loggedNullWindowHandle = true;
         }
+
+        QTimer::singleShot(0, this, [this]() {
+            if (windowHandle() != nullptr) {
+                scheduleStateVisualRefresh();
+            }
+        });
         return;
     }
 
@@ -716,6 +734,11 @@ void FramelessWindow::applyVisualEffects()
     void *hwnd = reinterpret_cast<void *>(winId());
     if (hwnd == nullptr) {
         Diagnostics::logWarning(QStringLiteral("applyVisualEffects skipped: winId returned null handle"));
+        QTimer::singleShot(0, this, [this]() {
+            if (windowHandle() != nullptr) {
+                scheduleStateVisualRefresh();
+            }
+        });
         return;
     }
 
@@ -737,19 +760,20 @@ void FramelessWindow::forceBackdropRebind()
     const bool maximized = isMaximized();
     const bool minimized = isMinimized();
 
-    // Force compositor to drop and re-attach backdrop material on restore edge.
-    m_windowEffect.applyBackdropEffects(hwnd,
-                                        false,
-                                        useDarkMode,
-                                        maximized,
-                                        minimized,
-                                        effectiveBackdropPreference());
+    // Re-assert the target backdrop mode without inserting a temporary
+    // visual-off state, so maximize/restore keeps a more consistent look.
     m_windowEffect.applyBackdropEffects(hwnd,
                                         true,
                                         useDarkMode,
                                         maximized,
                                         minimized,
-                                        effectiveBackdropPreference());
+                                        m_backdropPreference);
+    m_windowEffect.applyBackdropEffects(hwnd,
+                                        true,
+                                        useDarkMode,
+                                        maximized,
+                                        minimized,
+                                        m_backdropPreference);
 }
 
 bool FramelessWindow::shouldStartRestoreTransitionFromSizeState(bool isMaximizedState, bool isRestoredState)
@@ -770,10 +794,6 @@ bool FramelessWindow::shouldStartRestoreTransitionFromSizeState(bool isMaximized
 
 WindowEffectWin::BackdropPreference FramelessWindow::effectiveBackdropPreference() const
 {
-    if (m_backdropTransitionGuardActive) {
-        return WindowEffectWin::BackdropPreference::None;
-    }
-
     return m_backdropPreference;
 }
 
@@ -787,8 +807,8 @@ void FramelessWindow::beginBackdropTransitionGuard()
     m_backdropTransitionGuardActive = true;
     const quint64 epoch = ++m_backdropTransitionEpoch;
 
-    // Keep backdrop off for a short transition window so DWM can settle
-    // before reapplying the target material.
+    // Keep a short restore guard window for delayed re-assertion timings.
+    // Backdrop preference itself stays stable to avoid transient effect loss.
     QTimer::singleShot(160, this, [this, epoch]() {
         if (epoch != m_backdropTransitionEpoch) {
             return;
@@ -820,9 +840,13 @@ bool FramelessWindow::shouldUseDarkMode() const
 
 bool FramelessWindow::shouldUseTranslucentBackground() const
 {
+    // Keep Qt translucent-surface policy stable across maximize/restore guard.
+    // Native backdrop can be temporarily forced to None, but coupling that
+    // transient state to QWidget translucency may cause delayed composition
+    // recovery on Windows after restore.
     return WindowVisualState::shouldUseTranslucentBackground(m_backdropEnabled,
-                                                              isMinimized(),
-                                                              effectiveBackdropPreference());
+                                                              false,
+                                                              m_backdropPreference);
 }
 
 QColor FramelessWindow::preferredBorderColor() const
