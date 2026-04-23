@@ -613,14 +613,12 @@ void FramelessWindow::toggleMaximizeRestore()
     }
 
     scheduleStateVisualRefresh();
-    QTimer::singleShot(120, this, [this]() {
+    QTimer::singleShot(90, this, [this]() {
         if (!isVisible()) {
             return;
         }
+
         scheduleStateVisualRefresh();
-        // Ensure compositor receives a concrete redraw after state transitions
-        // where visual tokens may already be stable.
-        forceNativeDwmRefresh();
     });
 #else
     if (isMaximized()) {

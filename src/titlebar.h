@@ -1,11 +1,14 @@
 #pragma once
 
 #include <QWidget>
+#include <QHash>
 
 class QLabel;
 class QPushButton;
 class QMouseEvent;
 class QHBoxLayout;
+class QGraphicsOpacityEffect;
+class QPropertyAnimation;
 
 class TitleBar : public QWidget
 {
@@ -44,11 +47,19 @@ protected:
     void leaveEvent(QEvent *event) override;
 
 private:
+    struct ButtonVisualFx {
+        QGraphicsOpacityEffect *effect = nullptr;
+        QPropertyAnimation *animation = nullptr;
+    };
+
     bool isOnControlButton(const QPoint &pos) const;
     QPushButton *controlButtonAt(const QPoint &pos) const;
+    void initControlButton(QPushButton *button, const char *role);
+    void updateControlButtonGlyphs();
     void updateButtonVisualState(QPushButton *button, const char *state);
     void resetButtonVisualStates();
     void syncButtonVisualStatesFromCursor();
+    void animateButtonOpacity(QPushButton *button, const QString &state);
 
     QHBoxLayout *m_layout;
     QWidget *m_centerContainer;
@@ -61,4 +72,5 @@ private:
     bool m_dragInitiated;
     QPoint m_pressPos;
     bool m_visualMaximized;
+    QHash<QPushButton *, ButtonVisualFx> m_buttonFx;
 };

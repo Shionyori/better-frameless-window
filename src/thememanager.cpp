@@ -91,7 +91,10 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
         }
         #TitleBarLabel {
             color: %4;
+            font-family: "Segoe UI";
+            font-size: 13px;
             font-weight: 600;
+            letter-spacing: 0.2px;
         }
         #ContentLabel {
             color: %5;
@@ -103,7 +106,9 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
             border: none;
             background: transparent;
             color: %4;
-            font-size: 14px;
+            font-family: "Segoe MDL2 Assets", "Segoe UI";
+            font-size: 10px;
+            padding: 0px;
         }
         #TitleBarMinimizeButton[btnState="hover"],
         #TitleBarMaximizeButton[btnState="hover"] {

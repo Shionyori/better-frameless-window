@@ -182,9 +182,28 @@ bool NativeWindowsMessageRouter::handle(FramelessWindow &window, void *message, 
         return false;
     }
     case WM_EXITSIZEMOVE:
-    case WM_WINDOWPOSCHANGED:
-    case WM_ACTIVATE:
         window.scheduleStateVisualRefresh();
+        return false;
+    case WM_WINDOWPOSCHANGED:
+    {
+        const auto *windowPos = reinterpret_cast<const WINDOWPOS *>(msg->lParam);
+        if (windowPos == nullptr) {
+            window.scheduleStateVisualRefresh();
+            return false;
+        }
+
+        const bool geometryChanged = (windowPos->flags & SWP_NOSIZE) == 0
+                                     || (windowPos->flags & SWP_NOMOVE) == 0
+                                     || (windowPos->flags & SWP_FRAMECHANGED) != 0;
+        if (geometryChanged) {
+            window.scheduleStateVisualRefresh();
+        }
+        return false;
+    }
+    case WM_ACTIVATE:
+        if (LOWORD(msg->wParam) != WA_INACTIVE) {
+            window.scheduleStateVisualRefresh();
+        }
         return false;
     case WM_NCCALCSIZE:
         if (msg->wParam == TRUE) {
