@@ -9,12 +9,12 @@ bool shouldUseDarkMode(ThemeManager::ThemeMode themeMode)
     return themeMode == ThemeManager::ThemeMode::Dark;
 }
 
-bool shouldUseTranslucentBackground(bool backdropEnabled,
+bool shouldUseTranslucentBackground(bool nativeEffectsEnabled,
                                     bool minimized,
-                                    WindowEffectWin::BackdropPreference backdropPreference)
+                                    WindowEffectWin::BackdropPreference nativeBackdropPreference)
 {
 #ifdef Q_OS_WIN
-    if (!backdropEnabled || minimized) {
+    if (!nativeEffectsEnabled || minimized) {
         return false;
     }
 
@@ -23,7 +23,7 @@ bool shouldUseTranslucentBackground(bool backdropEnabled,
                                     || caps.supportsLegacyMica
                                     || caps.supportsAcrylic;
 
-    switch (backdropPreference) {
+    switch (nativeBackdropPreference) {
     case WindowEffectWin::BackdropPreference::Auto:
         return autoChainAvailable;
     case WindowEffectWin::BackdropPreference::None:
@@ -38,16 +38,16 @@ bool shouldUseTranslucentBackground(bool backdropEnabled,
 
     return false;
 #else
-    Q_UNUSED(backdropEnabled)
+    Q_UNUSED(nativeEffectsEnabled)
     Q_UNUSED(minimized)
-    Q_UNUSED(backdropPreference)
+    Q_UNUSED(nativeBackdropPreference)
     return false;
 #endif
 }
 
 WindowEffectWin::VisualEffectOptions buildVisualEffectOptions(bool shadowEnabled,
-                                                              bool backdropEnabled,
-                                                              WindowEffectWin::BackdropPreference backdropPreference,
+                                                              bool nativeEffectsEnabled,
+                                                              WindowEffectWin::BackdropPreference nativeBackdropPreference,
                                                               bool roundedCornersEnabled,
                                                               bool immersiveDarkModeEnabled,
                                                               ThemeManager::ThemeMode themeMode,
@@ -57,8 +57,8 @@ WindowEffectWin::VisualEffectOptions buildVisualEffectOptions(bool shadowEnabled
 {
     WindowEffectWin::VisualEffectOptions options;
     options.shadowEnabled = shadowEnabled;
-    options.backdropEnabled = backdropEnabled;
-    options.backdropPreference = backdropPreference;
+    options.nativeEffectsEnabled = nativeEffectsEnabled;
+    options.nativeBackdropPreference = nativeBackdropPreference;
     options.roundedCornersEnabled = roundedCornersEnabled;
     options.immersiveDarkModeEnabled = immersiveDarkModeEnabled;
     options.useDarkMode = shouldUseDarkMode(themeMode);

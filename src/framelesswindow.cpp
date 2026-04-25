@@ -23,6 +23,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWindow>
+#include <QtGlobal>
 
 FramelessWindow::FramelessWindow(QWidget *parent)
     : QWidget(parent)
@@ -31,8 +32,8 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_userContentWidget(nullptr)
     , m_layout(nullptr)
     , m_shadowEnabled(true)
-    , m_backdropEnabled(true)
-    , m_backdropPreference(WindowEffectWin::BackdropPreference::Auto)
+    , m_nativeEffectsEnabled(false)
+    , m_nativeBackdropPreference(WindowEffectWin::BackdropPreference::None)
     , m_roundedCornersEnabled(true)
     , m_immersiveDarkModeEnabled(true)
     , m_backdropTransitionGuardActive(false)
@@ -68,6 +69,42 @@ FramelessWindow::FramelessWindow(QWidget *parent)
 
 FramelessWindow::~FramelessWindow() = default;
 
+void FramelessWindow::setWindowOpacityLevel(qreal opacity)
+{
+    const qreal normalizedOpacity = qBound<qreal>(0.0, opacity, 1.0);
+    if (qFuzzyCompare(windowOpacityLevel(), normalizedOpacity)) {
+        return;
+    }
+
+    setWindowOpacity(normalizedOpacity);
+}
+
+qreal FramelessWindow::windowOpacityLevel() const
+{
+    return windowOpacity();
+}
+
+void FramelessWindow::setWindowSizeLimits(const QSize &minimumSize, const QSize &maximumSize)
+{
+    if (minimumSize.isValid() && minimumSize != QWidget::minimumSize()) {
+        QWidget::setMinimumSize(minimumSize);
+    }
+
+    if (maximumSize.isValid() && maximumSize != QWidget::maximumSize()) {
+        QWidget::setMaximumSize(maximumSize);
+    }
+}
+
+QSize FramelessWindow::minimumWindowSize() const
+{
+    return QWidget::minimumSize();
+}
+
+QSize FramelessWindow::maximumWindowSize() const
+{
+    return QWidget::maximumSize();
+}
+
 void FramelessWindow::setShadowEnabled(bool enabled)
 {
     if (m_shadowEnabled == enabled) {
@@ -78,24 +115,34 @@ void FramelessWindow::setShadowEnabled(bool enabled)
     requestVisualRefresh();
 }
 
-void FramelessWindow::setBackdropEnabled(bool enabled)
+void FramelessWindow::setNativeEffectsEnabled(bool enabled)
 {
-    if (m_backdropEnabled == enabled) {
+    if (m_nativeEffectsEnabled == enabled) {
         return;
     }
 
-    m_backdropEnabled = enabled;
+    m_nativeEffectsEnabled = enabled;
     requestVisualRefresh();
 }
 
-void FramelessWindow::setBackdropPreference(WindowEffectWin::BackdropPreference preference)
+bool FramelessWindow::isNativeEffectsEnabled() const
 {
-    if (m_backdropPreference == preference) {
+    return m_nativeEffectsEnabled;
+}
+
+void FramelessWindow::setNativeBackdropPreference(WindowEffectWin::BackdropPreference preference)
+{
+    if (m_nativeBackdropPreference == preference) {
         return;
     }
 
-    m_backdropPreference = preference;
+    m_nativeBackdropPreference = preference;
     requestVisualRefresh();
+}
+
+WindowEffectWin::BackdropPreference FramelessWindow::nativeBackdropPreference() const
+{
+    return m_nativeBackdropPreference;
 }
 
 void FramelessWindow::setRoundedCornersEnabled(bool enabled)
@@ -250,16 +297,6 @@ bool FramelessWindow::isShadowEnabled() const
     return m_shadowEnabled;
 }
 
-bool FramelessWindow::isBackdropEnabled() const
-{
-    return m_backdropEnabled;
-}
-
-WindowEffectWin::BackdropPreference FramelessWindow::backdropPreference() const
-{
-    return m_backdropPreference;
-}
-
 bool FramelessWindow::isRoundedCornersEnabled() const
 {
     return m_roundedCornersEnabled;
@@ -403,7 +440,7 @@ quint64 FramelessWindow::currentVisualStateToken() const
                                                     isMinimized(),
                                                     isActiveWindow(),
                                                     m_shadowEnabled,
-                                                    m_backdropEnabled,
+                                                    m_nativeEffectsEnabled,
                                                     m_roundedCornersEnabled,
                                                     m_immersiveDarkModeEnabled,
                                                     effectiveBackdropPreference(),
@@ -720,7 +757,7 @@ void FramelessWindow::applyVisualEffects()
 
     const WindowEffectWin::VisualEffectOptions options = WindowVisualState::buildVisualEffectOptions(
         m_shadowEnabled,
-        m_backdropEnabled,
+        m_nativeEffectsEnabled,
         effectiveBackdropPreference(),
         m_roundedCornersEnabled,
         m_immersiveDarkModeEnabled,
@@ -745,7 +782,7 @@ void FramelessWindow::applyVisualEffects()
 
 void FramelessWindow::forceBackdropRebind()
 {
-    if (!m_backdropEnabled || windowHandle() == nullptr) {
+    if (!m_nativeEffectsEnabled || windowHandle() == nullptr) {
         return;
     }
 
@@ -760,18 +797,18 @@ void FramelessWindow::forceBackdropRebind()
 
     // Re-assert the target backdrop mode without inserting a temporary
     // visual-off state, so maximize/restore keeps a more consistent look.
-    m_windowEffect.applyBackdropEffects(hwnd,
-                                        true,
-                                        useDarkMode,
-                                        maximized,
-                                        minimized,
-                                        m_backdropPreference);
-    m_windowEffect.applyBackdropEffects(hwnd,
-                                        true,
-                                        useDarkMode,
-                                        maximized,
-                                        minimized,
-                                        m_backdropPreference);
+    m_windowEffect.applyNativeBackdropEffects(hwnd,
+                                              true,
+                                              useDarkMode,
+                                              maximized,
+                                              minimized,
+                                              m_nativeBackdropPreference);
+    m_windowEffect.applyNativeBackdropEffects(hwnd,
+                                              true,
+                                              useDarkMode,
+                                              maximized,
+                                              minimized,
+                                              m_nativeBackdropPreference);
 }
 
 bool FramelessWindow::shouldStartRestoreTransitionFromSizeState(bool isMaximizedState, bool isRestoredState)
@@ -792,12 +829,16 @@ bool FramelessWindow::shouldStartRestoreTransitionFromSizeState(bool isMaximized
 
 WindowEffectWin::BackdropPreference FramelessWindow::effectiveBackdropPreference() const
 {
-    return m_backdropPreference;
+    if (!m_nativeEffectsEnabled) {
+        return WindowEffectWin::BackdropPreference::None;
+    }
+
+    return m_nativeBackdropPreference;
 }
 
 void FramelessWindow::beginBackdropTransitionGuard()
 {
-    if (!m_backdropEnabled) {
+    if (!m_nativeEffectsEnabled) {
         m_backdropTransitionGuardActive = false;
         return;
     }
@@ -842,9 +883,9 @@ bool FramelessWindow::shouldUseTranslucentBackground() const
     // Native backdrop can be temporarily forced to None, but coupling that
     // transient state to QWidget translucency may cause delayed composition
     // recovery on Windows after restore.
-    return WindowVisualState::shouldUseTranslucentBackground(m_backdropEnabled,
+    return WindowVisualState::shouldUseTranslucentBackground(m_nativeEffectsEnabled,
                                                               false,
-                                                              m_backdropPreference);
+                                                              effectiveBackdropPreference());
 }
 
 QColor FramelessWindow::preferredBorderColor() const

@@ -140,12 +140,12 @@ void WindowEffectWin::applyVisualEffects(void *hwnd, const VisualEffectOptions &
     applyShadow(hwnd, options.shadowEnabled, options.maximized, options.minimized);
     applyRoundedCorners(hwnd, options.roundedCornersEnabled, options.maximized, options.minimized);
     applyImmersiveDarkMode(hwnd, options.immersiveDarkModeEnabled, options.useDarkMode);
-    applyBackdropEffects(hwnd,
-                         options.backdropEnabled,
+    applyNativeBackdropEffects(hwnd,
+                                 options.nativeEffectsEnabled,
                          options.useDarkMode,
                          options.maximized,
                          options.minimized,
-                         options.backdropPreference);
+                         options.nativeBackdropPreference);
     applyBorderColor(hwnd, options.borderColor);
 #else
     (void) hwnd;
@@ -343,17 +343,17 @@ WindowEffectWin::BackdropMode WindowEffectWin::selectBackdropMode(bool enabled,
     return BackdropMode::None;
 }
 
-void WindowEffectWin::applyBackdropEffects(void *hwnd,
-                                           bool enabled,
-                                           bool useDarkMode,
-                                           bool maximized,
-                                           bool minimized,
-                                           BackdropPreference backdropPreference) const
+void WindowEffectWin::applyNativeBackdropEffects(void *hwnd,
+                                                 bool enabled,
+                                                 bool useDarkMode,
+                                                 bool maximized,
+                                                 bool minimized,
+                                                 BackdropPreference backdropPreference) const
 {
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
     if (win == nullptr) {
-        Diagnostics::logWarning(QStringLiteral("applyBackdropEffects: null HWND"));
+        Diagnostics::logWarning(QStringLiteral("applyNativeBackdropEffects: null HWND"));
         return;
     }
 
@@ -382,13 +382,13 @@ void WindowEffectWin::applyBackdropEffects(void *hwnd,
                                                  sizeof(backdropType));
         if (hr == E_INVALIDARG) {
             systemBackdropAttributeSupported = false;
-            Diagnostics::logWarning(QStringLiteral("applyBackdropEffects: DWMWA_SYSTEMBACKDROP_TYPE unsupported (hr=0x%1, reason=%2)")
+            Diagnostics::logWarning(QStringLiteral("applyNativeBackdropEffects: DWMWA_SYSTEMBACKDROP_TYPE unsupported (hr=0x%1, reason=%2)")
                                         .arg(QString::number(static_cast<qulonglong>(hr), 16), reason));
             return hr;
         }
 
         if (FAILED(hr)) {
-            Diagnostics::logWarning(QStringLiteral("applyBackdropEffects: DWMWA_SYSTEMBACKDROP_TYPE failed (hr=0x%1, reason=%2)")
+            Diagnostics::logWarning(QStringLiteral("applyNativeBackdropEffects: DWMWA_SYSTEMBACKDROP_TYPE failed (hr=0x%1, reason=%2)")
                                         .arg(QString::number(static_cast<qulonglong>(hr), 16), reason));
         }
 
@@ -406,13 +406,13 @@ void WindowEffectWin::applyBackdropEffects(void *hwnd,
                                                  sizeof(enabledLegacyMica));
         if (hr == E_INVALIDARG) {
             legacyMicaAttributeSupported = false;
-            Diagnostics::logWarning(QStringLiteral("applyBackdropEffects: DWMWA_MICA_EFFECT unsupported (hr=0x%1, reason=%2)")
+            Diagnostics::logWarning(QStringLiteral("applyNativeBackdropEffects: DWMWA_MICA_EFFECT unsupported (hr=0x%1, reason=%2)")
                                         .arg(QString::number(static_cast<qulonglong>(hr), 16), reason));
             return hr;
         }
 
         if (FAILED(hr)) {
-            Diagnostics::logWarning(QStringLiteral("applyBackdropEffects: DWMWA_MICA_EFFECT failed (hr=0x%1, reason=%2)")
+            Diagnostics::logWarning(QStringLiteral("applyNativeBackdropEffects: DWMWA_MICA_EFFECT failed (hr=0x%1, reason=%2)")
                                         .arg(QString::number(static_cast<qulonglong>(hr), 16), reason));
         }
 

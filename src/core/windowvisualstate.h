@@ -11,13 +11,13 @@ namespace WindowVisualState {
 
 bool shouldUseDarkMode(ThemeManager::ThemeMode themeMode);
 
-bool shouldUseTranslucentBackground(bool backdropEnabled,
+bool shouldUseTranslucentBackground(bool nativeEffectsEnabled,
                                     bool minimized,
-                                    WindowEffectWin::BackdropPreference backdropPreference);
+                                    WindowEffectWin::BackdropPreference nativeBackdropPreference);
 
 WindowEffectWin::VisualEffectOptions buildVisualEffectOptions(bool shadowEnabled,
-                                                              bool backdropEnabled,
-                                                              WindowEffectWin::BackdropPreference backdropPreference,
+                                                              bool nativeEffectsEnabled,
+                                                              WindowEffectWin::BackdropPreference nativeBackdropPreference,
                                                               bool roundedCornersEnabled,
                                                               bool immersiveDarkModeEnabled,
                                                               ThemeManager::ThemeMode themeMode,

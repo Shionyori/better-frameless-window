@@ -4,11 +4,12 @@
 #include "core/visualrefreshcoordinator.h"
 #include "windoweffectwin.h"
 
+#include <QColor>
+#include <QSize>
 #include <QWidget>
 
 class QVBoxLayout;
 class TitleBar;
-class QColor;
 class QString;
 class NativeWindowsMessageRouter;
 
@@ -19,9 +20,17 @@ public:
     explicit FramelessWindow(QWidget *parent = nullptr);
     ~FramelessWindow();
 
+    void setWindowOpacityLevel(qreal opacity);
+    qreal windowOpacityLevel() const;
+    void setWindowSizeLimits(const QSize &minimumSize, const QSize &maximumSize = QSize());
+    QSize minimumWindowSize() const;
+    QSize maximumWindowSize() const;
+
     void setShadowEnabled(bool enabled);
-    void setBackdropEnabled(bool enabled);
-    void setBackdropPreference(WindowEffectWin::BackdropPreference preference);
+    void setNativeEffectsEnabled(bool enabled);
+    bool isNativeEffectsEnabled() const;
+    void setNativeBackdropPreference(WindowEffectWin::BackdropPreference preference);
+    WindowEffectWin::BackdropPreference nativeBackdropPreference() const;
     void setRoundedCornersEnabled(bool enabled);
     void setImmersiveDarkModeEnabled(bool enabled);
     void setThemeMode(ThemeManager::ThemeMode mode);
@@ -35,8 +44,6 @@ public:
     void clearTitleBarWidgets();
     void setDiagnosticsEnabled(bool enabled);
     bool isShadowEnabled() const;
-    bool isBackdropEnabled() const;
-    WindowEffectWin::BackdropPreference backdropPreference() const;
     bool isRoundedCornersEnabled() const;
     bool isImmersiveDarkModeEnabled() const;
     bool isDiagnosticsEnabled() const;
@@ -95,8 +102,8 @@ private:
     QWidget *m_userContentWidget;
     QVBoxLayout *m_layout;
     bool m_shadowEnabled;
-    bool m_backdropEnabled;
-    WindowEffectWin::BackdropPreference m_backdropPreference;
+    bool m_nativeEffectsEnabled;
+    WindowEffectWin::BackdropPreference m_nativeBackdropPreference;
     bool m_roundedCornersEnabled;
     bool m_immersiveDarkModeEnabled;
     bool m_backdropTransitionGuardActive;

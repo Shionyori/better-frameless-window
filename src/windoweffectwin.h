@@ -22,10 +22,10 @@ public:
 
     struct VisualEffectOptions {
         bool shadowEnabled = true;
-        bool backdropEnabled = true;
+        bool nativeEffectsEnabled = false;
         bool roundedCornersEnabled = true;
         bool immersiveDarkModeEnabled = true;
-        BackdropPreference backdropPreference = BackdropPreference::Auto;
+        BackdropPreference nativeBackdropPreference = BackdropPreference::None;
         bool useDarkMode = false;
         bool maximized = false;
         bool minimized = false;
@@ -38,12 +38,12 @@ public:
     void applyShadow(void *hwnd, bool enabled, bool maximized, bool minimized) const;
     void applyRoundedCorners(void *hwnd, bool enabled, bool maximized, bool minimized) const;
     void applyImmersiveDarkMode(void *hwnd, bool enabled, bool useDarkMode) const;
-    void applyBackdropEffects(void *hwnd,
-                              bool enabled,
-                              bool useDarkMode,
-                              bool maximized,
-                              bool minimized,
-                              BackdropPreference backdropPreference) const;
+    void applyNativeBackdropEffects(void *hwnd,
+                                    bool enabled,
+                                    bool useDarkMode,
+                                    bool maximized,
+                                    bool minimized,
+                                    BackdropPreference backdropPreference) const;
     void applyBorderColor(void *hwnd, const QColor &borderColor) const;
 
 private:
