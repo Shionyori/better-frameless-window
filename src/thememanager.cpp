@@ -43,16 +43,6 @@ QColor ThemeManager::accentColor() const
     return m_accentColor;
 }
 
-void ThemeManager::setBackgroundMode(BackgroundMode mode)
-{
-    m_backgroundMode = mode;
-}
-
-ThemeManager::BackgroundMode ThemeManager::backgroundMode() const
-{
-    return m_backgroundMode;
-}
-
 bool ThemeManager::isDarkMode() const
 {
     return m_themeMode == ThemeMode::Dark;

@@ -11,15 +11,13 @@ namespace WindowVisualState {
 
 bool shouldUseDarkMode(ThemeManager::ThemeMode themeMode);
 
-bool shouldUseTranslucentBackground(bool nativeEffectsEnabled,
-                                    bool minimized,
-                                    WindowEffectWin::BackdropPreference nativeBackdropPreference);
+bool shouldUseTranslucentBackground(bool minimized,
+                                    WindowEffectWin::BackdropMode systemBackdropMode);
 
 WindowEffectWin::VisualEffectOptions buildVisualEffectOptions(bool shadowEnabled,
-                                                              bool nativeEffectsEnabled,
-                                                              WindowEffectWin::BackdropPreference nativeBackdropPreference,
+                                                              WindowEffectWin::BackdropMode systemBackdropMode,
                                                               bool roundedCornersEnabled,
-                                                              bool immersiveDarkModeEnabled,
+                                                              bool systemDarkModeEnabled,
                                                               ThemeManager::ThemeMode themeMode,
                                                               bool maximized,
                                                               bool minimized,
@@ -30,10 +28,9 @@ quint64 buildVisualStateToken(bool visible,
                               bool minimized,
                               bool active,
                               bool shadowEnabled,
-                              bool backdropEnabled,
                               bool roundedCornersEnabled,
-                              bool immersiveDarkModeEnabled,
-                              WindowEffectWin::BackdropPreference backdropPreference,
+                              bool systemDarkModeEnabled,
+                              WindowEffectWin::BackdropMode systemBackdropMode,
                               ThemeManager::ThemeMode themeMode,
                               bool translucentBackground);
 

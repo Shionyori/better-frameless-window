@@ -20,36 +20,40 @@ public:
     explicit FramelessWindow(QWidget *parent = nullptr);
     ~FramelessWindow();
 
-    void setWindowOpacityLevel(qreal opacity);
-    qreal windowOpacityLevel() const;
+    void setWindowOpacity(qreal opacity);
+    qreal windowOpacity() const;
+
     void setWindowSizeLimits(const QSize &minimumSize, const QSize &maximumSize = QSize());
     QSize minimumWindowSize() const;
     QSize maximumWindowSize() const;
 
     void setShadowEnabled(bool enabled);
-    void setNativeEffectsEnabled(bool enabled);
-    bool isNativeEffectsEnabled() const;
-    void setNativeBackdropPreference(WindowEffectWin::BackdropPreference preference);
-    WindowEffectWin::BackdropPreference nativeBackdropPreference() const;
+    bool isShadowEnabled() const;
+
+    void setSystemBackdrop(WindowEffectWin::BackdropMode mode);
+    WindowEffectWin::BackdropMode systemBackdrop() const;
+
     void setRoundedCornersEnabled(bool enabled);
-    void setImmersiveDarkModeEnabled(bool enabled);
+    bool isRoundedCornersEnabled() const;
+
+    void setSystemDarkModeEnabled(bool enabled);
+    bool isSystemDarkModeEnabled() const;
+
     void setThemeMode(ThemeManager::ThemeMode mode);
+    ThemeManager::ThemeMode themeMode() const;
+
     void setAccentColor(const QColor &accentColor);
-    void setBackgroundMode(ThemeManager::BackgroundMode mode);
+    QColor accentColor() const;
 
     void setCentralWidget(QWidget *widget);
     QWidget *centralWidget() const;
     QWidget *takeCentralWidget();
+
     void addTitleBarWidget(QWidget *widget);
     void clearTitleBarWidgets();
+
     void setDiagnosticsEnabled(bool enabled);
-    bool isShadowEnabled() const;
-    bool isRoundedCornersEnabled() const;
-    bool isImmersiveDarkModeEnabled() const;
     bool isDiagnosticsEnabled() const;
-    ThemeManager::ThemeMode themeMode() const;
-    QColor accentColor() const;
-    ThemeManager::BackgroundMode backgroundMode() const;
 
 protected:
     bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
@@ -88,7 +92,7 @@ protected:
 
 private:
     bool shouldStartRestoreTransitionFromSizeState(bool isMaximizedState, bool isRestoredState);
-    WindowEffectWin::BackdropPreference effectiveBackdropPreference() const;
+    WindowEffectWin::BackdropMode effectiveBackdropMode() const;
     void beginBackdropTransitionGuard();
     void performVisualRefreshPass();
     void requestVisualRefresh();
@@ -102,10 +106,9 @@ private:
     QWidget *m_userContentWidget;
     QVBoxLayout *m_layout;
     bool m_shadowEnabled;
-    bool m_nativeEffectsEnabled;
-    WindowEffectWin::BackdropPreference m_nativeBackdropPreference;
+    WindowEffectWin::BackdropMode m_systemBackdropMode;
     bool m_roundedCornersEnabled;
-    bool m_immersiveDarkModeEnabled;
+    bool m_systemDarkModeEnabled;
     bool m_backdropTransitionGuardActive;
     quint64 m_backdropTransitionEpoch;
     bool m_lastNativeSizeMaximized;
