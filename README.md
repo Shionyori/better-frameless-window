@@ -9,10 +9,18 @@
 
 ## 现阶段问题
 
-基本功能已经初具雏形，但还是存在不少问题：
+基本功能已经初具雏形，但还是存在不少问题
+
+已知/搁置的问题：
 
 - 深色模式还没有实现
 - Mica/Acrylic 视觉效果在最小化窗口后会暂时丢失
+
+下一步计划：
+
+- 修复 FramelessWindow初始化backdropMode 与 setSystemBackdrop() 之间的冲突问题
+- 添加 BackgroundMode（Solid/Transparent）设置接口，修改当前的 setWindowOpacity() 接口以适应新的 BackgroundMode 设置
+- 调整目录结构，分离平台相关代码和核心功能代码
 
 ## 最小接入
 
@@ -35,58 +43,27 @@ int main(int argc, char *argv[])
 }
 ```
 
-## API 总览
+## API 总览（面向使用者）
 
 ### FramelessWindow
 
-#### 窗口本体
+#### 窗口属性
 
-- `setWindowOpacityLevel(...)` / `windowOpacityLevel()`：窗口透明度
+- `setWindowOpacity(qreal opacity)` - 设置窗口整体不透明度（0.0 - 1.0）
 - `setWindowSizeLimits(...)` / `minimumWindowSize()` / `maximumWindowSize()`：窗口尺寸约束
-- `setShadowEnabled(...)` / `isShadowEnabled()`：阴影开关
+- `setShadowEnabled(...)`：窗口阴影
 - `setCentralWidget(...)` / `centralWidget()` / `takeCentralWidget()`：主内容区
 - `addTitleBarWidget(...)` / `clearTitleBarWidgets()`：标题栏中部插槽
-- `setDiagnosticsEnabled(...)` / `isDiagnosticsEnabled()`：诊断日志开关
 
-#### 原生效果
+#### 视觉效果
 
-- `setNativeEffectsEnabled(...)` / `isNativeEffectsEnabled()`：原生效果总开关，默认关闭
-- `setNativeBackdropPreference(...)` / `nativeBackdropPreference()`：原生背景偏好，支持 `Auto / None / MicaSystem / MicaLegacy / Acrylic`
-- `setRoundedCornersEnabled(...)` / `isRoundedCornersEnabled()`：圆角开关
-- `setImmersiveDarkModeEnabled(...)` / `isImmersiveDarkModeEnabled()`：深色模式开关
-- `setThemeMode(...)` / `themeMode()`：主题模式
-- `setAccentColor(...)` / `accentColor()`：强调色
-- `setBackgroundMode(...)` / `backgroundMode()`：背景模式
+- `setRoundedCornersEnabled(bool enabled)` - 启用/禁用圆角
+- `setSystemDarkModeEnabled(bool enabled)` - 启用/禁用系统深色模式适配
+- `setThemeMode(ThemeManager::ThemeMode mode)` - 设置主题模式（Light/Dark/System）
+- `setAccentColor(...)` / `accentColor()`：设置/获取系统强调色
+- `setSystemEffectsEnabled(bool enabled)` - 启用/禁用系统视觉效果（如 Mica/Acrylic）
+- `setSystemBackdrop(WindowEffectWin::BackdropMode mode)` - 设置系统背景效果模式（None/Mica/MicaLegacy/Acrylic）
 
-### TitleBar
+#### 其他
 
-- `TitleBar(QWidget *parent = nullptr)`：标题栏组件
-- `heightHint()`：标题栏建议高度
-- `setMaximized(bool)`：同步最大化状态
-- `addCenterWidget(QWidget*)`：在标题栏中部插入控件
-- `clearCenterWidgets()`：清空中部控件
-- `hitRegionAt(const QPoint &)`：命中区域识别
-- `minimizeRequested()` / `maximizeRestoreRequested()` / `closeRequested()` / `systemMoveRequested()` / `systemMenuRequested(const QPoint &)`：交互信号
-
-### WindowEffectWin
-
-- `BackdropPreference`：`Auto / None / MicaSystem / MicaLegacy / Acrylic`
-- `BackdropMode`：底层选中的实际背景模式
-- `VisualEffectOptions`：视觉效果参数包，`nativeEffectsEnabled` 默认关闭
-- `applyVisualEffects(...)`：一次性应用所有窗口效果
-- `applyShadow(...)`：阴影
-- `applyRoundedCorners(...)`：圆角
-- `applyImmersiveDarkMode(...)`：深色模式
-- `applyNativeBackdropEffects(...)`：背景材质
-- `applyBorderColor(...)`：边框色
-
-### 内部辅助模块
-
-- `VisualRefreshCoordinator::configure(...)` / `requestRefresh()`
-- `Diagnostics::setEnabled(...)` / `isEnabled()` / `logWarning(...)`
-- `WinUtils::toLocalPos(...)` / `hitFromEdges(...)` / `syncNativeWindowStyles(...)` / `windowsBuildNumber()` / `detectWindowsCapabilities()`
-- `WindowFrameWin::syncWindowFrame(...)` / `forceDwmRefresh(...)`
-- `WindowCommandWin::toggleMaximizeRestore(...)`
-- `SystemMenuWin::WindowState` / `SystemMenuWin::showForWindow(...)`
-- `WindowHitTestWin::TitleRegion` / `WindowHitTestWin::Context` / `resizeBorderThickness(...)` / `nonClientHitTest(...)`
-- `NativeWindowsMessageRouter::handle(...)`
+- `setDiagnosticsEnabled(bool enabled)` - 启用/禁用诊断日志输出（用于调试视觉效果问题）
