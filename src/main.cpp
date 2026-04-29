@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
 
     window.setThemeMode(ThemeManager::ThemeMode::Light);
     window.setShadowEnabled(true);
-    window.setSystemBackdrop(WindowEffectWin::BackdropMode::MicaLegacy);
+    window.setSystemBackdrop(WindowEffectWin::BackdropMode::Acrylic);
     window.setRoundedCornersEnabled(true);
     window.setSystemDarkModeEnabled(true);
     window.setWindowSizeLimits(QSize(520, 360), QSize());
