@@ -192,10 +192,10 @@ bool NativeWindowsMessageRouter::handle(FramelessWindow &window, void *message, 
             return false;
         }
 
-        const bool geometryChanged = (windowPos->flags & SWP_NOSIZE) == 0
-                                     || (windowPos->flags & SWP_NOMOVE) == 0
-                                     || (windowPos->flags & SWP_FRAMECHANGED) != 0;
-        if (geometryChanged) {
+        const bool sizeChanged = (windowPos->flags & SWP_NOSIZE) == 0;
+        const bool posChanged = (windowPos->flags & SWP_NOMOVE) == 0;
+
+        if (sizeChanged || posChanged) {
             window.scheduleStateVisualRefresh();
         }
         return false;
