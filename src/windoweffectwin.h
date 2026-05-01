@@ -5,7 +5,7 @@
 class WindowEffectWin
 {
 public:
-    enum class BackdropPreference {
+    enum class SystemBackdropPreference {
         Auto,
         None,
         MicaSystem,
@@ -13,7 +13,7 @@ public:
         Acrylic
     };
 
-    enum class BackdropMode {
+    enum class SystemBackdropMode {
         None,
         MicaSystem,
         MicaLegacy,
@@ -22,10 +22,10 @@ public:
 
     struct VisualEffectOptions {
         bool shadowEnabled = true;
-        bool backdropEnabled = true;
+        bool systemBackdropEnabled = true;
         bool roundedCornersEnabled = true;
-        bool immersiveDarkModeEnabled = true;
-        BackdropPreference backdropPreference = BackdropPreference::Auto;
+        bool systemDarkModeEnabled = true;
+        SystemBackdropPreference systemBackdropPreference = SystemBackdropPreference::Auto;
         bool useDarkMode = false;
         bool maximized = false;
         bool minimized = false;
@@ -37,18 +37,18 @@ public:
     void applyVisualEffects(void *hwnd, const VisualEffectOptions &options) const;
     void applyShadow(void *hwnd, bool enabled, bool maximized, bool minimized) const;
     void applyRoundedCorners(void *hwnd, bool enabled, bool maximized, bool minimized) const;
-    void applyImmersiveDarkMode(void *hwnd, bool enabled, bool useDarkMode) const;
-    void applyBackdropEffects(void *hwnd,
+    void applySystemDarkMode(void *hwnd, bool enabled, bool useDarkMode) const;
+    void applySystemBackdropEffects(void *hwnd,
                               bool enabled,
                               bool useDarkMode,
                               bool maximized,
                               bool minimized,
-                              BackdropPreference backdropPreference) const;
+                              SystemBackdropPreference systemBackdropPreference) const;
     void applyBorderColor(void *hwnd, const QColor &borderColor) const;
 
 private:
-    BackdropMode selectBackdropMode(bool enabled,
+    SystemBackdropMode selectSystemBackdropMode(bool enabled,
                                     bool maximized,
                                     bool minimized,
-                                    BackdropPreference backdropPreference) const;
+                                    SystemBackdropPreference systemBackdropPreference) const;
 };

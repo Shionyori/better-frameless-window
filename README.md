@@ -41,5 +41,5 @@ int main(int argc, char *argv[])
 - `addTitleBarWidget(QWidget*)`：向标题栏中部插入自定义控件
 - `clearTitleBarWidgets()`：清空标题栏插槽控件
 - `setThemeMode(...)` / `setAccentColor(...)`：主题与强调色
-- `setBackdropPreference(...)`：特效模式偏好，参数可选 `Auto / None / MicaSystem / MicaLegacy / Acrylic`
-- `setShadowEnabled(...)` / `setBackdropEnabled(...)` / `setRoundedCornersEnabled(...)` / `setImmersiveDarkModeEnabled(...)`：视觉效果开关
+- `setSystemBackdropPreference(...)`：特效模式偏好，参数可选 `Auto / None / MicaSystem / MicaLegacy / Acrylic`
+- `setShadowEnabled(...)` / `setSystemBackdropEnabled(...)` / `setRoundedCornersEnabled(...)` / `setSystemDarkModeEnabled(...)`：视觉效果开关

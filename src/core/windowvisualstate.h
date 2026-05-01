@@ -11,15 +11,15 @@ namespace WindowVisualState {
 
 bool shouldUseDarkMode(ThemeManager::ThemeMode themeMode);
 
-bool shouldUseTranslucentBackground(bool backdropEnabled,
+bool shouldUseTranslucentBackground(bool systemBackdropEnabled,
                                     bool minimized,
-                                    WindowEffectWin::BackdropPreference backdropPreference);
+                                    WindowEffectWin::SystemBackdropPreference systemBackdropPreference);
 
 WindowEffectWin::VisualEffectOptions buildVisualEffectOptions(bool shadowEnabled,
-                                                              bool backdropEnabled,
-                                                              WindowEffectWin::BackdropPreference backdropPreference,
+                                                              bool systemBackdropEnabled,
+                                                              WindowEffectWin::SystemBackdropPreference systemBackdropPreference,
                                                               bool roundedCornersEnabled,
-                                                              bool immersiveDarkModeEnabled,
+                                                              bool systemDarkModeEnabled,
                                                               ThemeManager::ThemeMode themeMode,
                                                               bool maximized,
                                                               bool minimized,
@@ -30,10 +30,10 @@ quint64 buildVisualStateToken(bool visible,
                               bool minimized,
                               bool active,
                               bool shadowEnabled,
-                              bool backdropEnabled,
+                              bool systemBackdropEnabled,
                               bool roundedCornersEnabled,
-                              bool immersiveDarkModeEnabled,
-                              WindowEffectWin::BackdropPreference backdropPreference,
+                              bool systemDarkModeEnabled,
+                              WindowEffectWin::SystemBackdropPreference systemBackdropPreference,
                               ThemeManager::ThemeMode themeMode,
                               bool translucentBackground);
 

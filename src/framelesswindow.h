@@ -20,10 +20,10 @@ public:
     ~FramelessWindow();
 
     void setShadowEnabled(bool enabled);
-    void setBackdropEnabled(bool enabled);
-    void setBackdropPreference(WindowEffectWin::BackdropPreference preference);
+    void setSystemBackdropEnabled(bool enabled);
+    void setSystemBackdropPreference(WindowEffectWin::SystemBackdropPreference preference);
     void setRoundedCornersEnabled(bool enabled);
-    void setImmersiveDarkModeEnabled(bool enabled);
+    void setSystemDarkModeEnabled(bool enabled);
     void setThemeMode(ThemeManager::ThemeMode mode);
     void setAccentColor(const QColor &accentColor);
     void setBackgroundMode(ThemeManager::BackgroundMode mode);
@@ -35,10 +35,10 @@ public:
     void clearTitleBarWidgets();
     void setDiagnosticsEnabled(bool enabled);
     bool isShadowEnabled() const;
-    bool isBackdropEnabled() const;
-    WindowEffectWin::BackdropPreference backdropPreference() const;
+    bool isSystemBackdropEnabled() const;
+    WindowEffectWin::SystemBackdropPreference systemBackdropPreference() const;
     bool isRoundedCornersEnabled() const;
-    bool isImmersiveDarkModeEnabled() const;
+    bool isSystemDarkModeEnabled() const;
     bool isDiagnosticsEnabled() const;
     ThemeManager::ThemeMode themeMode() const;
     QColor accentColor() const;
@@ -81,11 +81,11 @@ protected:
 
 private:
     bool shouldStartRestoreTransitionFromSizeState(bool isMaximizedState, bool isRestoredState);
-    WindowEffectWin::BackdropPreference effectiveBackdropPreference() const;
-    void beginBackdropTransitionGuard();
+    WindowEffectWin::SystemBackdropPreference effectiveSystemBackdropPreference() const;
+    void beginSystemBackdropTransitionGuard();
     void performVisualRefreshPass();
     void requestVisualRefresh();
-    void forceBackdropRebind();
+    void forceSystemBackdropRebind();
     void attachContentEventFilters(QWidget *widget);
     void detachContentEventFilters(QWidget *widget);
     friend class NativeWindowsMessageRouter;
@@ -95,12 +95,12 @@ private:
     QWidget *m_userContentWidget;
     QVBoxLayout *m_layout;
     bool m_shadowEnabled;
-    bool m_backdropEnabled;
-    WindowEffectWin::BackdropPreference m_backdropPreference;
+    bool m_systemBackdropEnabled;
+    WindowEffectWin::SystemBackdropPreference m_systemBackdropPreference;
     bool m_roundedCornersEnabled;
-    bool m_immersiveDarkModeEnabled;
-    bool m_backdropTransitionGuardActive;
-    quint64 m_backdropTransitionEpoch;
+    bool m_systemDarkModeEnabled;
+    bool m_systemBackdropTransitionGuardActive;
+    quint64 m_systemBackdropTransitionEpoch;
     bool m_lastNativeSizeMaximized;
     bool m_applyingTheme;
     QString m_lastAppliedStyleSheet;

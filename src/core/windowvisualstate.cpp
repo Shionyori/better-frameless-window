@@ -9,47 +9,47 @@ bool shouldUseDarkMode(ThemeManager::ThemeMode themeMode)
     return themeMode == ThemeManager::ThemeMode::Dark;
 }
 
-bool shouldUseTranslucentBackground(bool backdropEnabled,
+bool shouldUseTranslucentBackground(bool systemBackdropEnabled,
                                     bool minimized,
-                                    WindowEffectWin::BackdropPreference backdropPreference)
+                                    WindowEffectWin::SystemBackdropPreference systemBackdropPreference)
 {
 #ifdef Q_OS_WIN
-    if (!backdropEnabled || minimized) {
+    if (!systemBackdropEnabled || minimized) {
         return false;
     }
 
     const WinUtils::WindowsCapabilities caps = WinUtils::detectWindowsCapabilities();
-    const bool autoChainAvailable = caps.supportsSystemBackdrop
+    const bool autoChainAvailable = caps.supportsSystemSystemBackdrop
                                     || caps.supportsLegacyMica
                                     || caps.supportsAcrylic;
 
-    switch (backdropPreference) {
-    case WindowEffectWin::BackdropPreference::Auto:
+    switch (systemBackdropPreference) {
+    case WindowEffectWin::SystemBackdropPreference::Auto:
         return autoChainAvailable;
-    case WindowEffectWin::BackdropPreference::None:
+    case WindowEffectWin::SystemBackdropPreference::None:
         return false;
-    case WindowEffectWin::BackdropPreference::MicaSystem:
-        return caps.supportsSystemBackdrop ? true : autoChainAvailable;
-    case WindowEffectWin::BackdropPreference::MicaLegacy:
+    case WindowEffectWin::SystemBackdropPreference::MicaSystem:
+        return caps.supportsSystemSystemBackdrop ? true : autoChainAvailable;
+    case WindowEffectWin::SystemBackdropPreference::MicaLegacy:
         return caps.supportsLegacyMica ? true : autoChainAvailable;
-    case WindowEffectWin::BackdropPreference::Acrylic:
+    case WindowEffectWin::SystemBackdropPreference::Acrylic:
         return caps.supportsAcrylic ? true : autoChainAvailable;
     }
 
     return false;
 #else
-    Q_UNUSED(backdropEnabled)
+    Q_UNUSED(systemBackdropEnabled)
     Q_UNUSED(minimized)
-    Q_UNUSED(backdropPreference)
+    Q_UNUSED(systemBackdropPreference)
     return false;
 #endif
 }
 
 WindowEffectWin::VisualEffectOptions buildVisualEffectOptions(bool shadowEnabled,
-                                                              bool backdropEnabled,
-                                                              WindowEffectWin::BackdropPreference backdropPreference,
+                                                              bool systemBackdropEnabled,
+                                                              WindowEffectWin::SystemBackdropPreference systemBackdropPreference,
                                                               bool roundedCornersEnabled,
-                                                              bool immersiveDarkModeEnabled,
+                                                              bool systemDarkModeEnabled,
                                                               ThemeManager::ThemeMode themeMode,
                                                               bool maximized,
                                                               bool minimized,
@@ -57,10 +57,10 @@ WindowEffectWin::VisualEffectOptions buildVisualEffectOptions(bool shadowEnabled
 {
     WindowEffectWin::VisualEffectOptions options;
     options.shadowEnabled = shadowEnabled;
-    options.backdropEnabled = backdropEnabled;
-    options.backdropPreference = backdropPreference;
+    options.systemBackdropEnabled = systemBackdropEnabled;
+    options.systemBackdropPreference = systemBackdropPreference;
     options.roundedCornersEnabled = roundedCornersEnabled;
-    options.immersiveDarkModeEnabled = immersiveDarkModeEnabled;
+    options.systemDarkModeEnabled = systemDarkModeEnabled;
     options.useDarkMode = shouldUseDarkMode(themeMode);
     options.maximized = maximized;
     options.minimized = minimized;
@@ -73,10 +73,10 @@ quint64 buildVisualStateToken(bool visible,
                               bool minimized,
                               bool active,
                               bool shadowEnabled,
-                              bool backdropEnabled,
+                              bool systemBackdropEnabled,
                               bool roundedCornersEnabled,
-                              bool immersiveDarkModeEnabled,
-                              WindowEffectWin::BackdropPreference backdropPreference,
+                              bool systemDarkModeEnabled,
+                              WindowEffectWin::SystemBackdropPreference systemBackdropPreference,
                               ThemeManager::ThemeMode themeMode,
                               bool translucentBackground)
 {
@@ -86,12 +86,12 @@ quint64 buildVisualStateToken(bool visible,
     token |= static_cast<quint64>(minimized) << 2;
     token |= static_cast<quint64>(active) << 3;
     token |= static_cast<quint64>(shadowEnabled) << 4;
-    token |= static_cast<quint64>(backdropEnabled) << 5;
+    token |= static_cast<quint64>(systemBackdropEnabled) << 5;
     token |= static_cast<quint64>(roundedCornersEnabled) << 6;
-    token |= static_cast<quint64>(immersiveDarkModeEnabled) << 7;
+    token |= static_cast<quint64>(systemDarkModeEnabled) << 7;
     token |= static_cast<quint64>(shouldUseDarkMode(themeMode)) << 8;
     token |= static_cast<quint64>(translucentBackground) << 9;
-    token |= static_cast<quint64>(static_cast<int>(backdropPreference) & 0xF) << 10;
+    token |= static_cast<quint64>(static_cast<int>(systemBackdropPreference) & 0xF) << 10;
     token |= static_cast<quint64>(static_cast<int>(themeMode) & 0x3) << 14;
     return token;
 }

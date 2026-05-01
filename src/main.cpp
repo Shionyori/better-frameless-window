@@ -13,8 +13,8 @@ int main(int argc, char *argv[])
     window.setDiagnosticsEnabled(true); // enable diagnostics logging for visual effect debugging
     window.setThemeMode(ThemeManager::ThemeMode::Light);
     window.setBackgroundMode(ThemeManager::BackgroundMode::Solid);
-    window.setBackdropEnabled(true);
-    window.setBackdropPreference(WindowEffectWin::BackdropPreference::Acrylic);
+    window.setSystemBackdropEnabled(true);
+    window.setSystemBackdropPreference(WindowEffectWin::SystemBackdropPreference::Acrylic);
 
     // QWidget *businessPage = new QWidget();
     // businessPage->setAttribute(Qt::WA_TranslucentBackground, true);

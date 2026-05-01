@@ -146,9 +146,9 @@ WindowsCapabilities detectWindowsCapabilities()
 #ifdef Q_OS_WIN
     caps.isWindows = true;
     caps.buildNumber = windowsBuildNumber();
-    caps.supportsImmersiveDarkMode = caps.buildNumber >= 17763;
+    caps.supportsSystemDarkMode = caps.buildNumber >= 17763;
     caps.supportsRoundedCorners = caps.buildNumber >= 22000;
-    caps.supportsSystemBackdrop = caps.buildNumber >= 22621;
+    caps.supportsSystemSystemBackdrop = caps.buildNumber >= 22621;
     caps.supportsLegacyMica = caps.buildNumber >= 22000;
     caps.supportsAcrylic = caps.buildNumber >= 17763;
 #endif
