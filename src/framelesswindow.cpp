@@ -32,11 +32,12 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_userContentWidget(nullptr)
     , m_layout(nullptr)
     , m_shadowEnabled(true)
-    , m_systemBackdropMode(WindowEffectWin::BackdropMode::None)
+    , m_systemBackdropEnabled(true)
+    , m_systemBackdropPreference(WindowEffectWin::SystemBackdropPreference::Auto)
     , m_roundedCornersEnabled(true)
     , m_systemDarkModeEnabled(true)
-    , m_backdropTransitionGuardActive(false)
-    , m_backdropTransitionEpoch(0)
+    , m_systemBackdropTransitionGuardActive(false)
+    , m_systemBackdropTransitionEpoch(0)
     , m_lastNativeSizeMaximized(false)
     , m_applyingTheme(false)
     , m_lastAppliedStyleSheet()
@@ -104,23 +105,23 @@ QSize FramelessWindow::maximumWindowSize() const
     return QWidget::maximumSize();
 }
 
-void FramelessWindow::setShadowEnabled(bool enabled)
+void FramelessWindow::setSystemShadowEnabled(bool enabled)
 {
-    if (m_shadowEnabled == enabled) {
+    if (m_systemBackdropEnabled == enabled) {
         return;
     }
 
-    m_shadowEnabled = enabled;
+    m_systemBackdropEnabled = enabled;
     requestVisualRefresh();
 }
 
-void FramelessWindow::setSystemBackdrop(WindowEffectWin::BackdropMode mode)
+void FramelessWindow::setSystemBackdropPreference(WindowEffectWin::SystemBackdropPreference preference)
 {
-    if (m_systemBackdropMode == mode) {
+    if (m_systemBackdropPreference == preference) {
         return;
     }
 
-    m_systemBackdropMode = mode;
+    m_systemBackdropPreference = preference;
     requestVisualRefresh();
 }
 
@@ -271,6 +272,16 @@ bool FramelessWindow::isShadowEnabled() const
     return m_shadowEnabled;
 }
 
+bool FramelessWindow::isSystemBackdropEnabled() const
+{
+    return m_systemBackdropEnabled;
+}
+
+WindowEffectWin::SystemBackdropPreference FramelessWindow::systemBackdropPreference() const
+{
+    return m_systemBackdropPreference;
+}
+
 bool FramelessWindow::isRoundedCornersEnabled() const
 {
     return m_roundedCornersEnabled;
@@ -375,7 +386,7 @@ void FramelessWindow::changeEvent(QEvent *event)
     if (event->type() == QEvent::WindowStateChange) {
         // Keep maximize/restore edge tracking owned by WM_SIZE handling.
         // Mixing Qt-state writes here can clear the native transition flag
-        // before SIZE_RESTORED arrives, which may skip backdrop rebind guard.
+        // before SIZE_RESTORED arrives, which may skip systemBackdrop rebind guard.
         scheduleStateVisualRefresh();
     } else if (event->type() == QEvent::ActivationChange) {
         if (isActiveWindow()) {
@@ -409,9 +420,10 @@ quint64 FramelessWindow::currentVisualStateToken() const
                                                     isMinimized(),
                                                     isActiveWindow(),
                                                     m_shadowEnabled,
+                                                    m_systemBackdropEnabled,
                                                     m_roundedCornersEnabled,
                                                     m_systemDarkModeEnabled,
-                                                    effectiveBackdropMode(),
+                                                    effectiveSystemBackdropPreference(),
                                                     m_themeManager.themeMode(),
                                                     shouldUseTranslucentBackground());
 }
@@ -725,7 +737,8 @@ void FramelessWindow::applyVisualEffects()
 
     const WindowEffectWin::VisualEffectOptions options = WindowVisualState::buildVisualEffectOptions(
         m_shadowEnabled,
-        effectiveBackdropMode(),
+        m_systemBackdropEnabled,
+        effectiveSystemBackdropPreference(),
         m_roundedCornersEnabled,
         m_systemDarkModeEnabled,
         m_themeManager.themeMode(),
@@ -747,9 +760,9 @@ void FramelessWindow::applyVisualEffects()
     m_windowEffect.applyVisualEffects(hwnd, options);
 }
 
-void FramelessWindow::forceBackdropRebind()
+void FramelessWindow::forceSystemBackdropRebind()
 {
-    if (effectiveBackdropMode() == WindowEffectWin::BackdropMode::None || windowHandle() == nullptr) {
+    if (!m_systemBackdropEnabled || windowHandle() == nullptr) {
         return;
     }
 
@@ -762,18 +775,20 @@ void FramelessWindow::forceBackdropRebind()
     const bool maximized = isMaximized();
     const bool minimized = isMinimized();
 
-    // Re-assert the target backdrop mode without inserting a temporary
+    // Re-assert the target systemBackdrop mode without inserting a temporary
     // visual-off state, so maximize/restore keeps a more consistent look.
-    m_windowEffect.applySystemBackdrop(hwnd,
-                                              useDarkMode,
-                                              maximized,
-                                              minimized,
-                                              m_systemBackdropMode);
-    m_windowEffect.applySystemBackdrop(hwnd,
-                                              useDarkMode,
-                                              maximized,
-                                              minimized,
-                                              m_systemBackdropMode);
+    m_windowEffect.applySystemBackdropEffects(hwnd,
+                                        true,
+                                        useDarkMode,
+                                        maximized,
+                                        minimized,
+                                        m_systemBackdropPreference);
+    m_windowEffect.applySystemBackdropEffects(hwnd,
+                                        true,
+                                        useDarkMode,
+                                        maximized,
+                                        minimized,
+                                        m_systemBackdropPreference);
 }
 
 bool FramelessWindow::shouldStartRestoreTransitionFromSizeState(bool isMaximizedState, bool isRestoredState)
@@ -792,42 +807,42 @@ bool FramelessWindow::shouldStartRestoreTransitionFromSizeState(bool isMaximized
     return false;
 }
 
-WindowEffectWin::BackdropMode FramelessWindow::effectiveBackdropMode() const
+WindowEffectWin::SystemBackdropPreference FramelessWindow::effectiveSystemBackdropPreference() const
 {
-    return m_systemBackdropMode;
+    return m_systemBackdropPreference;
 }
 
-void FramelessWindow::beginBackdropTransitionGuard()
+void FramelessWindow::beginSystemBackdropTransitionGuard()
 {
-    if (effectiveBackdropMode() == WindowEffectWin::BackdropMode::None) {
-        m_backdropTransitionGuardActive = false;
+    if (!m_systemBackdropEnabled) {
+        m_systemBackdropTransitionGuardActive = false;
         return;
     }
 
-    m_backdropTransitionGuardActive = true;
-    const quint64 epoch = ++m_backdropTransitionEpoch;
+    m_systemBackdropTransitionGuardActive = true;
+    const quint64 epoch = ++m_systemBackdropTransitionEpoch;
 
     // Keep a short restore guard window for delayed re-assertion timings.
-    // Backdrop preference itself stays stable to avoid transient effect loss.
+    // SystemBackdrop preference itself stays stable to avoid transient effect loss.
     QTimer::singleShot(160, this, [this, epoch]() {
-        if (epoch != m_backdropTransitionEpoch) {
+        if (epoch != m_systemBackdropTransitionEpoch) {
             return;
         }
 
-        m_backdropTransitionGuardActive = false;
+        m_systemBackdropTransitionGuardActive = false;
         requestVisualRefresh();
-        forceBackdropRebind();
+        forceSystemBackdropRebind();
         forceNativeDwmRefresh();
 
         // Fallback pass: some DWM composition paths may drop the first
         // restored-material bind. Re-apply once more after settle.
         QTimer::singleShot(220, this, [this, epoch]() {
-            if (epoch != m_backdropTransitionEpoch || m_backdropTransitionGuardActive || !isVisible()) {
+            if (epoch != m_systemBackdropTransitionEpoch || m_systemBackdropTransitionGuardActive || !isVisible()) {
                 return;
             }
 
             requestVisualRefresh();
-            forceBackdropRebind();
+            forceSystemBackdropRebind();
             forceNativeDwmRefresh();
         });
     });
@@ -841,11 +856,12 @@ bool FramelessWindow::shouldUseDarkMode() const
 bool FramelessWindow::shouldUseTranslucentBackground() const
 {
     // Keep Qt translucent-surface policy stable across maximize/restore guard.
-    // Native backdrop can be temporarily forced to None, but coupling that
+    // Native systemBackdrop can be temporarily forced to None, but coupling that
     // transient state to QWidget translucency may cause delayed composition
     // recovery on Windows after restore.
-    return WindowVisualState::shouldUseTranslucentBackground(false,
-                                                              effectiveBackdropMode());
+    return WindowVisualState::shouldUseTranslucentBackground(m_systemBackdropEnabled,
+                                                              false,
+                                                              m_systemBackdropPreference);
 }
 
 QColor FramelessWindow::preferredBorderColor() const

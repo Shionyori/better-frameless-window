@@ -159,7 +159,7 @@ bool NativeWindowsMessageRouter::handle(FramelessWindow &window, void *message, 
                                                                                             isRestoredSize);
         window.syncNativeWindowFrame();
         if (restoredFromMaximized) {
-            window.beginBackdropTransitionGuard();
+            window.beginSystemBackdropTransitionGuard();
             window.scheduleStateVisualRefresh();
         } else if (isMaximizedSize) {
             window.scheduleStateVisualRefresh();
@@ -174,7 +174,7 @@ bool NativeWindowsMessageRouter::handle(FramelessWindow &window, void *message, 
                 }
 
                 // Early restore nudge: poke compositor and queue a refresh,
-                // while final backdrop rebind is handled by guard release.
+                // while final systemBackdrop rebind is handled by guard release.
                 window.scheduleStateVisualRefresh();
                 window.forceNativeDwmRefresh();
             });

@@ -28,17 +28,10 @@ public:
     QSize maximumWindowSize() const;
 
     void setShadowEnabled(bool enabled);
-    bool isShadowEnabled() const;
-
-    void setSystemBackdrop(WindowEffectWin::BackdropMode mode);
-    WindowEffectWin::BackdropMode systemBackdrop() const;
-
+    void setSystemBackdropEnabled(bool enabled);
+    void setSystemBackdropPreference(WindowEffectWin::SystemBackdropPreference preference);
     void setRoundedCornersEnabled(bool enabled);
-    bool isRoundedCornersEnabled() const;
-
     void setSystemDarkModeEnabled(bool enabled);
-    bool isSystemDarkModeEnabled() const;
-
     void setThemeMode(ThemeManager::ThemeMode mode);
     ThemeManager::ThemeMode themeMode() const;
 
@@ -53,6 +46,11 @@ public:
     void clearTitleBarWidgets();
 
     void setDiagnosticsEnabled(bool enabled);
+    bool isShadowEnabled() const;
+    bool isSystemBackdropEnabled() const;
+    WindowEffectWin::SystemBackdropPreference systemBackdropPreference() const;
+    bool isRoundedCornersEnabled() const;
+    bool isSystemDarkModeEnabled() const;
     bool isDiagnosticsEnabled() const;
 
 protected:
@@ -92,11 +90,11 @@ protected:
 
 private:
     bool shouldStartRestoreTransitionFromSizeState(bool isMaximizedState, bool isRestoredState);
-    WindowEffectWin::BackdropMode effectiveBackdropMode() const;
-    void beginBackdropTransitionGuard();
+    WindowEffectWin::SystemBackdropPreference effectiveSystemBackdropPreference() const;
+    void beginSystemBackdropTransitionGuard();
     void performVisualRefreshPass();
     void requestVisualRefresh();
-    void forceBackdropRebind();
+    void forceSystemBackdropRebind();
     void attachContentEventFilters(QWidget *widget);
     void detachContentEventFilters(QWidget *widget);
     friend class NativeWindowsMessageRouter;
@@ -106,11 +104,12 @@ private:
     QWidget *m_userContentWidget;
     QVBoxLayout *m_layout;
     bool m_shadowEnabled;
-    WindowEffectWin::BackdropMode m_systemBackdropMode;
+    bool m_systemBackdropEnabled;
+    WindowEffectWin::SystemBackdropPreference m_systemBackdropPreference;
     bool m_roundedCornersEnabled;
     bool m_systemDarkModeEnabled;
-    bool m_backdropTransitionGuardActive;
-    quint64 m_backdropTransitionEpoch;
+    bool m_systemBackdropTransitionGuardActive;
+    quint64 m_systemBackdropTransitionEpoch;
     bool m_lastNativeSizeMaximized;
     bool m_applyingTheme;
     QString m_lastAppliedStyleSheet;

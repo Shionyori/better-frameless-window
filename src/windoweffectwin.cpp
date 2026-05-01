@@ -17,12 +17,12 @@
 #define DWMWA_BORDER_COLOR 34
 #endif
 
-#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
-#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+#ifndef DWMWA_USE_SYSTEM_DARK_MODE
+#define DWMWA_USE_SYSTEM_DARK_MODE 20
 #endif
 
-#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1
-#define DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 19
+#ifndef DWMWA_USE_SYSTEM_DARK_MODE_BEFORE_20H1
+#define DWMWA_USE_SYSTEM_DARK_MODE_BEFORE_20H1 19
 #endif
 
 #ifndef DWMWA_SYSTEMBACKDROP_TYPE
@@ -141,12 +141,13 @@ void WindowEffectWin::applyVisualEffects(void *hwnd, const VisualEffectOptions &
 #ifdef Q_OS_WIN
     applyShadow(hwnd, options.shadowEnabled, options.maximized, options.minimized);
     applyRoundedCorners(hwnd, options.roundedCornersEnabled, options.maximized, options.minimized);
-    applySystemDarkMode(hwnd, options.SystemDarkModeEnabled, options.useDarkMode);
-    applySystemBackdrop(hwnd,
-                               options.useDarkMode,
-                               options.maximized,
-                               options.minimized,
-                               options.SystemBackdropMode);
+    applySystemDarkMode(hwnd, options.systemDarkModeEnabled, options.useDarkMode);
+    applySystemBackdropEffects(hwnd,
+                         options.systemBackdropEnabled,
+                         options.useDarkMode,
+                         options.maximized,
+                         options.minimized,
+                         options.systemBackdropPreference);
     applyBorderColor(hwnd, options.borderColor);
 #else
     (void) hwnd;
@@ -240,7 +241,7 @@ void WindowEffectWin::applySystemDarkMode(void *hwnd, bool enabled, bool useDark
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
     if (win == nullptr) {
-        Diagnostics::logWarning(QStringLiteral("applyImmersiveDarkMode: null HWND"));
+        Diagnostics::logWarning(QStringLiteral("applySystemDarkMode: null HWND"));
         return;
     }
 
@@ -253,7 +254,7 @@ void WindowEffectWin::applySystemDarkMode(void *hwnd, bool enabled, bool useDark
     const BOOL darkEnabled = (enabled && useDarkMode) ? TRUE : FALSE;
     if (darkMode20Valid) {
         const HRESULT result = DwmSetWindowAttribute(win,
-                                                     DWMWA_USE_IMMERSIVE_DARK_MODE,
+                                                     DWMWA_USE_SYSTEM_DARK_MODE,
                                                      &darkEnabled,
                                                      sizeof(darkEnabled));
         if (SUCCEEDED(result)) {
@@ -261,18 +262,18 @@ void WindowEffectWin::applySystemDarkMode(void *hwnd, bool enabled, bool useDark
         }
 
         darkMode20Valid = false;
-        Diagnostics::logWarning(QStringLiteral("applyImmersiveDarkMode: DWMWA_USE_IMMERSIVE_DARK_MODE failed (hr=0x%1), fallback to legacy attribute")
+        Diagnostics::logWarning(QStringLiteral("applySystemDarkMode: DWMWA_USE_SYSTEM_DARK_MODE failed (hr=0x%1), fallback to legacy attribute")
                                     .arg(QString::number(static_cast<qulonglong>(result), 16)));
     }
 
     if (darkMode19Valid) {
         const HRESULT legacyResult = DwmSetWindowAttribute(win,
-                                                            DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
+                                                            DWMWA_USE_SYSTEM_DARK_MODE_BEFORE_20H1,
                                                             &darkEnabled,
                                                             sizeof(darkEnabled));
         if (FAILED(legacyResult)) {
             darkMode19Valid = false;
-            Diagnostics::logWarning(QStringLiteral("applyImmersiveDarkMode: legacy dark mode attribute failed (hr=0x%1), disable subsequent calls")
+            Diagnostics::logWarning(QStringLiteral("applySystemDarkMode: legacy dark mode attribute failed (hr=0x%1), disable subsequent calls")
                                         .arg(QString::number(static_cast<qulonglong>(legacyResult), 16)));
         }
     }
@@ -283,16 +284,78 @@ void WindowEffectWin::applySystemDarkMode(void *hwnd, bool enabled, bool useDark
 #endif
 }
 
-void WindowEffectWin::applySystemBackdrop(void *hwnd,
-                                                 bool useDarkMode,
-                                                 bool maximized,
-                                                 bool minimized,
-                                                 BackdropMode mode) const
+WindowEffectWin::SystemBackdropMode WindowEffectWin::selectSystemBackdropMode(bool enabled,
+                                                                  bool maximized,
+                                                                  bool minimized,
+                                                                  SystemBackdropPreference systemBackdropPreference) const
+{
+#ifdef Q_OS_WIN
+    if (!enabled || minimized) {
+        return SystemBackdropMode::None;
+    }
+
+    const WinUtils::WindowsCapabilities caps = WinUtils::detectWindowsCapabilities();
+    Q_UNUSED(maximized)
+    const bool allowAcrylic = true;
+    if (systemBackdropPreference != SystemBackdropPreference::Auto) {
+        switch (systemBackdropPreference) {
+        case SystemBackdropPreference::None:
+            return SystemBackdropMode::None;
+        case SystemBackdropPreference::MicaSystem:
+            if (caps.supportsSystemSystemBackdrop) {
+                return SystemBackdropMode::MicaSystem;
+            }
+            Diagnostics::logWarning(QStringLiteral("selectSystemBackdropMode: requested MicaSystem not supported, fallback to Auto chain"));
+            break;
+        case SystemBackdropPreference::MicaLegacy:
+            if (caps.supportsLegacyMica) {
+                return SystemBackdropMode::MicaLegacy;
+            }
+            Diagnostics::logWarning(QStringLiteral("selectSystemBackdropMode: requested MicaLegacy not supported, fallback to Auto chain"));
+            break;
+        case SystemBackdropPreference::Acrylic:
+            if (allowAcrylic && caps.supportsAcrylic && getSetWindowCompositionAttribute() != nullptr) {
+                return SystemBackdropMode::Acrylic;
+            }
+            Diagnostics::logWarning(QStringLiteral("selectSystemBackdropMode: requested Acrylic not supported now, fallback to Mica/Auto chain"));
+            break;
+        case SystemBackdropPreference::Auto:
+            break;
+        }
+    }
+
+    if (caps.supportsSystemSystemBackdrop) {
+        return SystemBackdropMode::MicaSystem;
+    }
+
+    if (caps.supportsLegacyMica) {
+        return SystemBackdropMode::MicaLegacy;
+    }
+
+    if (allowAcrylic && caps.supportsAcrylic && getSetWindowCompositionAttribute() != nullptr) {
+        return SystemBackdropMode::Acrylic;
+    }
+#else
+    (void) enabled;
+    (void) maximized;
+    (void) minimized;
+    (void) systemBackdropPreference;
+#endif
+
+    return SystemBackdropMode::None;
+}
+
+void WindowEffectWin::applySystemBackdropEffects(void *hwnd,
+                                           bool enabled,
+                                           bool useDarkMode,
+                                           bool maximized,
+                                           bool minimized,
+                                           SystemBackdropPreference systemBackdropPreference) const
 {
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
     if (win == nullptr) {
-        Diagnostics::logWarning(QStringLiteral("applyNativeBackdropEffects: null HWND"));
+        Diagnostics::logWarning(QStringLiteral("applySystemBackdropEffects: null HWND"));
         return;
     }
 
@@ -300,38 +363,38 @@ void WindowEffectWin::applySystemBackdrop(void *hwnd,
     (void) minimized;
 
     const WinUtils::WindowsCapabilities caps = WinUtils::detectWindowsCapabilities();
-    static bool systemBackdropAttributeSupported = true;
-    static bool legacyMicaAttributeSupported = true;
-    struct BackdropRequestState {
-        BackdropMode mode = BackdropMode::None;
-        bool useDarkMode = false;
-        bool applied = false;
-    };
-    static std::unordered_map<HWND, BackdropRequestState> lastStateByWindow;
+    SystemBackdropMode mode = selectSystemBackdropMode(enabled, maximized, minimized, systemBackdropPreference);
 
-    const auto previousStateIt = lastStateByWindow.find(win);
-    if (previousStateIt != lastStateByWindow.end()) {
-        const BackdropRequestState &previousState = previousStateIt->second;
-        if (previousState.mode == mode
-            && previousState.useDarkMode == useDarkMode
-            && previousState.applied) {
-            return;
-        }
+    static bool acrylicWasEnabled = false;
+    static bool systemSystemBackdropWasEnabled = false;
+    static bool legacyMicaWasEnabled = false;
+    static bool systemSystemBackdropAttributeSupported = true;
+    static bool legacyMicaAttributeSupported = true;
+
+    if (mode != SystemBackdropMode::Acrylic && acrylicWasEnabled) {
+        applyAcrylicAccent(win, false, useDarkMode);
+        acrylicWasEnabled = false;
     }
 
-    auto setSystemBackdropType = [&](DWORD backdropType) -> HRESULT {
-        if (!systemBackdropAttributeSupported) {
+    auto setSystemSystemBackdropType = [&](DWORD systemBackdropType, const QString &reason) -> HRESULT {
+        if (!systemSystemBackdropAttributeSupported) {
             return E_NOTIMPL;
         }
 
         const HRESULT hr = DwmSetWindowAttribute(win,
                                                  DWMWA_SYSTEMBACKDROP_TYPE,
-                                                 &backdropType,
-                                                 sizeof(backdropType));
+                                                 &systemBackdropType,
+                                                 sizeof(systemBackdropType));
         if (hr == E_INVALIDARG) {
-            systemBackdropAttributeSupported = false;
-            Diagnostics::logWarning(QStringLiteral("applyNativeBackdropEffects: DWMWA_SYSTEMBACKDROP_TYPE unsupported on this system (hr=0x%1)")
-                                        .arg(QString::number(static_cast<qulonglong>(hr), 16)));
+            systemSystemBackdropAttributeSupported = false;
+            Diagnostics::logWarning(QStringLiteral("applySystemBackdropEffects: DWMWA_SYSTEMBACKDROP_TYPE unsupported (hr=0x%1, reason=%2)")
+                                        .arg(QString::number(static_cast<qulonglong>(hr), 16), reason));
+            return hr;
+        }
+
+        if (FAILED(hr)) {
+            Diagnostics::logWarning(QStringLiteral("applySystemBackdropEffects: DWMWA_SYSTEMBACKDROP_TYPE failed (hr=0x%1, reason=%2)")
+                                        .arg(QString::number(static_cast<qulonglong>(hr), 16), reason));
         }
         return hr;
     };
@@ -347,73 +410,82 @@ void WindowEffectWin::applySystemBackdrop(void *hwnd,
                                                  sizeof(enabledLegacyMica));
         if (hr == E_INVALIDARG) {
             legacyMicaAttributeSupported = false;
-            Diagnostics::logWarning(QStringLiteral("applyNativeBackdropEffects: DWMWA_MICA_EFFECT unsupported on this system (hr=0x%1)")
-                                        .arg(QString::number(static_cast<qulonglong>(hr), 16)));
+            Diagnostics::logWarning(QStringLiteral("applySystemBackdropEffects: DWMWA_MICA_EFFECT unsupported (hr=0x%1, reason=%2)")
+                                        .arg(QString::number(static_cast<qulonglong>(hr), 16), reason));
+            return hr;
+        }
+
+        if (FAILED(hr)) {
+            Diagnostics::logWarning(QStringLiteral("applySystemBackdropEffects: DWMWA_MICA_EFFECT failed (hr=0x%1, reason=%2)")
+                                        .arg(QString::number(static_cast<qulonglong>(hr), 16), reason));
         }
         return hr;
     };
 
-    if (caps.supportsSystemBackdrop && systemBackdropAttributeSupported) {
-        const DWORD noneType = DWMSBT_NONE;
-        setSystemBackdropType(noneType);
-    }
-
-    if (caps.supportsLegacyMica && legacyMicaAttributeSupported) {
-        const BOOL micaOff = FALSE;
-        setLegacyMica(micaOff);
-    }
-
-    if (caps.supportsAcrylic && getSetWindowCompositionAttribute() != nullptr) {
-        applyAcrylicAccent(win, false, useDarkMode);
-    }
-
-    if (mode == BackdropMode::None) {
-        lastStateByWindow[win] = BackdropRequestState{BackdropMode::None, useDarkMode, true};
-        return;
-    }
-
-    bool applied = false;
-
-    if (mode == BackdropMode::Acrylic && caps.supportsAcrylic) {
-        if (getSetWindowCompositionAttribute() != nullptr) {
-            applyAcrylicAccent(win, true, useDarkMode);
-            applied = true;
-        }
-    }
-
-    if (!applied && caps.supportsSystemBackdrop && systemBackdropAttributeSupported) {
-        DWORD backdropType = DWMSBT_NONE;
-        switch (mode) {
-        case BackdropMode::Mica:
-            backdropType = DWMSBT_MAINWINDOW;
-            break;
-        case BackdropMode::Acrylic:
-            backdropType = DWMSBT_TRANSIENTWINDOW;
-            break;
-        case BackdropMode::MicaLegacy:
-            backdropType = DWMSBT_TABBEDWINDOW;
-            break;
-        case BackdropMode::None:
-            backdropType = DWMSBT_NONE;
-            break;
+    auto fallbackFromMicaSystem = [&]() {
+        if (caps.supportsLegacyMica && legacyMicaAttributeSupported) {
+            mode = SystemBackdropMode::MicaLegacy;
+            return;
         }
 
-        if (backdropType != DWMSBT_NONE) {
-            const HRESULT hr = setSystemBackdropType(backdropType);
-            applied = SUCCEEDED(hr);
+        if (caps.supportsAcrylic && getSetWindowCompositionAttribute() != nullptr) {
+            mode = SystemBackdropMode::Acrylic;
+            return;
         }
+
+        mode = SystemBackdropMode::None;
+    };
+
+    auto fallbackFromLegacyMica = [&]() {
+        if (caps.supportsAcrylic && getSetWindowCompositionAttribute() != nullptr) {
+            mode = SystemBackdropMode::Acrylic;
+            return;
+        }
+
+        mode = SystemBackdropMode::None;
+    };
+
+    if (mode == SystemBackdropMode::MicaSystem) {
+        const HRESULT systemHr = setSystemSystemBackdropType(DWMSBT_MAINWINDOW, QStringLiteral("apply-mica-system"));
+        if (FAILED(systemHr)) {
+            fallbackFromMicaSystem();
+            if (systemSystemBackdropWasEnabled) {
+                setSystemSystemBackdropType(DWMSBT_NONE, QStringLiteral("clear-after-mica-system-fallback"));
+                systemSystemBackdropWasEnabled = false;
+            }
+        } else {
+            systemSystemBackdropWasEnabled = true;
+        }
+    } else if (systemSystemBackdropWasEnabled) {
+        setSystemSystemBackdropType(DWMSBT_NONE, QStringLiteral("clear-non-system-mode"));
+        systemSystemBackdropWasEnabled = false;
     }
 
-    if (!applied
-        && (mode == BackdropMode::Mica || mode == BackdropMode::MicaLegacy)
-        && caps.supportsLegacyMica
-        && legacyMicaAttributeSupported) {
-        const BOOL micaOn = TRUE;
-        const HRESULT hr = setLegacyMica(micaOn);
-        applied = SUCCEEDED(hr);
+    if (mode == SystemBackdropMode::MicaLegacy) {
+        const HRESULT legacyHr = setLegacyMica(TRUE, QStringLiteral("apply-mica-legacy"));
+        if (FAILED(legacyHr)) {
+            fallbackFromLegacyMica();
+            if (legacyMicaWasEnabled) {
+                setLegacyMica(FALSE, QStringLiteral("clear-after-mica-legacy-fallback"));
+                legacyMicaWasEnabled = false;
+            }
+        } else {
+            legacyMicaWasEnabled = true;
+        }
+    } else if (legacyMicaWasEnabled) {
+        setLegacyMica(FALSE, QStringLiteral("clear-non-legacy-mode"));
+        legacyMicaWasEnabled = false;
     }
 
-    if (applied && mode != BackdropMode::Acrylic) {
+    if (mode == SystemBackdropMode::Acrylic) {
+        applyAcrylicAccent(win, true, useDarkMode);
+        acrylicWasEnabled = true;
+    }
+
+    // Acrylic path already forces a redraw in applyAcrylicAccent.
+    // For Mica/SystemSystemBackdrop toggles, force a lightweight native refresh so
+    // compositor updates immediately after maximize/restore transitions.
+    if (mode != SystemBackdropMode::Acrylic) {
         SetWindowPos(win,
                      nullptr,
                      0,
@@ -442,7 +514,7 @@ void WindowEffectWin::applySystemBackdrop(void *hwnd,
     (void) useDarkMode;
     (void) maximized;
     (void) minimized;
-    (void) mode;
+    (void) systemBackdropPreference;
 #endif
 }
 
@@ -460,7 +532,7 @@ void WindowEffectWin::applyBorderColor(void *hwnd, const QColor &borderColor) co
     }
 
     const WinUtils::WindowsCapabilities caps = WinUtils::detectWindowsCapabilities();
-    if (!caps.supportsLegacyMica && !caps.supportsSystemBackdrop) {
+    if (!caps.supportsLegacyMica && !caps.supportsSystemSystemBackdrop) {
         return;
     }
 

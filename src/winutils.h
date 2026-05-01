@@ -11,9 +11,9 @@ namespace WinUtils {
 struct WindowsCapabilities {
 	bool isWindows = false;
 	uint32_t buildNumber = 0;
-	bool supportsImmersiveDarkMode = false;
+	bool supportsSystemDarkMode = false;
 	bool supportsRoundedCorners = false;
-	bool supportsSystemBackdrop = false;
+	bool supportsSystemSystemBackdrop = false;
 	bool supportsLegacyMica = false;
 	bool supportsAcrylic = false;
 };

@@ -146,12 +146,10 @@ WindowsCapabilities detectWindowsCapabilities()
 #ifdef Q_OS_WIN
     caps.isWindows = true;
     caps.buildNumber = windowsBuildNumber();
-    caps.supportsImmersiveDarkMode = caps.buildNumber >= 17763;
+    caps.supportsSystemDarkMode = caps.buildNumber >= 17763;
     caps.supportsRoundedCorners = caps.buildNumber >= 22000;
-    caps.supportsSystemBackdrop = caps.buildNumber >= 22621;
-    // Legacy DWMWA_MICA_EFFECT is mainly for early Win11 builds before
-    // DWMWA_SYSTEMBACKDROP_TYPE became broadly available.
-    caps.supportsLegacyMica = (caps.buildNumber >= 22000) && (caps.buildNumber < 22621);
+    caps.supportsSystemSystemBackdrop = caps.buildNumber >= 22621;
+    caps.supportsLegacyMica = caps.buildNumber >= 22000;
     caps.supportsAcrylic = caps.buildNumber >= 17763;
 #endif
 

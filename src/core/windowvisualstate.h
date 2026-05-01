@@ -11,11 +11,13 @@ namespace WindowVisualState {
 
 bool shouldUseDarkMode(ThemeManager::ThemeMode themeMode);
 
-bool shouldUseTranslucentBackground(bool minimized,
-                                    WindowEffectWin::BackdropMode systemBackdropMode);
+bool shouldUseTranslucentBackground(bool systemBackdropEnabled,
+                                    bool minimized,
+                                    WindowEffectWin::SystemBackdropPreference systemBackdropPreference);
 
 WindowEffectWin::VisualEffectOptions buildVisualEffectOptions(bool shadowEnabled,
-                                                              WindowEffectWin::BackdropMode systemBackdropMode,
+                                                              bool systemBackdropEnabled,
+                                                              WindowEffectWin::SystemBackdropPreference systemBackdropPreference,
                                                               bool roundedCornersEnabled,
                                                               bool systemDarkModeEnabled,
                                                               ThemeManager::ThemeMode themeMode,
@@ -28,9 +30,10 @@ quint64 buildVisualStateToken(bool visible,
                               bool minimized,
                               bool active,
                               bool shadowEnabled,
+                              bool systemBackdropEnabled,
                               bool roundedCornersEnabled,
                               bool systemDarkModeEnabled,
-                              WindowEffectWin::BackdropMode systemBackdropMode,
+                              WindowEffectWin::SystemBackdropPreference systemBackdropPreference,
                               ThemeManager::ThemeMode themeMode,
                               bool translucentBackground);
 
