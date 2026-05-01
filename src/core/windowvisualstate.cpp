@@ -28,7 +28,7 @@ bool shouldUseTranslucentBackground(bool systemBackdropEnabled,
         return autoChainAvailable;
     case WindowEffectWin::SystemBackdropPreference::None:
         return false;
-    case WindowEffectWin::SystemBackdropPreference::MicaSystem:
+    case WindowEffectWin::SystemBackdropPreference::Mica:
         return caps.supportsSystemSystemBackdrop ? true : autoChainAvailable;
     case WindowEffectWin::SystemBackdropPreference::MicaLegacy:
         return caps.supportsLegacyMica ? true : autoChainAvailable;

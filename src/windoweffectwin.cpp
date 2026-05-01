@@ -301,11 +301,11 @@ WindowEffectWin::SystemBackdropMode WindowEffectWin::selectSystemBackdropMode(bo
         switch (systemBackdropPreference) {
         case SystemBackdropPreference::None:
             return SystemBackdropMode::None;
-        case SystemBackdropPreference::MicaSystem:
+        case SystemBackdropPreference::Mica:
             if (caps.supportsSystemSystemBackdrop) {
-                return SystemBackdropMode::MicaSystem;
+                return SystemBackdropMode::Mica;
             }
-            Diagnostics::logWarning(QStringLiteral("selectSystemBackdropMode: requested MicaSystem not supported, fallback to Auto chain"));
+            Diagnostics::logWarning(QStringLiteral("selectSystemBackdropMode: requested Mica not supported, fallback to Auto chain"));
             break;
         case SystemBackdropPreference::MicaLegacy:
             if (caps.supportsLegacyMica) {
@@ -325,7 +325,7 @@ WindowEffectWin::SystemBackdropMode WindowEffectWin::selectSystemBackdropMode(bo
     }
 
     if (caps.supportsSystemSystemBackdrop) {
-        return SystemBackdropMode::MicaSystem;
+        return SystemBackdropMode::Mica;
     }
 
     if (caps.supportsLegacyMica) {
@@ -399,7 +399,7 @@ void WindowEffectWin::applySystemBackdropEffects(void *hwnd,
         return hr;
     };
 
-    auto setLegacyMica = [&](BOOL enabledLegacyMica) -> HRESULT {
+    auto setLegacyMica = [&](BOOL enabledLegacyMica, const QString &reason) -> HRESULT {
         if (!legacyMicaAttributeSupported) {
             return E_NOTIMPL;
         }
@@ -422,7 +422,7 @@ void WindowEffectWin::applySystemBackdropEffects(void *hwnd,
         return hr;
     };
 
-    auto fallbackFromMicaSystem = [&]() {
+    auto fallbackFromMica = [&]() {
         if (caps.supportsLegacyMica && legacyMicaAttributeSupported) {
             mode = SystemBackdropMode::MicaLegacy;
             return;
@@ -445,10 +445,10 @@ void WindowEffectWin::applySystemBackdropEffects(void *hwnd,
         mode = SystemBackdropMode::None;
     };
 
-    if (mode == SystemBackdropMode::MicaSystem) {
+    if (mode == SystemBackdropMode::Mica) {
         const HRESULT systemHr = setSystemSystemBackdropType(DWMSBT_MAINWINDOW, QStringLiteral("apply-mica-system"));
         if (FAILED(systemHr)) {
-            fallbackFromMicaSystem();
+            fallbackFromMica();
             if (systemSystemBackdropWasEnabled) {
                 setSystemSystemBackdropType(DWMSBT_NONE, QStringLiteral("clear-after-mica-system-fallback"));
                 systemSystemBackdropWasEnabled = false;
@@ -498,16 +498,6 @@ void WindowEffectWin::applySystemBackdropEffects(void *hwnd,
                      nullptr,
                      RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN);
     }
-
-    if (!applied && mode != BackdropMode::None) {
-        Diagnostics::logWarning(QStringLiteral("applyNativeBackdropEffects: failed to apply mode=%1 (system=%2, legacy=%3, acrylic=%4)")
-                                    .arg(static_cast<int>(mode))
-                                    .arg(caps.supportsSystemBackdrop)
-                                    .arg(caps.supportsLegacyMica)
-                                    .arg(caps.supportsAcrylic));
-    }
-
-    lastStateByWindow[win] = BackdropRequestState{mode, useDarkMode, applied};
 
 #else
     (void) hwnd;

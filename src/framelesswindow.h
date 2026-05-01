@@ -27,7 +27,7 @@ public:
     QSize minimumWindowSize() const;
     QSize maximumWindowSize() const;
 
-    void setShadowEnabled(bool enabled);
+    void setSystemShadowEnabled(bool enabled);
     void setSystemBackdropEnabled(bool enabled);
     void setSystemBackdropPreference(WindowEffectWin::SystemBackdropPreference preference);
     void setRoundedCornersEnabled(bool enabled);

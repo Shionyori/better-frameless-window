@@ -107,6 +107,16 @@ QSize FramelessWindow::maximumWindowSize() const
 
 void FramelessWindow::setSystemShadowEnabled(bool enabled)
 {
+    if (m_shadowEnabled == enabled) {
+        return;
+    }
+
+    m_shadowEnabled = enabled;
+    requestVisualRefresh();
+}
+
+void FramelessWindow::setSystemBackdropEnabled(bool enabled)
+{
     if (m_systemBackdropEnabled == enabled) {
         return;
     }
@@ -123,11 +133,6 @@ void FramelessWindow::setSystemBackdropPreference(WindowEffectWin::SystemBackdro
 
     m_systemBackdropPreference = preference;
     requestVisualRefresh();
-}
-
-WindowEffectWin::BackdropMode FramelessWindow::systemBackdrop() const
-{
-    return m_systemBackdropMode;
 }
 
 void FramelessWindow::setRoundedCornersEnabled(bool enabled)

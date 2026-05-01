@@ -14,10 +14,8 @@ int main(int argc, char *argv[])
     window.setDiagnosticsEnabled(true); // enable diagnostics logging for visual effect debugging
 
     window.setThemeMode(ThemeManager::ThemeMode::Light);
-    window.setShadowEnabled(true);
-    window.setSystemBackdrop(WindowEffectWin::BackdropMode::Acrylic);
-    window.setRoundedCornersEnabled(true);
-    window.setSystemDarkModeEnabled(true);
+    window.setSystemBackdropEnabled(true);
+    window.setSystemBackdropPreference(WindowEffectWin::SystemBackdropPreference::Acrylic);
     window.setWindowSizeLimits(QSize(520, 360), QSize());
 
     window.show();

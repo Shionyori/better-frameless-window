@@ -8,7 +8,7 @@ public:
     enum class SystemBackdropPreference {
         Auto,
         None,
-        MicaSystem,
+        Mica,
         MicaLegacy,
         Acrylic
     };
