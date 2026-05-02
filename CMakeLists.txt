@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
 
-# replace "your_project_name" with the actual name of your project
 set(TARGET_NAME better-frameless-window)
 project(${TARGET_NAME} VERSION 1.0.0 LANGUAGES CXX)
 
@@ -27,20 +26,25 @@ find_package(Qt6 REQUIRED COMPONENTS
 # Add executable and specify source files
 add_executable(${TARGET_NAME})
 
-target_sources(${TARGET_NAME} PRIVATE
+set(BASE_SOURCES
     src/main.cpp
     src/framelesswindow.cpp
     src/framelesswindow.h
     src/titlebar.cpp
     src/titlebar.h
-    src/windoweffectwin.cpp
-    src/windoweffectwin.h
     src/core/windowvisualstate.cpp
     src/core/windowvisualstate.h
-    src/platform/win32/winnativemessagerouter.cpp
-    src/platform/win32/winnativemessagerouter.h
     src/core/visualrefreshcoordinator.cpp
     src/core/visualrefreshcoordinator.h
+    src/thememanager.cpp
+    src/thememanager.h
+    src/diagnostics.cpp
+    src/diagnostics.h
+)
+
+set(WIN32_SOURCES
+    src/platform/win32/winnativemessagerouter.cpp
+    src/platform/win32/winnativemessagerouter.h
     src/platform/win32/systemmenuwin.cpp
     src/platform/win32/systemmenuwin.h
     src/platform/win32/windowcommandwin.cpp
@@ -49,16 +53,21 @@ target_sources(${TARGET_NAME} PRIVATE
     src/platform/win32/windowframewin.h
     src/platform/win32/windowhittestwin.cpp
     src/platform/win32/windowhittestwin.h
-    src/winutils.cpp
-    src/winutils.h
-    src/thememanager.cpp
-    src/thememanager.h
-    src/diagnostics.cpp
-    src/diagnostics.h
+    src/platform/win32/windoweffectwin.cpp
+    src/platform/win32/windoweffectwin.h
+    src/platform/win32/winutils.cpp
+    src/platform/win32/winutils.h
 )
+
+# Add sources to the target
+target_sources(${TARGET_NAME} PRIVATE ${BASE_SOURCES})
+if(WIN32)
+    target_sources(${TARGET_NAME} PRIVATE ${WIN32_SOURCES})
+endif()
 
 target_include_directories(${TARGET_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/platform/win32
 )
 
 # Link Qt6 libraries to the executable
@@ -66,9 +75,15 @@ target_link_libraries(${TARGET_NAME} PRIVATE
     Qt6::Core 
     Qt6::Gui 
     Qt6::Widgets
-    dwmapi
-    user32
 )
+
+# Link platform-specific libraries
+if(WIN32)
+    target_link_libraries(${TARGET_NAME} PRIVATE 
+        dwmapi
+        user32
+    )
+endif()   
 
 # Deploy Qt dependencies using windeployqt (Windows) or macdeployqt (macOS)
 if(WIN32)
