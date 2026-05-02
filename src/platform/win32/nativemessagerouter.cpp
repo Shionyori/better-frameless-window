@@ -1,4 +1,4 @@
-#include "winnativemessagerouter.h"
+#include "nativemessagerouter.h"
 
 #include "diagnostics.h"
 #include "framelesswindow.h"
@@ -21,7 +21,7 @@
 #define WM_NCUAHDRAWFRAME 0x00AF
 #endif
 
-bool NativeWindowsMessageRouter::handleNcHitTestMessage(FramelessWindow &window, qintptr lParam, qintptr *result)
+bool NativeMessageRouter::handleNcHitTestMessage(FramelessWindow &window, qintptr lParam, qintptr *result)
 {
     const QPoint globalPos(GET_X_LPARAM(static_cast<LPARAM>(lParam)), GET_Y_LPARAM(static_cast<LPARAM>(lParam)));
     const int hit = window.hitTest(globalPos);
@@ -34,7 +34,7 @@ bool NativeWindowsMessageRouter::handleNcHitTestMessage(FramelessWindow &window,
     return false;
 }
 
-bool NativeWindowsMessageRouter::handleNcButtonMessage(FramelessWindow &window,
+bool NativeMessageRouter::handleNcButtonMessage(FramelessWindow &window,
                                                        quint32 messageId,
                                                        quintptr wParam,
                                                        qintptr *result)
@@ -62,7 +62,7 @@ bool NativeWindowsMessageRouter::handleNcButtonMessage(FramelessWindow &window,
     return true;
 }
 
-bool NativeWindowsMessageRouter::handleGetMinMaxInfoMessage(FramelessWindow &window,
+bool NativeMessageRouter::handleGetMinMaxInfoMessage(FramelessWindow &window,
                                                             void *lParam,
                                                             qintptr *result)
 {
@@ -86,7 +86,7 @@ bool NativeWindowsMessageRouter::handleGetMinMaxInfoMessage(FramelessWindow &win
     return true;
 }
 
-bool NativeWindowsMessageRouter::handleNcRightButtonUpMessage(FramelessWindow &window,
+bool NativeMessageRouter::handleNcRightButtonUpMessage(FramelessWindow &window,
                                                               quintptr wParam,
                                                               qintptr lParam,
                                                               qintptr *result)
@@ -102,7 +102,7 @@ bool NativeWindowsMessageRouter::handleNcRightButtonUpMessage(FramelessWindow &w
 }
 #endif
 
-bool NativeWindowsMessageRouter::handle(FramelessWindow &window, void *message, qintptr *result)
+bool NativeMessageRouter::handle(FramelessWindow &window, void *message, qintptr *result)
 {
 #ifdef Q_OS_WIN
     const MSG *msg = static_cast<MSG *>(message);
@@ -127,7 +127,7 @@ bool NativeWindowsMessageRouter::handle(FramelessWindow &window, void *message, 
             }
         }
 
-        return NativeWindowsMessageRouter::handleNcHitTestMessage(window,
+        return NativeMessageRouter::handleNcHitTestMessage(window,
                                       static_cast<qintptr>(msg->lParam),
                                       result);
     }
@@ -142,7 +142,7 @@ bool NativeWindowsMessageRouter::handle(FramelessWindow &window, void *message, 
     case WM_NCLBUTTONDOWN:
     case WM_NCLBUTTONDBLCLK:
     case WM_NCLBUTTONUP:
-        return NativeWindowsMessageRouter::handleNcButtonMessage(window,
+        return NativeMessageRouter::handleNcButtonMessage(window,
                                      msg->message,
                                      static_cast<quintptr>(msg->wParam),
                                      result);
@@ -212,11 +212,11 @@ bool NativeWindowsMessageRouter::handle(FramelessWindow &window, void *message, 
         }
         return false;
     case WM_GETMINMAXINFO:
-        return NativeWindowsMessageRouter::handleGetMinMaxInfoMessage(window,
+        return NativeMessageRouter::handleGetMinMaxInfoMessage(window,
                                           reinterpret_cast<void *>(msg->lParam),
                                           result);
     case WM_NCRBUTTONUP:
-        return NativeWindowsMessageRouter::handleNcRightButtonUpMessage(window,
+        return NativeMessageRouter::handleNcRightButtonUpMessage(window,
                                         static_cast<quintptr>(msg->wParam),
                                         static_cast<qintptr>(msg->lParam),
                                         result);

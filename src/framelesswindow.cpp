@@ -2,11 +2,11 @@
 
 #include "diagnostics.h"
 #include "core/windowvisualstate.h"
-#include "platform/win32/windowcommandwin.h"
-#include "platform/win32/systemmenuwin.h"
-#include "platform/win32/windowhittestwin.h"
-#include "platform/win32/windowframewin.h"
-#include "platform/win32/winnativemessagerouter.h"
+#include "win32/windowcommand.h"
+#include "win32/systemmenu.h"
+#include "win32/windowhittest.h"
+#include "win32/windowframe.h"
+#include "win32/nativemessagerouter.h"
 #include "titlebar.h"
 
 #include <QEvent>
@@ -33,7 +33,7 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_layout(nullptr)
     , m_shadowEnabled(true)
     , m_systemBackdropEnabled(true)
-    , m_systemBackdropPreference(WindowEffectWin::SystemBackdropPreference::Auto)
+    , m_systemBackdropPreference(WindowEffect::SystemBackdropPreference::Auto)
     , m_roundedCornersEnabled(true)
     , m_systemDarkModeEnabled(true)
     , m_systemBackdropTransitionGuardActive(false)
@@ -125,7 +125,7 @@ void FramelessWindow::setSystemBackdropEnabled(bool enabled)
     requestVisualRefresh();
 }
 
-void FramelessWindow::setSystemBackdropPreference(WindowEffectWin::SystemBackdropPreference preference)
+void FramelessWindow::setSystemBackdropPreference(WindowEffect::SystemBackdropPreference preference)
 {
     if (m_systemBackdropPreference == preference) {
         return;
@@ -282,7 +282,7 @@ bool FramelessWindow::isSystemBackdropEnabled() const
     return m_systemBackdropEnabled;
 }
 
-WindowEffectWin::SystemBackdropPreference FramelessWindow::systemBackdropPreference() const
+WindowEffect::SystemBackdropPreference FramelessWindow::systemBackdropPreference() const
 {
     return m_systemBackdropPreference;
 }
@@ -359,7 +359,7 @@ bool FramelessWindow::nativeEvent(const QByteArray &eventType, void *message, qi
         return QWidget::nativeEvent(eventType, message, result);
     }
 
-    if (NativeWindowsMessageRouter::handle(*this, message, result)) {
+    if (NativeMessageRouter::handle(*this, message, result)) {
         return true;
     }
 
@@ -505,7 +505,7 @@ void FramelessWindow::showEvent(QShowEvent *event)
 
 void FramelessWindow::forceNativeDwmRefresh()
 {
-    WindowFrameWin::forceDwmRefresh(reinterpret_cast<void *>(winId()));
+    WindowFrame::forceDwmRefresh(reinterpret_cast<void *>(winId()));
 }
 
 void FramelessWindow::mousePressEvent(QMouseEvent *event)
@@ -536,35 +536,35 @@ void FramelessWindow::leaveEvent(QEvent *event)
 int FramelessWindow::hitTest(const QPoint &globalPos) const
 {
 #ifdef Q_OS_WIN
-    WindowHitTestWin::Context context;
+    WindowHitTest::Context context;
     context.hwnd = reinterpret_cast<void *>(winId());
     context.logicalWidth = width();
     context.logicalHeight = height();
     context.maximized = isMaximized();
     context.titleRegionResolver = [this](const QPoint &localPos) {
         if (m_titleBar == nullptr || !m_titleBar->geometry().contains(localPos)) {
-            return WindowHitTestWin::TitleRegion::None;
+            return WindowHitTest::TitleRegion::None;
         }
 
         const TitleBar::HitRegion hit = m_titleBar->hitRegionAt(m_titleBar->mapFrom(this, localPos));
         switch (hit) {
         case TitleBar::HitRegion::Caption:
-            return WindowHitTestWin::TitleRegion::Caption;
+            return WindowHitTest::TitleRegion::Caption;
         case TitleBar::HitRegion::MinimizeButton:
-            return WindowHitTestWin::TitleRegion::MinimizeButton;
+            return WindowHitTest::TitleRegion::MinimizeButton;
         case TitleBar::HitRegion::MaximizeButton:
-            return WindowHitTestWin::TitleRegion::MaximizeButton;
+            return WindowHitTest::TitleRegion::MaximizeButton;
         case TitleBar::HitRegion::CloseButton:
-            return WindowHitTestWin::TitleRegion::CloseButton;
+            return WindowHitTest::TitleRegion::CloseButton;
         case TitleBar::HitRegion::OtherInteractive:
-            return WindowHitTestWin::TitleRegion::OtherInteractive;
+            return WindowHitTest::TitleRegion::OtherInteractive;
         case TitleBar::HitRegion::None:
         default:
-            return WindowHitTestWin::TitleRegion::None;
+            return WindowHitTest::TitleRegion::None;
         }
     };
 
-    return WindowHitTestWin::nonClientHitTest(context, globalPos);
+    return WindowHitTest::nonClientHitTest(context, globalPos);
 #endif
 
     return 0;
@@ -572,7 +572,7 @@ int FramelessWindow::hitTest(const QPoint &globalPos) const
 
 int FramelessWindow::resizeBorderThickness() const
 {
-    return WindowHitTestWin::resizeBorderThickness(reinterpret_cast<void *>(winId()));
+    return WindowHitTest::resizeBorderThickness(reinterpret_cast<void *>(winId()));
 }
 
 Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
@@ -624,7 +624,7 @@ Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
 void FramelessWindow::toggleMaximizeRestore()
 {
 #ifdef Q_OS_WIN
-    if (!WindowCommandWin::toggleMaximizeRestore(reinterpret_cast<void *>(winId()), isMaximized())) {
+    if (!WindowCommand::toggleMaximizeRestore(reinterpret_cast<void *>(winId()), isMaximized())) {
         Diagnostics::logWarning(QStringLiteral("toggleMaximizeRestore: null HWND, fallback to QWidget state switch"));
         if (isMaximized()) {
             showNormal();
@@ -660,10 +660,10 @@ void FramelessWindow::startSystemMove()
 
 void FramelessWindow::showSystemMenu(const QPoint &globalPos)
 {
-    SystemMenuWin::WindowState state;
+    SystemMenu::WindowState state;
     state.maximized = isMaximized();
     state.minimized = isMinimized();
-    SystemMenuWin::showForWindow(reinterpret_cast<void *>(winId()), globalPos, state);
+    SystemMenu::showForWindow(reinterpret_cast<void *>(winId()), globalPos, state);
 }
 
 void FramelessWindow::updateMaximizeButtonState()
@@ -707,12 +707,12 @@ bool FramelessWindow::tryStartSystemResizeAtGlobalPos(const QPoint &globalPos)
 
 void FramelessWindow::ensureNativeResizeStyle()
 {
-    WindowFrameWin::syncWindowFrame(reinterpret_cast<void *>(winId()));
+    WindowFrame::syncWindowFrame(reinterpret_cast<void *>(winId()));
 }
 
 void FramelessWindow::syncNativeWindowFrame()
 {
-    WindowFrameWin::syncWindowFrame(reinterpret_cast<void *>(winId()));
+    WindowFrame::syncWindowFrame(reinterpret_cast<void *>(winId()));
 }
 
 void FramelessWindow::applyVisualEffects()
@@ -740,7 +740,7 @@ void FramelessWindow::applyVisualEffects()
         setAttribute(Qt::WA_TranslucentBackground, shouldBeTranslucent);
     }
 
-    const WindowEffectWin::VisualEffectOptions options = WindowVisualState::buildVisualEffectOptions(
+    const WindowEffect::VisualEffectOptions options = WindowVisualState::buildVisualEffectOptions(
         m_shadowEnabled,
         m_systemBackdropEnabled,
         effectiveSystemBackdropPreference(),
@@ -812,7 +812,7 @@ bool FramelessWindow::shouldStartRestoreTransitionFromSizeState(bool isMaximized
     return false;
 }
 
-WindowEffectWin::SystemBackdropPreference FramelessWindow::effectiveSystemBackdropPreference() const
+WindowEffect::SystemBackdropPreference FramelessWindow::effectiveSystemBackdropPreference() const
 {
     return m_systemBackdropPreference;
 }

@@ -1,6 +1,6 @@
-#include "windowhittestwin.h"
+#include "windowhittest.h"
 
-#include "winutils.h"
+#include "utils.h"
 
 #include <QRect>
 
@@ -8,7 +8,7 @@
 #include <qt_windows.h>
 #endif
 
-namespace WindowHitTestWin {
+namespace WindowHitTest {
 
 int resizeBorderThickness(void *hwnd)
 {
@@ -58,7 +58,7 @@ int nonClientHitTest(const Context &context, const QPoint &globalPos)
     const int logicalWidth = qMax(1, context.logicalWidth);
     const int logicalHeight = qMax(1, context.logicalHeight);
     const QRect nativeWindowRect(left, top, right - left + 1, bottom - top + 1);
-    const QPoint localPos = WinUtils::toLocalPos(globalPos, nativeWindowRect, logicalWidth, logicalHeight);
+    const QPoint localPos = Utils::toLocalPos(globalPos, nativeWindowRect, logicalWidth, logicalHeight);
 
     const TitleRegion titleRegion = context.titleRegionResolver
         ? context.titleRegionResolver(localPos)
@@ -109,7 +109,7 @@ int nonClientHitTest(const Context &context, const QPoint &globalPos)
     }
 
     if (edges != Qt::Edges()) {
-        return WinUtils::hitFromEdges(edges);
+        return Utils::hitFromEdges(edges);
     }
 
     if (onTitleBarCaptionArea) {
@@ -124,4 +124,4 @@ int nonClientHitTest(const Context &context, const QPoint &globalPos)
 #endif
 }
 
-} // namespace WindowHitTestWin
+} // namespace WindowHitTest

@@ -1,4 +1,4 @@
-#include "systemmenuwin.h"
+#include "systemmenu.h"
 
 #include "diagnostics.h"
 
@@ -6,7 +6,7 @@
 #include <qt_windows.h>
 #endif
 
-namespace SystemMenuWin {
+namespace SystemMenu {
 
 void showForWindow(void *hwnd, const QPoint &globalPos, const WindowState &windowState)
 {
@@ -55,4 +55,4 @@ void showForWindow(void *hwnd, const QPoint &globalPos, const WindowState &windo
 #endif
 }
 
-} // namespace SystemMenuWin
+} // namespace SystemMenu

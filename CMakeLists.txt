@@ -43,20 +43,20 @@ set(BASE_SOURCES
 )
 
 set(WIN32_SOURCES
-    src/platform/win32/winnativemessagerouter.cpp
-    src/platform/win32/winnativemessagerouter.h
-    src/platform/win32/systemmenuwin.cpp
-    src/platform/win32/systemmenuwin.h
-    src/platform/win32/windowcommandwin.cpp
-    src/platform/win32/windowcommandwin.h
-    src/platform/win32/windowframewin.cpp
-    src/platform/win32/windowframewin.h
-    src/platform/win32/windowhittestwin.cpp
-    src/platform/win32/windowhittestwin.h
-    src/platform/win32/windoweffectwin.cpp
-    src/platform/win32/windoweffectwin.h
-    src/platform/win32/winutils.cpp
-    src/platform/win32/winutils.h
+    src/platform/win32/nativemessagerouter.cpp
+    src/platform/win32/nativemessagerouter.h
+    src/platform/win32/systemmenu.cpp
+    src/platform/win32/systemmenu.h
+    src/platform/win32/windowcommand.cpp
+    src/platform/win32/windowcommand.h
+    src/platform/win32/windowframe.cpp
+    src/platform/win32/windowframe.h
+    src/platform/win32/windowhittest.cpp
+    src/platform/win32/windowhittest.h
+    src/platform/win32/windoweffect.cpp
+    src/platform/win32/windoweffect.h
+    src/platform/win32/utils.cpp
+    src/platform/win32/utils.h
 )
 
 # Add sources to the target
@@ -67,7 +67,7 @@ endif()
 
 target_include_directories(${TARGET_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/platform/win32
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/platform
 )
 
 # Link Qt6 libraries to the executable

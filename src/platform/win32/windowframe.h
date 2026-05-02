@@ -1,8 +1,8 @@
 #pragma once
 
-namespace WindowFrameWin {
+namespace WindowFrame {
 
 void syncWindowFrame(void *hwnd);
 void forceDwmRefresh(void *hwnd);
 
-} // namespace WindowFrameWin
+} // namespace WindowFrame

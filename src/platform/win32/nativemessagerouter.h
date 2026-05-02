@@ -4,7 +4,7 @@
 
 class FramelessWindow;
 
-class NativeWindowsMessageRouter
+class NativeMessageRouter
 {
 public:
     static bool handle(FramelessWindow &window, void *message, qintptr *result);

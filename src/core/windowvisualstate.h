@@ -1,7 +1,7 @@
 #pragma once
 
 #include "thememanager.h"
-#include "windoweffectwin.h"
+#include "win32/windoweffect.h"
 
 #include <QColor>
 
@@ -13,11 +13,11 @@ bool shouldUseDarkMode(ThemeManager::ThemeMode themeMode);
 
 bool shouldUseTranslucentBackground(bool systemBackdropEnabled,
                                     bool minimized,
-                                    WindowEffectWin::SystemBackdropPreference systemBackdropPreference);
+                                    WindowEffect::SystemBackdropPreference systemBackdropPreference);
 
-WindowEffectWin::VisualEffectOptions buildVisualEffectOptions(bool shadowEnabled,
+WindowEffect::VisualEffectOptions buildVisualEffectOptions(bool shadowEnabled,
                                                               bool systemBackdropEnabled,
-                                                              WindowEffectWin::SystemBackdropPreference systemBackdropPreference,
+                                                              WindowEffect::SystemBackdropPreference systemBackdropPreference,
                                                               bool roundedCornersEnabled,
                                                               bool systemDarkModeEnabled,
                                                               ThemeManager::ThemeMode themeMode,
@@ -33,7 +33,7 @@ quint64 buildVisualStateToken(bool visible,
                               bool systemBackdropEnabled,
                               bool roundedCornersEnabled,
                               bool systemDarkModeEnabled,
-                              WindowEffectWin::SystemBackdropPreference systemBackdropPreference,
+                              WindowEffect::SystemBackdropPreference systemBackdropPreference,
                               ThemeManager::ThemeMode themeMode,
                               bool translucentBackground);
 

@@ -2,7 +2,7 @@
 
 #include "thememanager.h"
 #include "core/visualrefreshcoordinator.h"
-#include "windoweffectwin.h"
+#include "win32/windoweffect.h"
 
 #include <QColor>
 #include <QSize>
@@ -11,7 +11,7 @@
 class QVBoxLayout;
 class TitleBar;
 class QString;
-class NativeWindowsMessageRouter;
+class NativeMessageRouter;
 
 class FramelessWindow : public QWidget
 {
@@ -29,7 +29,7 @@ public:
 
     void setSystemShadowEnabled(bool enabled);
     void setSystemBackdropEnabled(bool enabled);
-    void setSystemBackdropPreference(WindowEffectWin::SystemBackdropPreference preference);
+    void setSystemBackdropPreference(WindowEffect::SystemBackdropPreference preference);
     void setRoundedCornersEnabled(bool enabled);
     void setSystemDarkModeEnabled(bool enabled);
     void setThemeMode(ThemeManager::ThemeMode mode);
@@ -48,7 +48,7 @@ public:
     void setDiagnosticsEnabled(bool enabled);
     bool isShadowEnabled() const;
     bool isSystemBackdropEnabled() const;
-    WindowEffectWin::SystemBackdropPreference systemBackdropPreference() const;
+    WindowEffect::SystemBackdropPreference systemBackdropPreference() const;
     bool isRoundedCornersEnabled() const;
     bool isSystemDarkModeEnabled() const;
     bool isDiagnosticsEnabled() const;
@@ -90,14 +90,14 @@ protected:
 
 private:
     bool shouldStartRestoreTransitionFromSizeState(bool isMaximizedState, bool isRestoredState);
-    WindowEffectWin::SystemBackdropPreference effectiveSystemBackdropPreference() const;
+    WindowEffect::SystemBackdropPreference effectiveSystemBackdropPreference() const;
     void beginSystemBackdropTransitionGuard();
     void performVisualRefreshPass();
     void requestVisualRefresh();
     void forceSystemBackdropRebind();
     void attachContentEventFilters(QWidget *widget);
     void detachContentEventFilters(QWidget *widget);
-    friend class NativeWindowsMessageRouter;
+    friend class NativeMessageRouter;
 
     TitleBar *m_titleBar;
     QWidget *m_contentPanel;
@@ -105,7 +105,7 @@ private:
     QVBoxLayout *m_layout;
     bool m_shadowEnabled;
     bool m_systemBackdropEnabled;
-    WindowEffectWin::SystemBackdropPreference m_systemBackdropPreference;
+    WindowEffect::SystemBackdropPreference m_systemBackdropPreference;
     bool m_roundedCornersEnabled;
     bool m_systemDarkModeEnabled;
     bool m_systemBackdropTransitionGuardActive;
@@ -116,5 +116,5 @@ private:
     bool m_loggedNullWindowHandle;
     VisualRefreshCoordinator m_visualRefreshCoordinator;
     ThemeManager m_themeManager;
-    WindowEffectWin m_windowEffect;
+    WindowEffect m_windowEffect;
 };

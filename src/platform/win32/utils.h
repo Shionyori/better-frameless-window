@@ -6,7 +6,7 @@
 
 #include <cstdint>
 
-namespace WinUtils {
+namespace Utils {
 
 struct WindowsCapabilities {
 	bool isWindows = false;
@@ -24,4 +24,4 @@ void syncNativeWindowStyles(void *hwnd, bool includeExStyle);
 uint32_t windowsBuildNumber();
 WindowsCapabilities detectWindowsCapabilities();
 
-} // namespace WinUtils
+} // namespace Utils

@@ -1,17 +1,17 @@
-#include "windowframewin.h"
+#include "windowframe.h"
 
-#include "winutils.h"
+#include "utils.h"
 
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
 #endif
 
-namespace WindowFrameWin {
+namespace WindowFrame {
 
 void syncWindowFrame(void *hwnd)
 {
 #ifdef Q_OS_WIN
-    WinUtils::syncNativeWindowStyles(hwnd, true);
+    Utils::syncNativeWindowStyles(hwnd, true);
 #else
     Q_UNUSED(hwnd)
 #endif
@@ -41,4 +41,4 @@ void forceDwmRefresh(void *hwnd)
 #endif
 }
 
-} // namespace WindowFrameWin
+} // namespace WindowFrame

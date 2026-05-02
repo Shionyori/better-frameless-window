@@ -1,4 +1,4 @@
-#include "winutils.h"
+#include "utils.h"
 
 #include "diagnostics.h"
 
@@ -6,7 +6,7 @@
 #include <qt_windows.h>
 #endif
 
-namespace WinUtils {
+namespace Utils {
 
 QPoint toLocalPos(const QPoint &globalPos, const QRect &nativeWindowRect, int logicalWidth, int logicalHeight)
 {
@@ -156,4 +156,4 @@ WindowsCapabilities detectWindowsCapabilities()
     return caps;
 }
 
-} // namespace WinUtils
+} // namespace Utils

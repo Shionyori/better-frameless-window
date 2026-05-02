@@ -1,4 +1,4 @@
-#include "windowcommandwin.h"
+#include "windowcommand.h"
 
 #include <QtGlobal>
 
@@ -6,7 +6,7 @@
 #include <qt_windows.h>
 #endif
 
-namespace WindowCommandWin {
+namespace WindowCommand {
 
 bool toggleMaximizeRestore(void *hwnd, bool currentlyMaximized)
 {
@@ -26,4 +26,4 @@ bool toggleMaximizeRestore(void *hwnd, bool currentlyMaximized)
 #endif
 }
 
-} // namespace WindowCommandWin
+} // namespace WindowCommand

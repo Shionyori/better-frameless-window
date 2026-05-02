@@ -4,7 +4,7 @@
 
 #include <functional>
 
-namespace WindowHitTestWin {
+namespace WindowHitTest {
 
 enum class TitleRegion {
     None,
@@ -26,4 +26,4 @@ struct Context {
 int resizeBorderThickness(void *hwnd);
 int nonClientHitTest(const Context &context, const QPoint &globalPos);
 
-} // namespace WindowHitTestWin
+} // namespace WindowHitTest

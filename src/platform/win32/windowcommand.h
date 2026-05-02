@@ -1,7 +1,7 @@
 #pragma once
 
-namespace WindowCommandWin {
+namespace WindowCommand {
 
 bool toggleMaximizeRestore(void *hwnd, bool currentlyMaximized);
 
-} // namespace WindowCommandWin
+} // namespace WindowCommand

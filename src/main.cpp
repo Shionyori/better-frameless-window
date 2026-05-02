@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
 
     window.setThemeMode(ThemeManager::ThemeMode::Light);
     window.setSystemBackdropEnabled(true);
-    window.setSystemBackdropPreference(WindowEffectWin::SystemBackdropPreference::Acrylic);
+    window.setSystemBackdropPreference(WindowEffect::SystemBackdropPreference::Acrylic);
     window.setWindowSizeLimits(QSize(520, 360), QSize());
 
     window.show();

@@ -1,6 +1,6 @@
 #include "windowvisualstate.h"
 
-#include "winutils.h"
+#include "win32/utils.h"
 
 namespace WindowVisualState {
 
@@ -11,28 +11,28 @@ bool shouldUseDarkMode(ThemeManager::ThemeMode themeMode)
 
 bool shouldUseTranslucentBackground(bool systemBackdropEnabled,
                                     bool minimized,
-                                    WindowEffectWin::SystemBackdropPreference systemBackdropPreference)
+                                    WindowEffect::SystemBackdropPreference systemBackdropPreference)
 {
 #ifdef Q_OS_WIN
     if (!systemBackdropEnabled || minimized) {
         return false;
     }
 
-    const WinUtils::WindowsCapabilities caps = WinUtils::detectWindowsCapabilities();
+    const Utils::WindowsCapabilities caps = Utils::detectWindowsCapabilities();
     const bool autoChainAvailable = caps.supportsSystemSystemBackdrop
                                     || caps.supportsLegacyMica
                                     || caps.supportsAcrylic;
 
     switch (systemBackdropPreference) {
-    case WindowEffectWin::SystemBackdropPreference::Auto:
+    case WindowEffect::SystemBackdropPreference::Auto:
         return autoChainAvailable;
-    case WindowEffectWin::SystemBackdropPreference::None:
+    case WindowEffect::SystemBackdropPreference::None:
         return false;
-    case WindowEffectWin::SystemBackdropPreference::Mica:
+    case WindowEffect::SystemBackdropPreference::Mica:
         return caps.supportsSystemSystemBackdrop ? true : autoChainAvailable;
-    case WindowEffectWin::SystemBackdropPreference::MicaLegacy:
+    case WindowEffect::SystemBackdropPreference::MicaLegacy:
         return caps.supportsLegacyMica ? true : autoChainAvailable;
-    case WindowEffectWin::SystemBackdropPreference::Acrylic:
+    case WindowEffect::SystemBackdropPreference::Acrylic:
         return caps.supportsAcrylic ? true : autoChainAvailable;
     }
 
@@ -45,9 +45,9 @@ bool shouldUseTranslucentBackground(bool systemBackdropEnabled,
 #endif
 }
 
-WindowEffectWin::VisualEffectOptions buildVisualEffectOptions(bool shadowEnabled,
+WindowEffect::VisualEffectOptions buildVisualEffectOptions(bool shadowEnabled,
                                                               bool systemBackdropEnabled,
-                                                              WindowEffectWin::SystemBackdropPreference systemBackdropPreference,
+                                                              WindowEffect::SystemBackdropPreference systemBackdropPreference,
                                                               bool roundedCornersEnabled,
                                                               bool systemDarkModeEnabled,
                                                               ThemeManager::ThemeMode themeMode,
@@ -55,7 +55,7 @@ WindowEffectWin::VisualEffectOptions buildVisualEffectOptions(bool shadowEnabled
                                                               bool minimized,
                                                               const QColor &borderColor)
 {
-    WindowEffectWin::VisualEffectOptions options;
+    WindowEffect::VisualEffectOptions options;
     options.shadowEnabled = shadowEnabled;
     options.systemBackdropEnabled = systemBackdropEnabled;
     options.systemBackdropPreference = systemBackdropPreference;
@@ -76,7 +76,7 @@ quint64 buildVisualStateToken(bool visible,
                               bool systemBackdropEnabled,
                               bool roundedCornersEnabled,
                               bool systemDarkModeEnabled,
-                              WindowEffectWin::SystemBackdropPreference systemBackdropPreference,
+                              WindowEffect::SystemBackdropPreference systemBackdropPreference,
                               ThemeManager::ThemeMode themeMode,
                               bool translucentBackground)
 {

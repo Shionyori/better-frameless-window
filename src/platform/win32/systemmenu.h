@@ -2,7 +2,7 @@
 
 #include <QPoint>
 
-namespace SystemMenuWin {
+namespace SystemMenu {
 
 struct WindowState {
     bool maximized = false;
@@ -11,4 +11,4 @@ struct WindowState {
 
 void showForWindow(void *hwnd, const QPoint &globalPos, const WindowState &windowState);
 
-} // namespace SystemMenuWin
+} // namespace SystemMenu

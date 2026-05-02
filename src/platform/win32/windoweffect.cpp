@@ -1,7 +1,7 @@
-#include "windoweffectwin.h"
+#include "windoweffect.h"
 
 #include "diagnostics.h"
-#include "winutils.h"
+#include "utils.h"
 
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
@@ -136,7 +136,7 @@ void applyAcrylicAccent(HWND hwnd, bool enable, bool useDarkMode)
 }
 #endif
 
-void WindowEffectWin::applyVisualEffects(void *hwnd, const VisualEffectOptions &options) const
+void WindowEffect::applyVisualEffects(void *hwnd, const VisualEffectOptions &options) const
 {
 #ifdef Q_OS_WIN
     applyShadow(hwnd, options.shadowEnabled, options.maximized, options.minimized);
@@ -155,7 +155,7 @@ void WindowEffectWin::applyVisualEffects(void *hwnd, const VisualEffectOptions &
 #endif
 }
 
-void WindowEffectWin::applyShadow(void *hwnd, bool enabled, bool maximized, bool minimized) const
+void WindowEffect::applyShadow(void *hwnd, bool enabled, bool maximized, bool minimized) const
 {
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
@@ -203,7 +203,7 @@ void WindowEffectWin::applyShadow(void *hwnd, bool enabled, bool maximized, bool
 #endif
 }
 
-void WindowEffectWin::applyRoundedCorners(void *hwnd, bool enabled, bool maximized, bool minimized) const
+void WindowEffect::applyRoundedCorners(void *hwnd, bool enabled, bool maximized, bool minimized) const
 {
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
@@ -236,7 +236,7 @@ void WindowEffectWin::applyRoundedCorners(void *hwnd, bool enabled, bool maximiz
 #endif
 }
 
-void WindowEffectWin::applySystemDarkMode(void *hwnd, bool enabled, bool useDarkMode) const
+void WindowEffect::applySystemDarkMode(void *hwnd, bool enabled, bool useDarkMode) const
 {
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
@@ -284,7 +284,7 @@ void WindowEffectWin::applySystemDarkMode(void *hwnd, bool enabled, bool useDark
 #endif
 }
 
-WindowEffectWin::SystemBackdropMode WindowEffectWin::selectSystemBackdropMode(bool enabled,
+WindowEffect::SystemBackdropMode WindowEffect::selectSystemBackdropMode(bool enabled,
                                                                   bool maximized,
                                                                   bool minimized,
                                                                   SystemBackdropPreference systemBackdropPreference) const
@@ -294,7 +294,7 @@ WindowEffectWin::SystemBackdropMode WindowEffectWin::selectSystemBackdropMode(bo
         return SystemBackdropMode::None;
     }
 
-    const WinUtils::WindowsCapabilities caps = WinUtils::detectWindowsCapabilities();
+    const Utils::WindowsCapabilities caps = Utils::detectWindowsCapabilities();
     Q_UNUSED(maximized)
     const bool allowAcrylic = true;
     if (systemBackdropPreference != SystemBackdropPreference::Auto) {
@@ -345,7 +345,7 @@ WindowEffectWin::SystemBackdropMode WindowEffectWin::selectSystemBackdropMode(bo
     return SystemBackdropMode::None;
 }
 
-void WindowEffectWin::applySystemBackdropEffects(void *hwnd,
+void WindowEffect::applySystemBackdropEffects(void *hwnd,
                                            bool enabled,
                                            bool useDarkMode,
                                            bool maximized,
@@ -362,7 +362,7 @@ void WindowEffectWin::applySystemBackdropEffects(void *hwnd,
     (void) maximized;
     (void) minimized;
 
-    const WinUtils::WindowsCapabilities caps = WinUtils::detectWindowsCapabilities();
+    const Utils::WindowsCapabilities caps = Utils::detectWindowsCapabilities();
     SystemBackdropMode mode = selectSystemBackdropMode(enabled, maximized, minimized, systemBackdropPreference);
 
     static bool acrylicWasEnabled = false;
@@ -508,7 +508,7 @@ void WindowEffectWin::applySystemBackdropEffects(void *hwnd,
 #endif
 }
 
-void WindowEffectWin::applyBorderColor(void *hwnd, const QColor &borderColor) const
+void WindowEffect::applyBorderColor(void *hwnd, const QColor &borderColor) const
 {
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
@@ -521,7 +521,7 @@ void WindowEffectWin::applyBorderColor(void *hwnd, const QColor &borderColor) co
         return;
     }
 
-    const WinUtils::WindowsCapabilities caps = WinUtils::detectWindowsCapabilities();
+    const Utils::WindowsCapabilities caps = Utils::detectWindowsCapabilities();
     if (!caps.supportsLegacyMica && !caps.supportsSystemSystemBackdrop) {
         return;
     }

@@ -2,7 +2,7 @@
 
 #include <QColor>
 
-class WindowEffectWin
+class WindowEffect
 {
 public:
     enum class SystemBackdropPreference {
@@ -32,7 +32,7 @@ public:
         QColor borderColor;
     };
 
-    WindowEffectWin() = default;
+    WindowEffect() = default;
 
     void applyVisualEffects(void *hwnd, const VisualEffectOptions &options) const;
     void applyShadow(void *hwnd, bool enabled, bool maximized, bool minimized) const;
