@@ -2,11 +2,13 @@
 
 #include "diagnostics.h"
 #include "core/windowvisualstate.h"
+#ifdef Q_OS_WIN
 #include "win32/windowcommand.h"
 #include "win32/systemmenu.h"
 #include "win32/windowhittest.h"
 #include "win32/windowframe.h"
 #include "win32/nativemessagerouter.h"
+#endif
 #include "titlebar.h"
 
 #include <QEvent>
@@ -505,7 +507,11 @@ void FramelessWindow::showEvent(QShowEvent *event)
 
 void FramelessWindow::forceNativeDwmRefresh()
 {
+#ifdef Q_OS_WIN
     WindowFrame::forceDwmRefresh(reinterpret_cast<void *>(winId()));
+#else
+    Q_UNUSED(winId())
+#endif
 }
 
 void FramelessWindow::mousePressEvent(QMouseEvent *event)
@@ -572,7 +578,11 @@ int FramelessWindow::hitTest(const QPoint &globalPos) const
 
 int FramelessWindow::resizeBorderThickness() const
 {
+#ifdef Q_OS_WIN
     return WindowHitTest::resizeBorderThickness(reinterpret_cast<void *>(winId()));
+#else
+    return 0;
+#endif
 }
 
 Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
@@ -660,10 +670,14 @@ void FramelessWindow::startSystemMove()
 
 void FramelessWindow::showSystemMenu(const QPoint &globalPos)
 {
+#ifdef Q_OS_WIN
     SystemMenu::WindowState state;
     state.maximized = isMaximized();
     state.minimized = isMinimized();
     SystemMenu::showForWindow(reinterpret_cast<void *>(winId()), globalPos, state);
+#else
+    Q_UNUSED(globalPos)
+#endif
 }
 
 void FramelessWindow::updateMaximizeButtonState()
@@ -707,16 +721,25 @@ bool FramelessWindow::tryStartSystemResizeAtGlobalPos(const QPoint &globalPos)
 
 void FramelessWindow::ensureNativeResizeStyle()
 {
+#ifdef Q_OS_WIN
     WindowFrame::syncWindowFrame(reinterpret_cast<void *>(winId()));
+#else
+    Q_UNUSED(winId())
+#endif
 }
 
 void FramelessWindow::syncNativeWindowFrame()
 {
+#ifdef Q_OS_WIN
     WindowFrame::syncWindowFrame(reinterpret_cast<void *>(winId()));
+#else
+    Q_UNUSED(winId())
+#endif
 }
 
 void FramelessWindow::applyVisualEffects()
 {
+#ifdef Q_OS_WIN
     if (windowHandle() == nullptr) {
         if (!m_loggedNullWindowHandle) {
             Diagnostics::logWarning(QStringLiteral("applyVisualEffects skipped: windowHandle is null"));
@@ -763,10 +786,14 @@ void FramelessWindow::applyVisualEffects()
     }
 
     m_windowEffect.applyVisualEffects(hwnd, options);
+#else
+    Q_UNUSED(winId())
+#endif
 }
 
 void FramelessWindow::forceSystemBackdropRebind()
 {
+#ifdef Q_OS_WIN
     if (!m_systemBackdropEnabled || windowHandle() == nullptr) {
         return;
     }
@@ -794,6 +821,9 @@ void FramelessWindow::forceSystemBackdropRebind()
                                         maximized,
                                         minimized,
                                         m_systemBackdropPreference);
+#else
+    Q_UNUSED(winId())
+#endif
 }
 
 bool FramelessWindow::shouldStartRestoreTransitionFromSizeState(bool isMaximizedState, bool isRestoredState)

@@ -349,7 +349,7 @@ void TitleBar::mousePressEvent(QMouseEvent *event)
     }
 
     if (event->button() == Qt::RightButton) {
-        emit systemMenuRequested(event->globalPos());
+        emit systemMenuRequested(event->globalPosition().toPoint());
         event->accept();
         return;
     }
