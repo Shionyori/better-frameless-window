@@ -28,11 +28,11 @@ jobs:
           - os: ubuntu-latest
             c_compiler: gcc
             cpp_compiler: g++
-            qt_arch: gcc_64
+            qt_arch: linux_gcc_64
           - os: ubuntu-latest
             c_compiler: clang
             cpp_compiler: clang++
-            qt_arch: gcc_64
+            qt_arch: linux_gcc_64
         exclude:
           - os: windows-latest
             c_compiler: gcc
