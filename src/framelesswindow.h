@@ -46,6 +46,7 @@ public:
     void clearTitleBarWidgets();
 
     void setDiagnosticsEnabled(bool enabled);
+    void setResizing(bool resizing);
     bool isShadowEnabled() const;
     bool isSystemBackdropEnabled() const;
     WindowEffect::SystemBackdropPreference systemBackdropPreference() const;
@@ -114,6 +115,7 @@ private:
     bool m_applyingTheme;
     QString m_lastAppliedStyleSheet;
     bool m_loggedNullWindowHandle;
+    bool m_resizing = false;
     VisualRefreshCoordinator m_visualRefreshCoordinator;
     ThemeManager m_themeManager;
     WindowEffect m_windowEffect;

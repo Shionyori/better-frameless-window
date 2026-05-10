@@ -51,4 +51,10 @@ private:
                                     bool maximized,
                                     bool minimized,
                                     SystemBackdropPreference systemBackdropPreference) const;
+
+    // Per-instance tracking to avoid redundant DWM calls during normal
+    // visual refresh (window move, focus change). Force-rebind during
+    // restore transitions bypasses this cache via enabled=false→true cycle.
+    mutable SystemBackdropMode m_lastAppliedMode = SystemBackdropMode::None;
+    mutable bool m_lastAppliedSuccessfully = false;
 };

@@ -3,6 +3,7 @@
 #include <QWidget>
 #include <QHash>
 
+class NativeMessageRouter;
 class QLabel;
 class QPushButton;
 class QMouseEvent;
@@ -13,6 +14,7 @@ class QPropertyAnimation;
 class TitleBar : public QWidget
 {
     Q_OBJECT
+    friend class NativeMessageRouter;
 public:
     enum class HitRegion {
         None,

@@ -2,6 +2,7 @@
 
 #include "diagnostics.h"
 #include "framelesswindow.h"
+#include "titlebar.h"
 
 #include <QGuiApplication>
 #include <QScreen>
@@ -148,8 +149,12 @@ bool NativeMessageRouter::handle(FramelessWindow &window, void *message, qintptr
                                      result);
     case WM_NCMOUSELEAVE:
     case WM_MOUSELEAVE:
+        return false;
     case WM_CAPTURECHANGED:
     case WM_KILLFOCUS:
+        if (window.m_titleBar != nullptr) {
+            window.m_titleBar->resetButtonVisualStates();
+        }
         return false;
     case WM_SIZE:
     {
@@ -181,7 +186,11 @@ bool NativeMessageRouter::handle(FramelessWindow &window, void *message, qintptr
         }
         return false;
     }
+    case WM_ENTERSIZEMOVE:
+        window.setResizing(true);
+        return false;
     case WM_EXITSIZEMOVE:
+        window.setResizing(false);
         window.scheduleStateVisualRefresh();
         return false;
     case WM_WINDOWPOSCHANGED:
@@ -203,6 +212,10 @@ bool NativeMessageRouter::handle(FramelessWindow &window, void *message, qintptr
     case WM_ACTIVATE:
         if (LOWORD(msg->wParam) != WA_INACTIVE) {
             window.scheduleStateVisualRefresh();
+        } else {
+            if (window.m_titleBar != nullptr) {
+                window.m_titleBar->resetButtonVisualStates();
+            }
         }
         return false;
     case WM_NCCALCSIZE:

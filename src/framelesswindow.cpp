@@ -191,8 +191,16 @@ void FramelessWindow::requestVisualRefresh()
 void FramelessWindow::performVisualRefreshPass()
 {
     applyTheme();
-    syncNativeWindowFrame();
-    applyVisualEffects();
+
+    // Suppress native frame sync and DWM visual effects during an active
+    // system resize (WM_ENTERSIZEMOVE → WM_EXITSIZEMOVE). Calling
+    // SetWindowPos(SWP_FRAMECHANGED) or DwmSetWindowAttribute mid-resize
+    // fights the system's own resize handling and causes visible jitter.
+    if (!m_resizing) {
+        syncNativeWindowFrame();
+        applyVisualEffects();
+    }
+
     updateMaximizeButtonState();
 }
 
@@ -272,6 +280,11 @@ void FramelessWindow::clearTitleBarWidgets()
 void FramelessWindow::setDiagnosticsEnabled(bool enabled)
 {
     Diagnostics::setEnabled(enabled);
+}
+
+void FramelessWindow::setResizing(bool resizing)
+{
+    m_resizing = resizing;
 }
 
 bool FramelessWindow::isShadowEnabled() const
@@ -807,10 +820,12 @@ void FramelessWindow::forceSystemBackdropRebind()
     const bool maximized = isMaximized();
     const bool minimized = isMinimized();
 
-    // Re-assert the target systemBackdrop mode without inserting a temporary
-    // visual-off state, so maximize/restore keeps a more consistent look.
+    // Force DWM to see a genuine state transition by clearing to None
+    // first, then re-applying the target. This bypasses the per-instance
+    // cache in applySystemBackdropEffects and ensures backdrop recovery
+    // after maximize/restore transitions.
     m_windowEffect.applySystemBackdropEffects(hwnd,
-                                        true,
+                                        false,
                                         useDarkMode,
                                         maximized,
                                         minimized,
@@ -857,8 +872,8 @@ void FramelessWindow::beginSystemBackdropTransitionGuard()
     m_systemBackdropTransitionGuardActive = true;
     const quint64 epoch = ++m_systemBackdropTransitionEpoch;
 
-    // Keep a short restore guard window for delayed re-assertion timings.
-    // SystemBackdrop preference itself stays stable to avoid transient effect loss.
+    // The new applySystemBackdropEffects always clears effects before applying,
+    // so a single recovery pass reliably restores the backdrop after restore.
     QTimer::singleShot(160, this, [this, epoch]() {
         if (epoch != m_systemBackdropTransitionEpoch) {
             return;
@@ -868,18 +883,6 @@ void FramelessWindow::beginSystemBackdropTransitionGuard()
         requestVisualRefresh();
         forceSystemBackdropRebind();
         forceNativeDwmRefresh();
-
-        // Fallback pass: some DWM composition paths may drop the first
-        // restored-material bind. Re-apply once more after settle.
-        QTimer::singleShot(220, this, [this, epoch]() {
-            if (epoch != m_systemBackdropTransitionEpoch || m_systemBackdropTransitionGuardActive || !isVisible()) {
-                return;
-            }
-
-            requestVisualRefresh();
-            forceSystemBackdropRebind();
-            forceNativeDwmRefresh();
-        });
     });
 }
 

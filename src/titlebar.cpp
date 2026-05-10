@@ -88,12 +88,12 @@ void TitleBar::initControlButton(QPushButton *button, const char *role)
     button->installEventFilter(this);
 
     auto *effect = new QGraphicsOpacityEffect(button);
-    effect->setOpacity(0.92);
+    effect->setOpacity(0.70);
     button->setGraphicsEffect(effect);
 
     auto *animation = new QPropertyAnimation(effect, "opacity", button);
-    animation->setDuration(90);
-    animation->setEasingCurve(QEasingCurve::OutCubic);
+    animation->setDuration(200);
+    animation->setEasingCurve(QEasingCurve::Linear);
 
     ButtonVisualFx fx;
     fx.effect = effect;
@@ -234,7 +234,6 @@ void TitleBar::updateButtonVisualState(QPushButton *button, const char *state)
     animateButtonOpacity(button, stateValue);
     button->style()->unpolish(button);
     button->style()->polish(button);
-    button->update();
 }
 
 void TitleBar::animateButtonOpacity(QPushButton *button, const QString &state)
@@ -249,13 +248,13 @@ void TitleBar::animateButtonOpacity(QPushButton *button, const QString &state)
         return;
     }
 
-    qreal targetOpacity = 0.92;
+    qreal targetOpacity = 0.70;
     if (state == QStringLiteral("hover")) {
         targetOpacity = 1.0;
     } else if (state == QStringLiteral("pressed")) {
-        targetOpacity = 0.78;
+        targetOpacity = 0.55;
     } else if (state == QStringLiteral("disabled")) {
-        targetOpacity = 0.45;
+        targetOpacity = 0.35;
     }
 
     if (qFuzzyCompare(fx.effect->opacity(), targetOpacity)) {
@@ -275,29 +274,31 @@ void TitleBar::resetButtonVisualStates()
 
 void TitleBar::syncButtonVisualStatesFromCursor()
 {
+    const QPoint localPos = mapFromGlobal(QCursor::pos());
+    QPushButton *hoveredButton = nullptr;
+
+    if (rect().contains(localPos)) {
+        hoveredButton = controlButtonAt(localPos);
+    }
+
+    const bool leftPressed = QApplication::mouseButtons().testFlag(Qt::LeftButton);
+
     const QList<QPushButton *> buttons = {m_minimizeButton, m_maximizeButton, m_closeButton};
     for (QPushButton *button : buttons) {
         if (button == nullptr) {
             continue;
         }
 
-        updateButtonVisualState(button, button->isEnabled() ? "normal" : "disabled");
-    }
+        const char *targetState;
+        if (!button->isEnabled()) {
+            targetState = "disabled";
+        } else if (button == hoveredButton) {
+            targetState = leftPressed ? "pressed" : "hover";
+        } else {
+            targetState = "normal";
+        }
 
-    const QPoint localPos = mapFromGlobal(QCursor::pos());
-    if (!rect().contains(localPos)) {
-        return;
-    }
-
-    QPushButton *hoveredButton = controlButtonAt(localPos);
-    if (hoveredButton == nullptr || !hoveredButton->isEnabled()) {
-        return;
-    }
-
-    if (QApplication::mouseButtons().testFlag(Qt::LeftButton)) {
-        updateButtonVisualState(hoveredButton, "pressed");
-    } else {
-        updateButtonVisualState(hoveredButton, "hover");
+        updateButtonVisualState(button, targetState);
     }
 }
 
