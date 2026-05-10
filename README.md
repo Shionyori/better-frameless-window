@@ -1,28 +1,28 @@
 # better-frameless-window
 
-**Qt6 Windows 无边框基础窗口**：
-- 去原生边框 + 自定义标题栏
-- 标题栏拖拽、双击最大化/还原、右键系统菜单
-- 8 向边缘缩放、HiDPI 命中修正
-- Win10/11 视觉效果（阴影、圆角、深色、Mica/Acrylic）
+A Qt6 C++17 frameless window library for Windows, with DWM visual effects integration.
 
+## Features
 
-## 现阶段问题
+- **Frameless window** with custom titlebar (drag, double-click maximize/restore, right-click system menu)
+- **8-direction resize** with HiDPI-aware hit testing
+- **Windows 10/11 visual effects**: shadow, rounded corners, system dark mode, Mica / Acrylic backdrop
+- **Snap Layout support** via native DWM hit-test forwarding
+- **Theme manager** with Light / Dark modes and accent color customization
+- **Titlebar extension slot** for custom widgets
 
-基本功能已经初具雏形，但还是存在不少问题
+## Build
 
-已知/搁置的问题：
+```bash
+cmake --preset windows-msvc-local-release
+cmake --build build/windows-msvc-local-release
+```
 
-- 深色模式还没有实现
-- Mica/Acrylic 视觉效果在最小化窗口后会暂时丢失
+The build produces `bfw-example` from `example/main.cpp`.
 
-下一步计划：
+**Requirements:** Qt 6.x (Core, Gui, Widgets), CMake 3.16+, MSVC 2022 (Windows).
 
-- 修复 FramelessWindow初始化backdropMode 与 setSystemBackdrop() 之间的冲突问题
-- 添加 BackgroundMode（Solid/Transparent）设置接口，修改当前的 setWindowOpacity() 接口以适应新的 BackgroundMode 设置
-- 调整目录结构，分离平台相关代码和核心功能代码
-
-## 最小接入
+## Quick Start
 
 ```cpp
 #include <QApplication>
@@ -31,39 +31,75 @@
 
 int main(int argc, char *argv[])
 {
-	QApplication app(argc, argv);
+    QApplication app(argc, argv);
 
-	FramelessWindow window;
-	auto *page = new QLabel("Your App Content");
-	page->setAlignment(Qt::AlignCenter);
-	window.setCentralWidget(page);
+    FramelessWindow window;
+    window.setWindowSizeLimits(QSize(480, 320), QSize());
 
-	window.show();
-	return app.exec();
+    auto *label = new QLabel("Hello!");
+    label->setAlignment(Qt::AlignCenter);
+    window.setCentralWidget(label);
+
+    window.show();
+    return app.exec();
 }
 ```
 
-## API 总览（面向使用者）
+Link against the `better-frameless-window` static library and include `src/` and `src/platform/` directories.
+
+## API Reference
 
 ### FramelessWindow
 
-#### 窗口属性
+#### Window configuration
 
-- `setWindowOpacity(qreal opacity)` - 设置窗口整体不透明度（0.0 - 1.0）
-- `setWindowSizeLimits(...)` / `minimumWindowSize()` / `maximumWindowSize()`：窗口尺寸约束
-- `setShadowEnabled(...)`：窗口阴影
-- `setCentralWidget(...)` / `centralWidget()` / `takeCentralWidget()`：主内容区
-- `addTitleBarWidget(...)` / `clearTitleBarWidgets()`：标题栏中部插槽
+| Method | Description |
+|---|---|
+| `setWindowSizeLimits(min, max)` | Set minimum / maximum window size |
+| `minimumWindowSize()` / `maximumWindowSize()` | Get current size limits |
+| `setCentralWidget(widget)` | Set the main content widget |
+| `centralWidget()` / `takeCentralWidget()` | Get / remove the main content widget |
+| `addTitleBarWidget(widget)` | Add a widget to the titlebar center area |
+| `clearTitleBarWidgets()` | Remove all titlebar center widgets |
 
-#### 视觉效果
+#### Visual effects
 
-- `setRoundedCornersEnabled(bool enabled)` - 启用/禁用圆角
-- `setSystemDarkModeEnabled(bool enabled)` - 启用/禁用系统深色模式适配
-- `setThemeMode(ThemeManager::ThemeMode mode)` - 设置主题模式（Light/Dark/System）
-- `setAccentColor(...)` / `accentColor()`：设置/获取系统强调色
-- `setSystemEffectsEnabled(bool enabled)` - 启用/禁用系统视觉效果（如 Mica/Acrylic）
-- `setSystemBackdrop(WindowEffectWin::BackdropMode mode)` - 设置系统背景效果模式（None/Mica/MicaLegacy/Acrylic）
+| Method | Description |
+|---|---|
+| `setThemeMode(mode)` | Set Light / Dark theme |
+| `themeMode()` | Get current theme mode |
+| `setAccentColor(color)` | Set the accent color |
+| `accentColor()` | Get current accent color |
+| `setSystemShadowEnabled(bool)` | Enable / disable system window shadow |
+| `setSystemBackdropEnabled(bool)` | Enable / disable system backdrop effects |
+| `setSystemBackdropPreference(pref)` | Set backdrop mode: Auto / None / Mica / MicaLegacy / Acrylic |
+| `setRoundedCornersEnabled(bool)` | Enable / disable rounded window corners |
+| `setSystemDarkModeEnabled(bool)` | Enable / disable system dark mode titlebar |
 
-#### 其他
+#### Diagnostics
 
-- `setDiagnosticsEnabled(bool enabled)` - 启用/禁用诊断日志输出（用于调试视觉效果问题）
+| Method | Description |
+|---|---|
+| `setDiagnosticsEnabled(bool)` | Enable debug logging for visual effect issues |
+
+### ThemeManager::ThemeMode
+
+- `Light` — Light application theme
+- `Dark` — Dark application theme
+
+### WindowEffect::SystemBackdropPreference
+
+- `Auto` — Best available (Mica > MicaLegacy > Acrylic)
+- `None` — Opaque window background
+- `Mica` — Windows 11 Mica material
+- `MicaLegacy` — Windows 10 Mica (fallback)
+- `Acrylic` — Acrylic blur material
+
+## Known Issues
+
+| Issue | Details |
+|---|---|
+| Snaps Layout missing | Snap Layout overlay may not appear on maximize button hover |
+| Resize jitter | Slight visual jitter during window resize |
+| Backdrop after restore | Mica/Acrylic may briefly flash after maximize→restore transition |
+| Dark mode titlebar | Dark mode may show incorrect background in normal (non-maximized) state |

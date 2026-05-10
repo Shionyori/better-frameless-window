@@ -347,7 +347,12 @@ void FramelessWindow::initLayout()
     m_titleBar = new TitleBar(this);
     m_contentPanel = new QWidget(this);
     m_contentPanel->setObjectName("FramelessContentPanel");
-    m_contentPanel->setAttribute(Qt::WA_TranslucentBackground, true);
+    // WA_TranslucentBackground on a child widget inside an already-layered
+    // top-level window breaks nested transparency compositing on Windows,
+    // causing child widgets (like user content labels) to render invisibly.
+    // The stylesheet #FramelessContentPanel { background: transparent; }
+    // already provides the desired visual transparency.
+    m_contentPanel->setAttribute(Qt::WA_TranslucentBackground, false);
 
     auto *contentLayout = new QVBoxLayout(m_contentPanel);
     contentLayout->setContentsMargins(0, 0, 0, 0);

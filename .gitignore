@@ -12,7 +12,7 @@ lib/
 CMakeUserPresets.json
 compile_commands.json
 
-# VS Code - Keep settings/launch/tasks but ignore user specific
+# VS Code
 .vscode/
 .history/
 .vs/
@@ -25,3 +25,7 @@ Thumbs.db
 workfiles/
 whattodo.md
 todolist.md
+
+# IDE specific
+.claude/
+.idea/
