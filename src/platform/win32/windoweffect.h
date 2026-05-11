@@ -48,7 +48,6 @@ public:
 
 private:
     SystemBackdropMode selectSystemBackdropMode(bool enabled,
-                                    bool maximized,
                                     bool minimized,
                                     SystemBackdropPreference systemBackdropPreference) const;
 

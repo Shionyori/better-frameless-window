@@ -7,12 +7,13 @@ QString colorToCss(const QColor &color)
 }
 
 QString buildWindowBackgroundRule(const QColor &windowBg,
-                                  bool transparentWindowBackground)
+                                  bool transparentWindowBackground,
+                                  bool dark)
 {
-    // Keep a stable translucent layer so Mica remains visible without introducing heavy blending artifacts.
-    const QString translucentBase = QStringLiteral("rgba(255, 255, 255, 0.30)");
-
     if (transparentWindowBackground) {
+        const QString translucentBase = dark
+            ? QStringLiteral("rgba(0, 0, 0, 0.35)")
+            : QStringLiteral("rgba(255, 255, 255, 0.30)");
         return QStringLiteral("background-color: %1; background-image: none;")
             .arg(translucentBase);
     }
@@ -64,7 +65,8 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
     const QColor closeHover = QColor(232, 17, 35);
 
     const QString windowBackgroundRule = buildWindowBackgroundRule(windowBg,
-                                                                   transparentWindowBackground);
+                                                                   transparentWindowBackground,
+                                                                   dark);
 
     return QStringLiteral(R"(
         #FramelessWindow {

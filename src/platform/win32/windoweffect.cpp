@@ -285,7 +285,6 @@ void WindowEffect::applySystemDarkMode(void *hwnd, bool enabled, bool useDarkMod
 }
 
 WindowEffect::SystemBackdropMode WindowEffect::selectSystemBackdropMode(bool enabled,
-                                                                  bool maximized,
                                                                   bool minimized,
                                                                   SystemBackdropPreference systemBackdropPreference) const
 {
@@ -295,7 +294,6 @@ WindowEffect::SystemBackdropMode WindowEffect::selectSystemBackdropMode(bool ena
     }
 
     const Utils::WindowsCapabilities caps = Utils::detectWindowsCapabilities();
-    Q_UNUSED(maximized)
     const bool allowAcrylic = true;
     if (systemBackdropPreference != SystemBackdropPreference::Auto) {
         switch (systemBackdropPreference) {
@@ -337,7 +335,6 @@ WindowEffect::SystemBackdropMode WindowEffect::selectSystemBackdropMode(bool ena
     }
 #else
     (void) enabled;
-    (void) maximized;
     (void) minimized;
     (void) systemBackdropPreference;
 #endif
@@ -360,7 +357,7 @@ void WindowEffect::applySystemBackdropEffects(void *hwnd,
     }
 
     const Utils::WindowsCapabilities caps = Utils::detectWindowsCapabilities();
-    SystemBackdropMode mode = selectSystemBackdropMode(enabled, maximized, minimized, systemBackdropPreference);
+    SystemBackdropMode mode = selectSystemBackdropMode(enabled, minimized, systemBackdropPreference);
 
     // Per-instance caching: skip redundant DWM calls during frequent visual
     // refreshes (window move, focus change) when nothing actually changed.

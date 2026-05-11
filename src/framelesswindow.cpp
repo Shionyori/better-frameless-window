@@ -460,7 +460,7 @@ bool FramelessWindow::eventFilter(QObject *watched, QEvent *event)
     if (event->type() == QEvent::MouseButtonPress) {
         const bool inContentPanel = watchedWidget != nullptr
                                     && m_contentPanel != nullptr
-                                    && (watchedWidget == m_contentPanel || m_contentPanel->isAncestorOf(watchedWidget));
+                                    && m_contentPanel->isAncestorOf(watchedWidget);
         const bool canInitiateResize = watched == this
                                        || watched == m_titleBar
                                        || inContentPanel;
@@ -528,7 +528,7 @@ void FramelessWindow::forceNativeDwmRefresh()
 #ifdef Q_OS_WIN
     WindowFrame::forceDwmRefresh(reinterpret_cast<void *>(winId()));
 #else
-    Q_UNUSED(winId())
+    Q_UNUSED(0)
 #endif
 }
 
@@ -742,7 +742,7 @@ void FramelessWindow::ensureNativeResizeStyle()
 #ifdef Q_OS_WIN
     WindowFrame::syncWindowFrame(reinterpret_cast<void *>(winId()));
 #else
-    Q_UNUSED(winId())
+    Q_UNUSED(0)
 #endif
 }
 
@@ -751,7 +751,7 @@ void FramelessWindow::syncNativeWindowFrame()
 #ifdef Q_OS_WIN
     WindowFrame::syncWindowFrame(reinterpret_cast<void *>(winId()));
 #else
-    Q_UNUSED(winId())
+    Q_UNUSED(0)
 #endif
 }
 
@@ -805,7 +805,7 @@ void FramelessWindow::applyVisualEffects()
 
     m_windowEffect.applyVisualEffects(hwnd, options);
 #else
-    Q_UNUSED(winId())
+    Q_UNUSED(0)
 #endif
 }
 
@@ -842,7 +842,7 @@ void FramelessWindow::forceSystemBackdropRebind()
                                         minimized,
                                         m_systemBackdropPreference);
 #else
-    Q_UNUSED(winId())
+    Q_UNUSED(0)
 #endif
 }
 
