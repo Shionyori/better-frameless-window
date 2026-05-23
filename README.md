@@ -175,7 +175,3 @@ Windows 11 22H2+ → Mica → MicaLegacy → Acrylic → None
 | Backdrop flash after restore | Mica/Acrylic may briefly flash after maximize→restore transition |
 | Dark mode titlebar | Dark mode may show incorrect background when not maximized |
 | Background + backdrop conflict | Background image and Mica/Acrylic are not designed to be used together; clear the image to enable backdrop effects |
-
-## License
-
-MIT
