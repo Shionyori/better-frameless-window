@@ -771,12 +771,12 @@ void FramelessWindow::toggleMaximizeRestore()
     // No setUpdatesEnabled freeze needed — the opacity effect hides
     // the layout change while the DWM animation runs.
     auto *fadeOut = new QPropertyAnimation(contentEffect, "opacity", this);
-    fadeOut->setDuration(100);
+    fadeOut->setDuration(60);
     fadeOut->setStartValue(contentEffect->opacity());
     fadeOut->setEndValue(0.0);
     fadeOut->start(QAbstractAnimation::DeleteWhenStopped);
 
-    QTimer::singleShot(100, this, [this]() {
+    QTimer::singleShot(60, this, [this]() {
         if (!WindowCommand::toggleMaximizeRestore(reinterpret_cast<void *>(winId()), isMaximized())) {
             auto *fx = qobject_cast<QGraphicsOpacityEffect *>(m_contentPanel->graphicsEffect());
             if (fx != nullptr) {
@@ -794,7 +794,7 @@ void FramelessWindow::toggleMaximizeRestore()
         scheduleStateVisualRefresh();
 
         // Fade content back in after the DWM animation settles
-        QTimer::singleShot(250, this, [this]() {
+        QTimer::singleShot(200, this, [this]() {
             if (!isVisible()) {
                 return;
             }
@@ -804,7 +804,7 @@ void FramelessWindow::toggleMaximizeRestore()
             auto *fx = qobject_cast<QGraphicsOpacityEffect *>(m_contentPanel->graphicsEffect());
             if (fx != nullptr) {
                 auto *fadeIn = new QPropertyAnimation(fx, "opacity", this);
-                fadeIn->setDuration(120);
+                fadeIn->setDuration(100);
                 fadeIn->setEasingCurve(QEasingCurve::OutCubic);
                 fadeIn->setStartValue(0.0);
                 fadeIn->setEndValue(1.0);
