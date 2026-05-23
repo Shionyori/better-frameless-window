@@ -33,6 +33,7 @@ public:
     void setSystemBackdropPreference(WindowEffect::SystemBackdropPreference preference);
     void setRoundedCornersEnabled(bool enabled);
     void setSystemDarkModeEnabled(bool enabled);
+    void setSnapLayoutEnabled(bool enabled);
     void setThemeMode(ThemeManager::ThemeMode mode, bool persist = true, bool animated = true);
     ThemeManager::ThemeMode themeMode() const;
     qreal themeTransitionProgress() const;
@@ -58,6 +59,7 @@ public:
     WindowEffect::SystemBackdropPreference systemBackdropPreference() const;
     bool isRoundedCornersEnabled() const;
     bool isSystemDarkModeEnabled() const;
+    bool isSnapLayoutEnabled() const;
     bool isDiagnosticsEnabled() const;
 
 protected:
@@ -115,6 +117,7 @@ private:
     WindowEffect::SystemBackdropPreference m_systemBackdropPreference;
     bool m_roundedCornersEnabled;
     bool m_systemDarkModeEnabled;
+    bool m_snapLayoutEnabled;
     bool m_systemBackdropTransitionGuardActive;
     quint64 m_systemBackdropTransitionEpoch;
     bool m_lastNativeSizeMaximized;

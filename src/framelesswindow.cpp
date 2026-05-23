@@ -42,6 +42,7 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_systemBackdropPreference(WindowEffect::SystemBackdropPreference::Auto)
     , m_roundedCornersEnabled(true)
     , m_systemDarkModeEnabled(true)
+    , m_snapLayoutEnabled(true)
     , m_systemBackdropTransitionGuardActive(false)
     , m_systemBackdropTransitionEpoch(0)
     , m_lastNativeSizeMaximized(false)
@@ -160,6 +161,11 @@ void FramelessWindow::setSystemDarkModeEnabled(bool enabled)
 
     m_systemDarkModeEnabled = enabled;
     requestVisualRefresh();
+}
+
+void FramelessWindow::setSnapLayoutEnabled(bool enabled)
+{
+    m_snapLayoutEnabled = enabled;
 }
 
 void FramelessWindow::setThemeMode(ThemeManager::ThemeMode mode, bool persist, bool animated)
@@ -353,6 +359,11 @@ bool FramelessWindow::isRoundedCornersEnabled() const
 bool FramelessWindow::isSystemDarkModeEnabled() const
 {
     return m_systemDarkModeEnabled;
+}
+
+bool FramelessWindow::isSnapLayoutEnabled() const
+{
+    return m_snapLayoutEnabled;
 }
 
 bool FramelessWindow::isDiagnosticsEnabled() const
@@ -663,6 +674,7 @@ int FramelessWindow::hitTest(const QPoint &globalPos) const
     context.logicalWidth = width();
     context.logicalHeight = height();
     context.maximized = isMaximized();
+    context.snapLayoutEnabled = m_snapLayoutEnabled;
     context.titleRegionResolver = [this](const QPoint &localPos) {
         if (m_titleBar == nullptr || !m_titleBar->geometry().contains(localPos)) {
             return WindowHitTest::TitleRegion::None;

@@ -20,6 +20,7 @@ struct Context {
     int logicalWidth = 0;
     int logicalHeight = 0;
     bool maximized = false;
+    bool snapLayoutEnabled = true;
     std::function<TitleRegion(const QPoint &)> titleRegionResolver;
 };
 

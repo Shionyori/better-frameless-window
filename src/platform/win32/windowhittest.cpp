@@ -68,7 +68,10 @@ int nonClientHitTest(const Context &context, const QPoint &globalPos)
         if (GetKeyState(VK_LBUTTON) < 0) {
             return HTCLIENT;
         }
-        return HTMAXBUTTON;
+        if (context.snapLayoutEnabled) {
+            return HTMAXBUTTON;
+        }
+        return HTCLIENT;
     }
 
     if (titleRegion == TitleRegion::MinimizeButton
