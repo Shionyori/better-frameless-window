@@ -1,10 +1,20 @@
-# better-frameless-window
-
 <p align="center">
-  <img src="docs/images/icon.png" alt="logo" width="96">
+  <img src="docs/images/icon.png" alt="logo" width="72">
 </p>
 
-A Qt6 C++17 frameless window library for Windows with DWM visual effects integration.
+<h1 align="center">better-frameless-window</h1>
+
+<p align="center">
+  A Qt6 · C++17 frameless window library for Windows
+  <br>
+  with DWM visual effects, background image, and theme support
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-Windows%2010%2B-blue" alt="Platform">
+  <img src="https://img.shields.io/badge/qt-6.x-green" alt="Qt">
+  <img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="License">
+</p>
 
 ## Screenshots
 
