@@ -192,6 +192,18 @@ bool NativeMessageRouter::handle(FramelessWindow &window, void *message, qintptr
                 window.scheduleStateVisualRefresh();
                 window.forceNativeDwmRefresh();
             });
+
+            // The restore animation runs ~300ms.  DWM may ignore
+            // SWP_FRAMECHANGED sent before the animation completes.
+            // One more refresh after the animation settles ensures
+            // DWM re-evaluates the non-client hit-test layout.
+            QTimer::singleShot(420, &window, [&window]() {
+                if (!window.isVisible()) {
+                    return;
+                }
+
+                window.forceNativeDwmRefresh();
+            });
         }
         return false;
     }
