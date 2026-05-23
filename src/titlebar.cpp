@@ -26,10 +26,10 @@ TitleBar::TitleBar(QWidget *parent)
     , m_dragInitiated(false)
     , m_visualMaximized(false)
 {
-    setFixedHeight(36);
+    setFixedHeight(44);
     setMouseTracking(true);
 
-    m_layout->setContentsMargins(10, 0, 6, 0);
+    m_layout->setContentsMargins(14, 0, 12, 0);
     m_layout->setSpacing(0);
 
     m_centerContainer->setObjectName("TitleBarCenterContainer");
@@ -42,7 +42,7 @@ TitleBar::TitleBar(QWidget *parent)
     m_closeButton->setObjectName("TitleBarCloseButton");
 
     QFont titleFont(QStringLiteral("Segoe UI"));
-    titleFont.setPixelSize(13);
+    titleFont.setPixelSize(14);
     titleFont.setWeight(QFont::DemiBold);
     m_titleLabel->setFont(titleFont);
 
@@ -55,9 +55,11 @@ TitleBar::TitleBar(QWidget *parent)
     m_layout->addWidget(m_titleLabel);
     m_layout->addWidget(m_centerContainer, 0);
     m_layout->addStretch();
-    m_layout->addSpacing(2);
+    m_layout->addSpacing(4);
     m_layout->addWidget(m_minimizeButton);
+    m_layout->addSpacing(4);
     m_layout->addWidget(m_maximizeButton);
+    m_layout->addSpacing(4);
     m_layout->addWidget(m_closeButton);
 
     connect(m_minimizeButton, &QPushButton::clicked, this, &TitleBar::minimizeRequested);
@@ -71,7 +73,7 @@ void TitleBar::initControlButton(QPushButton *button, const char *role)
         return;
     }
 
-    button->setFixedSize(40, 25);
+    button->setFixedSize(46, 30);
     button->setFlat(true);
     button->setAutoDefault(false);
     button->setDefault(false);
@@ -80,7 +82,7 @@ void TitleBar::initControlButton(QPushButton *button, const char *role)
     button->setAttribute(Qt::WA_Hover, true);
 
     QFont iconFont(QStringLiteral("Segoe MDL2 Assets"));
-    iconFont.setPixelSize(9);
+    iconFont.setPixelSize(10);
     button->setFont(iconFont);
 
     button->setProperty("btnRole", role);
