@@ -3,7 +3,14 @@
 namespace {
 QString colorToCss(const QColor &color)
 {
-    return color.name(QColor::HexRgb);
+    if (color.alpha() == 255) {
+        return color.name(QColor::HexRgb);
+    }
+    return QStringLiteral("rgba(%1, %2, %3, %4)")
+        .arg(color.red())
+        .arg(color.green())
+        .arg(color.blue())
+        .arg(color.alphaF(), 0, 'f', 2);
 }
 
 QString buildWindowBackgroundRule(const QColor &windowBg,
@@ -53,16 +60,16 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
 {
     const bool dark = isDarkMode();
 
-    const QColor windowBg = dark ? QColor(32, 32, 32) : QColor(243, 244, 246);
+    const QColor windowBg = dark ? QColor(25, 25, 25) : QColor(245, 245, 245);
     const QColor windowBorder = dark ? QColor(77, 77, 77) : QColor(185, 192, 202);
-    const QColor titleBg = dark ? QColor(43, 43, 43) : QColor(255, 255, 255);
-    const QColor titleBorder = dark ? QColor(66, 66, 66) : QColor(199, 206, 216);
-    const QColor textColor = dark ? QColor(241, 241, 241) : QColor(34, 34, 34);
-    const QColor contentColor = dark ? QColor(210, 210, 210) : QColor(68, 68, 68);
-    const QColor buttonHover = dark ? QColor(68, 68, 68) : QColor(232, 232, 232);
-    const QColor buttonPressed = dark ? QColor(84, 84, 84) : QColor(216, 216, 216);
-    const QColor disabledColor = textColor.lighter(160);
-    const QColor closeHover = QColor(232, 17, 35);
+    const QColor titleBg = dark ? QColor(45, 45, 45) : QColor(250, 250, 250);
+    const QColor titleBorder = dark ? QColor(42, 42, 42) : QColor(224, 224, 224);
+    const QColor textColor = dark ? QColor(250, 250, 250) : QColor(26, 26, 26);
+    const QColor contentColor = dark ? QColor(224, 224, 224) : QColor(58, 58, 58);
+    const QColor buttonHover = dark ? QColor(255, 255, 255, 20) : QColor(0, 0, 0, 10);
+    const QColor buttonPressed = dark ? QColor(255, 255, 255, 31) : QColor(0, 0, 0, 20);
+    const QColor disabledColor = dark ? QColor(255, 255, 255, 89) : QColor(0, 0, 0, 64);
+    const QColor closeHover = QColor(196, 43, 28);
 
     const QString windowBackgroundRule = buildWindowBackgroundRule(windowBg,
                                                                    transparentWindowBackground,
@@ -96,6 +103,7 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
         #TitleBarMaximizeButton,
         #TitleBarCloseButton {
             border: none;
+            border-radius: 5px;
             background: transparent;
             color: %4;
             font-family: "Segoe MDL2 Assets", "Segoe UI";
