@@ -132,6 +132,15 @@ bool NativeMessageRouter::handle(FramelessWindow &window, void *message, qintptr
                                       static_cast<qintptr>(msg->lParam),
                                       result);
     }
+    case WM_NCMOUSEMOVE:
+        // Qt QPA skips widget-level mouse-move translation for non-client
+        // messages.  Manually sync button visual states so hover effects
+        // render correctly even when WM_NCHITTEST reports HTMAXBUTTON
+        // (which the system uses for Snap Layout).
+        if (window.m_titleBar != nullptr) {
+            window.m_titleBar->syncButtonVisualStatesFromCursor();
+        }
+        return false;
     case WM_NCPAINT:
     case WM_NCUAHDRAWCAPTION:
     case WM_NCUAHDRAWFRAME:
