@@ -8,7 +8,7 @@
 #include "win32/windowhittest.h"
 #include "win32/windowframe.h"
 #include "win32/nativemessagerouter.h"
-#include "platform/win32/utils.h"
+#include "win32/utils.h"
 #endif
 #include "titlebar.h"
 
