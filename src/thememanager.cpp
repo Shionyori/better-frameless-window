@@ -161,6 +161,14 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
             background-color: %2;
             border-bottom: 1px solid %3;
         }
+        #TitleBarIconContainer {
+            background: transparent;
+            border: none;
+        }
+        #TitleBarIcon {
+            background: transparent;
+            border: none;
+        }
         #TitleBarLabel {
             color: %4;
             font-family: "Segoe UI";

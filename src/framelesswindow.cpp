@@ -608,6 +608,10 @@ void FramelessWindow::changeEvent(QEvent *event)
         if (m_titleBar != nullptr) {
             m_titleBar->setTitle(windowTitle());
         }
+    } else if (event->type() == QEvent::WindowIconChange) {
+        if (m_titleBar != nullptr) {
+            m_titleBar->setIcon(windowIcon());
+        }
     } else if (event->type() == QEvent::WindowStateChange) {
         // Keep maximize/restore edge tracking owned by WM_SIZE handling.
         // Mixing Qt-state writes here can clear the native transition flag
@@ -724,6 +728,7 @@ void FramelessWindow::showEvent(QShowEvent *event)
     QWidget::showEvent(event);
     if (m_titleBar != nullptr) {
         m_titleBar->setTitle(windowTitle());
+        m_titleBar->setIcon(windowIcon());
     }
     ensureNativeResizeStyle();
     scheduleStateVisualRefresh();

@@ -31,6 +31,8 @@ public:
     void setHeight(int height);
     void setTitle(const QString &title);
     QString title() const;
+    void setIcon(const QIcon &icon);
+    QIcon icon() const;
     void setMaximized(bool maximized);
     void addCenterWidget(QWidget *widget);
     void clearCenterWidgets();
@@ -69,6 +71,9 @@ private:
     QHBoxLayout *m_layout;
     QWidget *m_centerContainer;
     QHBoxLayout *m_centerLayout;
+    QIcon m_icon;
+    QWidget *m_iconContainer;
+    QLabel *m_iconLabel;
     QLabel *m_titleLabel;
     QPushButton *m_minimizeButton;
     QPushButton *m_maximizeButton;

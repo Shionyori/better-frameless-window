@@ -18,6 +18,8 @@ TitleBar::TitleBar(QWidget *parent)
     , m_layout(new QHBoxLayout(this))
     , m_centerContainer(new QWidget(this))
     , m_centerLayout(new QHBoxLayout(m_centerContainer))
+    , m_iconContainer(new QWidget(this))
+    , m_iconLabel(new QLabel(m_iconContainer))
     , m_titleLabel(new QLabel(this))
     , m_minimizeButton(new QPushButton(this))
     , m_maximizeButton(new QPushButton(this))
@@ -36,6 +38,17 @@ TitleBar::TitleBar(QWidget *parent)
     m_centerLayout->setContentsMargins(0, 0, 0, 0);
     m_centerLayout->setSpacing(6);
 
+    m_iconContainer->setObjectName("TitleBarIconContainer");
+    auto *iconLayout = new QHBoxLayout(m_iconContainer);
+    iconLayout->setContentsMargins(0, 0, 8, 0);
+    iconLayout->setSpacing(0);
+
+    m_iconLabel->setObjectName("TitleBarIcon");
+    m_iconLabel->setFixedSize(16, 16);
+    iconLayout->addWidget(m_iconLabel);
+
+    m_iconContainer->setVisible(false);
+
     m_titleLabel->setObjectName("TitleBarLabel");
     m_minimizeButton->setObjectName("TitleBarMinimizeButton");
     m_maximizeButton->setObjectName("TitleBarMaximizeButton");
@@ -52,6 +65,7 @@ TitleBar::TitleBar(QWidget *parent)
     updateControlButtonGlyphs();
     resetButtonVisualStates();
 
+    m_layout->addWidget(m_iconContainer);
     m_layout->addWidget(m_titleLabel);
     m_layout->addWidget(m_centerContainer, 0);
     m_layout->addStretch();
@@ -123,6 +137,23 @@ void TitleBar::setTitle(const QString &title)
 QString TitleBar::title() const
 {
     return m_titleLabel->text();
+}
+
+void TitleBar::setIcon(const QIcon &icon)
+{
+    m_icon = icon;
+    if (icon.isNull()) {
+        m_iconContainer->setVisible(false);
+        return;
+    }
+
+    m_iconLabel->setPixmap(icon.pixmap(16, 16));
+    m_iconContainer->setVisible(true);
+}
+
+QIcon TitleBar::icon() const
+{
+    return m_icon;
 }
 
 void TitleBar::addCenterWidget(QWidget *widget)
