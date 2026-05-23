@@ -15,6 +15,7 @@
 #include <QEvent>
 #include <QLayout>
 #include <QMouseEvent>
+#include <QGraphicsOpacityEffect>
 #include <QPropertyAnimation>
 #include <QObject>
 #include <QPainter>
@@ -749,17 +750,7 @@ Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
 void FramelessWindow::toggleMaximizeRestore()
 {
 #ifdef Q_OS_WIN
-    // Freeze Qt content updates during the DWM maximize/restore
-    // animation (~250ms).  Without this, widgets resize instantly
-    // while the window border is still animating, causing a visible
-    // flash where text and controls jump to their final layout
-    // mid-transition.
-    const bool wasUpdatesEnabled = updatesEnabled();
-    setUpdatesEnabled(false);
-
-    if (!WindowCommand::toggleMaximizeRestore(reinterpret_cast<void *>(winId()), isMaximized())) {
-        setUpdatesEnabled(wasUpdatesEnabled);
-        Diagnostics::logWarning(QStringLiteral("toggleMaximizeRestore: null HWND, fallback to QWidget state switch"));
+    if (m_contentPanel == nullptr) {
         if (isMaximized()) {
             showNormal();
         } else {
@@ -768,17 +759,59 @@ void FramelessWindow::toggleMaximizeRestore()
         return;
     }
 
-    // Re-enable Qt updates after the DWM animation settles, then
-    // perform a full visual refresh so the content paints at the
-    // correct final size.
-    QTimer::singleShot(250, this, [this]() {
-        if (!isVisible()) {
+    // Ensure the content panel has an opacity effect for fade
+    auto *contentEffect = qobject_cast<QGraphicsOpacityEffect *>(m_contentPanel->graphicsEffect());
+    if (contentEffect == nullptr) {
+        contentEffect = new QGraphicsOpacityEffect(m_contentPanel);
+        contentEffect->setOpacity(1.0);
+        m_contentPanel->setGraphicsEffect(contentEffect);
+    }
+
+    // Phase 1: fade content out (100ms)
+    {
+        auto *fadeOut = new QPropertyAnimation(contentEffect, "opacity", this);
+        fadeOut->setDuration(100);
+        fadeOut->setStartValue(1.0);
+        fadeOut->setEndValue(0.0);
+        fadeOut->start(QAbstractAnimation::DeleteWhenStopped);
+    }
+
+    // Phase 2: freeze + toggle + DWM animation
+    QTimer::singleShot(100, this, [this]() {
+        setUpdatesEnabled(false);
+
+        if (!WindowCommand::toggleMaximizeRestore(reinterpret_cast<void *>(winId()), isMaximized())) {
             setUpdatesEnabled(true);
+            Diagnostics::logWarning(QStringLiteral("toggleMaximizeRestore: null HWND, fallback"));
+
+            auto *effect = qobject_cast<QGraphicsOpacityEffect *>(m_contentPanel->graphicsEffect());
+            if (effect != nullptr) {
+                effect->setOpacity(1.0);
+            }
+
+            if (isMaximized()) {
+                showNormal();
+            } else {
+                showMaximized();
+            }
             return;
         }
 
-        setUpdatesEnabled(true);
-        scheduleStateVisualRefresh();
+        // Phase 3: after DWM animation settles, fade content back in
+        QTimer::singleShot(250, this, [this]() {
+            setUpdatesEnabled(true);
+            scheduleStateVisualRefresh();
+
+            auto *effect = qobject_cast<QGraphicsOpacityEffect *>(m_contentPanel->graphicsEffect());
+            if (effect != nullptr) {
+                auto *fadeIn = new QPropertyAnimation(effect, "opacity", this);
+                fadeIn->setDuration(120);
+                fadeIn->setEasingCurve(QEasingCurve::OutCubic);
+                fadeIn->setStartValue(0.0);
+                fadeIn->setEndValue(1.0);
+                fadeIn->start(QAbstractAnimation::DeleteWhenStopped);
+            }
+        });
     });
 #else
     if (isMaximized()) {
