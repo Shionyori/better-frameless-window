@@ -182,9 +182,6 @@ void FramelessWindow::setBackgroundImage(const QPixmap &image, BackgroundImageMo
         return;
     }
 
-    m_savedBackdropPreference = m_systemBackdropPreference;
-    m_savedBackdropEnabled = m_systemBackdropEnabled;
-
     m_backgroundImage = image;
     m_backgroundImageMode = mode;
 
@@ -200,8 +197,8 @@ void FramelessWindow::clearBackgroundImage()
     m_backgroundImage = QPixmap();
 
     if (hadImage) {
-        m_systemBackdropPreference = m_savedBackdropPreference;
-        m_systemBackdropEnabled = m_savedBackdropEnabled;
+        m_systemBackdropPreference = WindowEffect::SystemBackdropPreference::None;
+        m_systemBackdropEnabled = false;
         performVisualRefreshPass();
     }
 
