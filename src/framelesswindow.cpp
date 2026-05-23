@@ -608,6 +608,10 @@ void FramelessWindow::paintEvent(QPaintEvent *event)
         return;
     }
 
+    // Ensure an opaque backdrop so the background image blends toward the
+    // theme color rather than revealing the desktop when opacity < 1.0.
+    painter.fillRect(rect(), m_themeManager.windowBackgroundColor());
+
     painter.setOpacity(m_backgroundOpacity);
 
     const QRect r = rect();
@@ -1259,10 +1263,6 @@ bool FramelessWindow::shouldUseDarkMode() const
 
 bool FramelessWindow::shouldUseTranslucentBackground() const
 {
-    if (!m_backgroundImage.isNull()) {
-        return true;
-    }
-
     return WindowVisualState::shouldUseTranslucentBackground(m_systemBackdropEnabled,
                                                               false,
                                                               m_systemBackdropPreference);

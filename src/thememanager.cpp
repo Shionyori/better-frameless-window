@@ -58,6 +58,11 @@ bool ThemeManager::isDarkMode() const
     return m_themeMode == ThemeMode::Dark;
 }
 
+QColor ThemeManager::windowBackgroundColor() const
+{
+    return isDarkMode() ? QColor(25, 25, 25) : QColor(245, 245, 245);
+}
+
 void ThemeManager::startTransition(ThemeMode targetMode)
 {
     m_previousMode = m_themeMode;

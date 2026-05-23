@@ -25,6 +25,7 @@ public:
     QColor accentColor() const;
 
     bool isDarkMode() const;
+    QColor windowBackgroundColor() const;
 
     void startTransition(ThemeMode targetMode);
     void setTransitionProgress(qreal progress);
