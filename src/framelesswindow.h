@@ -34,6 +34,9 @@ public:
     void setSystemDarkModeEnabled(bool enabled);
     void setThemeMode(ThemeManager::ThemeMode mode);
     ThemeManager::ThemeMode themeMode() const;
+    void setFollowSystemTheme(bool enabled);
+    bool followsSystemTheme() const;
+    void syncThemeWithSystemIfFollowing();
 
     void setAccentColor(const QColor &accentColor);
     QColor accentColor() const;
@@ -118,5 +121,6 @@ private:
     bool m_resizing = false;
     VisualRefreshCoordinator m_visualRefreshCoordinator;
     ThemeManager m_themeManager;
+    bool m_followSystemTheme;
     WindowEffect m_windowEffect;
 };

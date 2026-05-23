@@ -8,6 +8,7 @@
 #include "win32/windowhittest.h"
 #include "win32/windowframe.h"
 #include "win32/nativemessagerouter.h"
+#include "platform/win32/utils.h"
 #endif
 #include "titlebar.h"
 
@@ -45,6 +46,7 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_lastAppliedStyleSheet()
     , m_loggedNullWindowHandle(false)
     , m_visualRefreshCoordinator(this)
+    , m_followSystemTheme(false)
 {
     m_visualRefreshCoordinator.configure(
         [this]() {
@@ -320,6 +322,46 @@ bool FramelessWindow::isDiagnosticsEnabled() const
 ThemeManager::ThemeMode FramelessWindow::themeMode() const
 {
     return m_themeManager.themeMode();
+}
+
+void FramelessWindow::setFollowSystemTheme(bool enabled)
+{
+    if (m_followSystemTheme == enabled) {
+        return;
+    }
+
+    m_followSystemTheme = enabled;
+
+#ifdef Q_OS_WIN
+    if (enabled) {
+        const bool systemDark = Utils::isSystemDarkModeEnabled();
+        setThemeMode(systemDark ? ThemeManager::ThemeMode::Dark
+                                : ThemeManager::ThemeMode::Light);
+    }
+#endif
+}
+
+bool FramelessWindow::followsSystemTheme() const
+{
+    return m_followSystemTheme;
+}
+
+void FramelessWindow::syncThemeWithSystemIfFollowing()
+{
+#ifdef Q_OS_WIN
+    if (!m_followSystemTheme) {
+        return;
+    }
+
+    const bool systemDark = Utils::isSystemDarkModeEnabled();
+    const ThemeManager::ThemeMode systemMode = systemDark
+        ? ThemeManager::ThemeMode::Dark
+        : ThemeManager::ThemeMode::Light;
+
+    if (m_themeManager.themeMode() != systemMode) {
+        setThemeMode(systemMode);
+    }
+#endif
 }
 
 QColor FramelessWindow::accentColor() const
