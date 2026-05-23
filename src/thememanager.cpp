@@ -61,7 +61,6 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
     const bool dark = isDarkMode();
 
     const QColor windowBg = dark ? QColor(25, 25, 25) : QColor(245, 245, 245);
-    const QColor windowBorder = dark ? QColor(77, 77, 77) : QColor(185, 192, 202);
     const QColor titleBg = dark ? QColor(45, 45, 45) : QColor(250, 250, 250);
     const QColor titleBorder = dark ? QColor(42, 42, 42) : QColor(224, 224, 224);
     const QColor textColor = dark ? QColor(250, 250, 250) : QColor(26, 26, 26);
