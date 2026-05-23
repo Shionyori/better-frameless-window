@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
     window.setWindowTitle("Example");
     window.setWindowIcon(QIcon(":/images/icon.png"));
     window.setBackgroundImage(QPixmap(":/images/bg.jpg"));
-    window.setWindowOpacity(0.92);
+    window.setBackgroundOpacity(0.85);
     window.restoreWindowGeometry();
 
     // ── Titlebar: theme toggle ──────────────────────────────────────────
@@ -100,32 +100,44 @@ int main(int argc, char *argv[])
     bgRow->addWidget(bgOffBtn);
     bgRow->addStretch();
 
-    // ── Opacity slider ──────────────────────────────────────────────────
+    // ── Opacity sliders ─────────────────────────────────────────────────
 
-    auto *opacityRow = new QHBoxLayout();
-    opacityRow->setSpacing(8);
-    auto *opacityLabel = new QLabel("Opacity:");
-    opacityLabel->setObjectName("ContentLabel");
-    opacityRow->addStretch();
-    opacityRow->addWidget(opacityLabel);
+    auto makeOpacityRow = [](const QString &label,
+                             std::function<void(int)> onChange,
+                             int initial, int fixedLabelWidth) -> QHBoxLayout * {
+        auto *row = new QHBoxLayout();
+        row->setSpacing(8);
+        auto *lbl = new QLabel(label);
+        lbl->setObjectName("ContentLabel");
+        lbl->setFixedWidth(fixedLabelWidth);
+        row->addStretch();
+        row->addWidget(lbl);
 
-    auto *opacitySlider = new QSlider(Qt::Horizontal);
-    opacitySlider->setRange(10, 100);
-    opacitySlider->setValue(92);
-    opacitySlider->setFixedWidth(120);
-    QObject::connect(opacitySlider, &QSlider::valueChanged, [&window](int v) {
+        auto *slider = new QSlider(Qt::Horizontal);
+        slider->setRange(10, 100);
+        slider->setValue(initial);
+        slider->setFixedWidth(120);
+        QObject::connect(slider, &QSlider::valueChanged, onChange);
+        row->addWidget(slider);
+
+        auto *val = new QLabel(QStringLiteral("%1%").arg(initial));
+        val->setObjectName("ContentLabel");
+        val->setFixedWidth(36);
+        QObject::connect(slider, &QSlider::valueChanged, [val](int v) {
+            val->setText(QStringLiteral("%1%").arg(v));
+        });
+        row->addWidget(val);
+        row->addStretch();
+        return row;
+    };
+
+    auto *winOpacityRow = makeOpacityRow("Window:", [&window](int v) {
         window.setWindowOpacity(v / 100.0);
-    });
-    opacityRow->addWidget(opacitySlider);
+    }, 100, 56);
 
-    auto *opacityVal = new QLabel("92%");
-    opacityVal->setObjectName("ContentLabel");
-    opacityVal->setFixedWidth(36);
-    QObject::connect(opacitySlider, &QSlider::valueChanged, [opacityVal](int v) {
-        opacityVal->setText(QStringLiteral("%1%").arg(v));
-    });
-    opacityRow->addWidget(opacityVal);
-    opacityRow->addStretch();
+    auto *bgOpacityRow = makeOpacityRow("Bg:", [&window](int v) {
+        window.setBackgroundOpacity(v / 100.0);
+    }, 85, 56);
 
     // ── Backdrop preference buttons ─────────────────────────────────────
 
@@ -169,7 +181,9 @@ int main(int argc, char *argv[])
     layout->addSpacing(20);
     layout->addLayout(bgRow);
     layout->addSpacing(6);
-    layout->addLayout(opacityRow);
+    layout->addLayout(winOpacityRow);
+    layout->addSpacing(4);
+    layout->addLayout(bgOpacityRow);
     layout->addSpacing(6);
     layout->addLayout(bdpRow);
     layout->addStretch();

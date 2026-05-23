@@ -218,6 +218,17 @@ FramelessWindow::BackgroundImageMode FramelessWindow::backgroundImageMode() cons
     return m_backgroundImageMode;
 }
 
+void FramelessWindow::setBackgroundOpacity(qreal opacity)
+{
+    m_backgroundOpacity = qBound(0.0, opacity, 1.0);
+    update();
+}
+
+qreal FramelessWindow::backgroundOpacity() const
+{
+    return m_backgroundOpacity;
+}
+
 void FramelessWindow::setTitleBarVisible(bool visible)
 {
     if (m_titleBar != nullptr) {
@@ -597,8 +608,7 @@ void FramelessWindow::paintEvent(QPaintEvent *event)
         return;
     }
 
-    const qreal opacity = windowOpacity();
-    painter.setOpacity(opacity);
+    painter.setOpacity(m_backgroundOpacity);
 
     const QRect r = rect();
     const QSize imgSize = m_backgroundImage.size();
