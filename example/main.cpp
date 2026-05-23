@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
         row->addWidget(lbl);
 
         auto *slider = new QSlider(Qt::Horizontal);
-        slider->setRange(10, 100);
+        slider->setRange(0, 100);
         slider->setValue(initial);
         slider->setFixedWidth(120);
         QObject::connect(slider, &QSlider::valueChanged, onChange);

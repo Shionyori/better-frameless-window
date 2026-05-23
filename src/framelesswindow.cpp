@@ -1259,10 +1259,10 @@ bool FramelessWindow::shouldUseDarkMode() const
 
 bool FramelessWindow::shouldUseTranslucentBackground() const
 {
-    // Keep Qt translucent-surface policy stable across maximize/restore guard.
-    // Native systemBackdrop can be temporarily forced to None, but coupling that
-    // transient state to QWidget translucency may cause delayed composition
-    // recovery on Windows after restore.
+    if (!m_backgroundImage.isNull()) {
+        return true;
+    }
+
     return WindowVisualState::shouldUseTranslucentBackground(m_systemBackdropEnabled,
                                                               false,
                                                               m_systemBackdropPreference);
