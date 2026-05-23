@@ -90,7 +90,7 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
         #TitleBarLabel {
             color: %4;
             font-family: "Segoe UI";
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 600;
             letter-spacing: 0.2px;
         }
