@@ -20,6 +20,7 @@
 #include <QColor>
 #include <QPushButton>
 #include <QScopedValueRollback>
+#include <QSettings>
 #include <QShowEvent>
 #include <QStyle>
 #include <QStyleOption>
@@ -166,6 +167,13 @@ void FramelessWindow::setThemeMode(ThemeManager::ThemeMode mode)
     }
 
     m_themeManager.setThemeMode(mode);
+
+    QSettings settings(QStringLiteral("better-frameless-window"), QStringLiteral("settings"));
+    settings.setValue(QStringLiteral("theme/mode"),
+                      mode == ThemeManager::ThemeMode::Dark
+                          ? QStringLiteral("dark")
+                          : QStringLiteral("light"));
+
     requestVisualRefresh();
 }
 
@@ -377,6 +385,19 @@ void FramelessWindow::initWindow()
     setAttribute(Qt::WA_StyledBackground, true);
 
     setObjectName("FramelessWindow");
+
+    // Restore persisted theme preference (only when not following system)
+    if (!m_followSystemTheme) {
+        QSettings settings(QStringLiteral("better-frameless-window"), QStringLiteral("settings"));
+        const QString savedMode = settings.value(QStringLiteral("theme/mode")).toString();
+        if (savedMode == QStringLiteral("dark")) {
+            m_themeManager.setThemeMode(ThemeManager::ThemeMode::Dark);
+        } else if (savedMode == QStringLiteral("light")) {
+            m_themeManager.setThemeMode(ThemeManager::ThemeMode::Light);
+        }
+        // If no saved value, keep default (Light)
+    }
+
     applyTheme();
 }
 
