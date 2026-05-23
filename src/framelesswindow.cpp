@@ -749,7 +749,16 @@ Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
 void FramelessWindow::toggleMaximizeRestore()
 {
 #ifdef Q_OS_WIN
+    // Freeze Qt content updates during the DWM maximize/restore
+    // animation (~250ms).  Without this, widgets resize instantly
+    // while the window border is still animating, causing a visible
+    // flash where text and controls jump to their final layout
+    // mid-transition.
+    const bool wasUpdatesEnabled = updatesEnabled();
+    setUpdatesEnabled(false);
+
     if (!WindowCommand::toggleMaximizeRestore(reinterpret_cast<void *>(winId()), isMaximized())) {
+        setUpdatesEnabled(wasUpdatesEnabled);
         Diagnostics::logWarning(QStringLiteral("toggleMaximizeRestore: null HWND, fallback to QWidget state switch"));
         if (isMaximized()) {
             showNormal();
@@ -759,12 +768,16 @@ void FramelessWindow::toggleMaximizeRestore()
         return;
     }
 
-    scheduleStateVisualRefresh();
-    QTimer::singleShot(90, this, [this]() {
+    // Re-enable Qt updates after the DWM animation settles, then
+    // perform a full visual refresh so the content paints at the
+    // correct final size.
+    QTimer::singleShot(250, this, [this]() {
         if (!isVisible()) {
+            setUpdatesEnabled(true);
             return;
         }
 
+        setUpdatesEnabled(true);
         scheduleStateVisualRefresh();
     });
 #else
