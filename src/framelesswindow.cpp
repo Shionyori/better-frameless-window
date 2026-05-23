@@ -674,7 +674,13 @@ int FramelessWindow::hitTest(const QPoint &globalPos) const
         case TitleBar::HitRegion::MinimizeButton:
             return WindowHitTest::TitleRegion::MinimizeButton;
         case TitleBar::HitRegion::MaximizeButton:
-            return WindowHitTest::TitleRegion::MaximizeButton;
+            // When maximized, the button acts as Restore. Keeping
+            // HTMAXBUTTON causes DWM to paint its own system button
+            // hover on top, covering Qt's rendering. Route through
+            // OtherInteractive (→ HTCLIENT) so clicks are delivered
+            // through Qt's widget system without DWM interference.
+            return isMaximized() ? WindowHitTest::TitleRegion::OtherInteractive
+                                 : WindowHitTest::TitleRegion::MaximizeButton;
         case TitleBar::HitRegion::CloseButton:
             return WindowHitTest::TitleRegion::CloseButton;
         case TitleBar::HitRegion::OtherInteractive:
