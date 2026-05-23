@@ -69,6 +69,7 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
     const QColor buttonPressed = dark ? QColor(255, 255, 255, 31) : QColor(0, 0, 0, 20);
     const QColor disabledColor = dark ? QColor(255, 255, 255, 89) : QColor(0, 0, 0, 64);
     const QColor closeHover = QColor(196, 43, 28);
+    const QColor buttonBg = dark ? QColor(255, 255, 255, 12) : QColor(0, 0, 0, 6);
 
     const QString windowBackgroundRule = buildWindowBackgroundRule(windowBg,
                                                                    transparentWindowBackground,
@@ -82,6 +83,24 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
         #FramelessContentPanel {
             background: transparent;
             border: none;
+        }
+        QPushButton {
+            color: %4;
+            background: %11;
+            border: none;
+            border-radius: 5px;
+            padding: 5px 14px;
+            font-family: "Segoe UI";
+            font-size: 12px;
+        }
+        QPushButton:hover {
+            background: %6;
+        }
+        QPushButton:pressed {
+            background: %7;
+        }
+        QPushButton:disabled {
+            color: %8;
         }
         TitleBar {
             background-color: %2;
@@ -140,5 +159,6 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
                colorToCss(buttonPressed),
                colorToCss(disabledColor),
                colorToCss(closeHover),
-               colorToCss(closeHover.darker(115)));
+               colorToCss(closeHover.darker(115)),
+               colorToCss(buttonBg));
 }
