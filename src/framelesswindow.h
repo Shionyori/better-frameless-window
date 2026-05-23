@@ -16,6 +16,7 @@ class NativeMessageRouter;
 class FramelessWindow : public QWidget
 {
     Q_OBJECT
+    Q_PROPERTY(qreal themeTransitionProgress READ themeTransitionProgress WRITE setThemeTransitionProgress)
 public:
     explicit FramelessWindow(QWidget *parent = nullptr);
     ~FramelessWindow();
@@ -32,8 +33,10 @@ public:
     void setSystemBackdropPreference(WindowEffect::SystemBackdropPreference preference);
     void setRoundedCornersEnabled(bool enabled);
     void setSystemDarkModeEnabled(bool enabled);
-    void setThemeMode(ThemeManager::ThemeMode mode, bool persist = true);
+    void setThemeMode(ThemeManager::ThemeMode mode, bool persist = true, bool animated = true);
     ThemeManager::ThemeMode themeMode() const;
+    qreal themeTransitionProgress() const;
+    void setThemeTransitionProgress(qreal progress);
     void setFollowSystemTheme(bool enabled);
     bool followsSystemTheme() const;
     void syncThemeWithSystemIfFollowing();

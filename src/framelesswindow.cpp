@@ -15,6 +15,7 @@
 #include <QEvent>
 #include <QLayout>
 #include <QMouseEvent>
+#include <QPropertyAnimation>
 #include <QObject>
 #include <QPainter>
 #include <QColor>
@@ -160,13 +161,11 @@ void FramelessWindow::setSystemDarkModeEnabled(bool enabled)
     requestVisualRefresh();
 }
 
-void FramelessWindow::setThemeMode(ThemeManager::ThemeMode mode, bool persist)
+void FramelessWindow::setThemeMode(ThemeManager::ThemeMode mode, bool persist, bool animated)
 {
     if (m_themeManager.themeMode() == mode) {
         return;
     }
-
-    m_themeManager.setThemeMode(mode);
 
     if (persist) {
         QSettings settings(QStringLiteral("better-frameless-window"), QStringLiteral("settings"));
@@ -176,15 +175,38 @@ void FramelessWindow::setThemeMode(ThemeManager::ThemeMode mode, bool persist)
                               : QStringLiteral("light"));
     }
 
-    requestVisualRefresh();
+    if (animated && isVisible()) {
+        m_themeManager.startTransition(mode);
+        auto *anim = new QPropertyAnimation(this, "themeTransitionProgress", this);
+        anim->setDuration(300);
+        anim->setEasingCurve(QEasingCurve::InOutCubic);
+        anim->setStartValue(0.0);
+        anim->setEndValue(1.0);
+        anim->start(QAbstractAnimation::DeleteWhenStopped);
 
-    // After a theme switch, the existing backdrop may still compose with
-    // the old background color for a frame, producing a muddy intermediate
-    // blend. Force a clear→rebind cycle so DWM re-evaluates the backdrop
-    // against the new theme background.
-    QTimer::singleShot(50, this, [this]() {
-        forceSystemBackdropRebind();
-    });
+        QTimer::singleShot(350, this, [this]() {
+            forceSystemBackdropRebind();
+        });
+    } else {
+        m_themeManager.setThemeMode(mode);
+        m_themeManager.setTransitionProgress(1.0);
+        requestVisualRefresh();
+
+        QTimer::singleShot(50, this, [this]() {
+            forceSystemBackdropRebind();
+        });
+    }
+}
+
+qreal FramelessWindow::themeTransitionProgress() const
+{
+    return m_themeManager.transitionProgress();
+}
+
+void FramelessWindow::setThemeTransitionProgress(qreal progress)
+{
+    m_themeManager.setTransitionProgress(progress);
+    requestVisualRefresh();
 }
 
 void FramelessWindow::setAccentColor(const QColor &accentColor)
@@ -355,7 +377,8 @@ void FramelessWindow::setFollowSystemTheme(bool enabled)
         const bool systemDark = Utils::isSystemDarkModeEnabled();
         setThemeMode(systemDark ? ThemeManager::ThemeMode::Dark
                                 : ThemeManager::ThemeMode::Light,
-                     /*persist=*/false);
+                     /*persist=*/false,
+                     /*animated=*/false);
     }
 #endif
 }
@@ -378,7 +401,7 @@ void FramelessWindow::syncThemeWithSystemIfFollowing()
         : ThemeManager::ThemeMode::Light;
 
     if (m_themeManager.themeMode() != systemMode) {
-        setThemeMode(systemMode, /*persist=*/false);
+        setThemeMode(systemMode, /*persist=*/false, /*animated=*/false);
     }
 #endif
 }
