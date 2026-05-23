@@ -17,11 +17,11 @@ int main(int argc, char *argv[])
 
     FramelessWindow window;
     window.setWindowSizeLimits(QSize(520, 380), QSize());
-    window.setWindowTitle("BFS - Example");
+    window.setWindowTitle("Better Framless Window - Example");
     window.setWindowIcon(QIcon(":/images/icon.png"));
     window.setBackgroundImage(QPixmap(":/images/bg.jpg"));
     window.setWindowOpacity(1.0);
-    window.setBackgroundOpacity(0.30);
+    window.setBackgroundOpacity(0.20);
     window.restoreWindowGeometry();
 
     // ── Titlebar: theme toggle ──────────────────────────────────────────
@@ -147,7 +147,7 @@ int main(int argc, char *argv[])
 
     auto *bgOpacityRow = makeOpacityRow("Background:", [&window](int v) {
         window.setBackgroundOpacity(v / 100.0);
-    }, 30, 110);
+    }, 20, 110);
 
     // ── Backdrop preference buttons ─────────────────────────────────────
 
