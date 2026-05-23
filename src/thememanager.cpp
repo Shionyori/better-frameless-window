@@ -20,7 +20,7 @@ QString buildWindowBackgroundRule(const QColor &windowBg,
     if (transparentWindowBackground) {
         const QString translucentBase = dark
             ? QStringLiteral("rgba(0, 0, 0, 0.35)")
-            : QStringLiteral("rgba(255, 255, 255, 0.30)");
+            : QStringLiteral("rgba(255, 255, 255, 0.15)");
         return QStringLiteral("background-color: %1; background-image: none;")
             .arg(translucentBase);
     }

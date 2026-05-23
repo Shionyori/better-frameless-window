@@ -177,6 +177,14 @@ void FramelessWindow::setThemeMode(ThemeManager::ThemeMode mode, bool persist)
     }
 
     requestVisualRefresh();
+
+    // After a theme switch, the existing backdrop may still compose with
+    // the old background color for a frame, producing a muddy intermediate
+    // blend. Force a clear→rebind cycle so DWM re-evaluates the backdrop
+    // against the new theme background.
+    QTimer::singleShot(50, this, [this]() {
+        forceSystemBackdropRebind();
+    });
 }
 
 void FramelessWindow::setAccentColor(const QColor &accentColor)
