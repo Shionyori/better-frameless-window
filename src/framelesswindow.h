@@ -143,6 +143,8 @@ private:
     bool m_snapLayoutEnabled;
     QPixmap m_backgroundImage;
     BackgroundImageMode m_backgroundImageMode = BackgroundImageMode::Cover;
+    WindowEffect::SystemBackdropPreference m_savedBackdropPreference = WindowEffect::SystemBackdropPreference::Auto;
+    bool m_savedBackdropEnabled = true;
     bool m_systemBackdropTransitionGuardActive;
     quint64 m_systemBackdropTransitionEpoch;
     bool m_lastNativeSizeMaximized;

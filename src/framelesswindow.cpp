@@ -175,14 +175,36 @@ void FramelessWindow::setSnapLayoutEnabled(bool enabled)
 
 void FramelessWindow::setBackgroundImage(const QPixmap &image, BackgroundImageMode mode)
 {
+    if (!m_backgroundImage.isNull() || image.isNull()) {
+        m_backgroundImage = image;
+        m_backgroundImageMode = mode;
+        update();
+        return;
+    }
+
+    m_savedBackdropPreference = m_systemBackdropPreference;
+    m_savedBackdropEnabled = m_systemBackdropEnabled;
+
     m_backgroundImage = image;
     m_backgroundImageMode = mode;
+
+    m_systemBackdropPreference = WindowEffect::SystemBackdropPreference::None;
+    m_systemBackdropEnabled = false;
+    requestVisualRefresh();
     update();
 }
 
 void FramelessWindow::clearBackgroundImage()
 {
+    const bool hadImage = !m_backgroundImage.isNull();
     m_backgroundImage = QPixmap();
+
+    if (hadImage) {
+        m_systemBackdropPreference = m_savedBackdropPreference;
+        m_systemBackdropEnabled = m_savedBackdropEnabled;
+        requestVisualRefresh();
+    }
+
     update();
 }
 
@@ -574,6 +596,9 @@ void FramelessWindow::paintEvent(QPaintEvent *event)
     if (m_backgroundImage.isNull()) {
         return;
     }
+
+    const qreal opacity = windowOpacity();
+    painter.setOpacity(opacity);
 
     const QRect r = rect();
     const QSize imgSize = m_backgroundImage.size();
