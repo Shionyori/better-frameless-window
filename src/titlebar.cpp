@@ -18,7 +18,7 @@ TitleBar::TitleBar(QWidget *parent)
     , m_layout(new QHBoxLayout(this))
     , m_centerContainer(new QWidget(this))
     , m_centerLayout(new QHBoxLayout(m_centerContainer))
-    , m_titleLabel(new QLabel("Better Frameless Window", this))
+    , m_titleLabel(new QLabel(this))
     , m_minimizeButton(new QPushButton(this))
     , m_maximizeButton(new QPushButton(this))
     , m_closeButton(new QPushButton(this))
@@ -108,6 +108,21 @@ void TitleBar::updateControlButtonGlyphs()
     m_minimizeButton->setText(QStringLiteral("\uE921"));
     m_maximizeButton->setText(m_visualMaximized ? QStringLiteral("\uE923") : QStringLiteral("\uE922"));
     m_closeButton->setText(QStringLiteral("\uE8BB"));
+}
+
+void TitleBar::setHeight(int height)
+{
+    setFixedHeight(height);
+}
+
+void TitleBar::setTitle(const QString &title)
+{
+    m_titleLabel->setText(title);
+}
+
+QString TitleBar::title() const
+{
+    return m_titleLabel->text();
 }
 
 void TitleBar::addCenterWidget(QWidget *widget)

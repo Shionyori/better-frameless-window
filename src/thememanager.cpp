@@ -122,6 +122,10 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
     const QColor buttonBg     = themeColor(QColor(0, 0, 0, 6),        QColor(255, 255, 255, 12));
     const QColor closeHover   = QColor(196, 43, 28);
 
+    const QColor accent = m_accentColor.isValid() ? m_accentColor : QColor(0, 120, 215);
+    const QColor accentHover = QColor(accent.red(), accent.green(), accent.blue(), dark ? 25 : 15);
+    const QColor accentPressed = QColor(accent.red(), accent.green(), accent.blue(), dark ? 40 : 25);
+
     const QString windowBackgroundRule = buildWindowBackgroundRule(windowBg,
                                                                    transparentWindowBackground,
                                                                    dark);
@@ -181,11 +185,11 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
         }
         #TitleBarMinimizeButton[btnState="hover"],
         #TitleBarMaximizeButton[btnState="hover"] {
-            background: %6;
+            background: %12;
         }
         #TitleBarMinimizeButton[btnState="pressed"],
         #TitleBarMaximizeButton[btnState="pressed"] {
-            background: %7;
+            background: %13;
         }
         #TitleBarMinimizeButton[btnState="disabled"],
         #TitleBarMaximizeButton[btnState="disabled"],
@@ -211,5 +215,7 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
                colorToCss(disabledColor),
                colorToCss(closeHover),
                colorToCss(closeHover.darker(115)),
-               colorToCss(buttonBg));
+               colorToCss(buttonBg),
+               colorToCss(accentHover),
+               colorToCss(accentPressed));
 }

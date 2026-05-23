@@ -28,6 +28,9 @@ public:
     explicit TitleBar(QWidget *parent = nullptr);
 
     int heightHint() const;
+    void setHeight(int height);
+    void setTitle(const QString &title);
+    QString title() const;
     void setMaximized(bool maximized);
     void addCenterWidget(QWidget *widget);
     void clearCenterWidgets();

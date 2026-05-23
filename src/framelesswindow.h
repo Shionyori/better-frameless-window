@@ -5,6 +5,7 @@
 #include "win32/windoweffect.h"
 
 #include <QColor>
+#include <QPixmap>
 #include <QSize>
 #include <QWidget>
 
@@ -52,6 +53,26 @@ public:
     void addTitleBarWidget(QWidget *widget);
     void clearTitleBarWidgets();
 
+    enum class BackgroundImageMode {
+        Stretch,
+        Fit,
+        Tile,
+        Center
+    };
+
+    void setBackgroundImage(const QPixmap &image, BackgroundImageMode mode = BackgroundImageMode::Stretch);
+    void clearBackgroundImage();
+    QPixmap backgroundImage() const;
+    BackgroundImageMode backgroundImageMode() const;
+
+    void setTitleBarVisible(bool visible);
+    bool isTitleBarVisible() const;
+    void setTitleBarHeight(int height);
+    int titleBarHeight() const;
+
+    void saveWindowGeometry();
+    void restoreWindowGeometry();
+
     void setDiagnosticsEnabled(bool enabled);
     void setResizing(bool resizing);
     bool isShadowEnabled() const;
@@ -68,6 +89,7 @@ protected:
     void paintEvent(QPaintEvent *e) override;
     void changeEvent(QEvent *event) override;
     void showEvent(QShowEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void leaveEvent(QEvent *event) override;
@@ -118,6 +140,8 @@ private:
     bool m_roundedCornersEnabled;
     bool m_systemDarkModeEnabled;
     bool m_snapLayoutEnabled;
+    QPixmap m_backgroundImage;
+    BackgroundImageMode m_backgroundImageMode = BackgroundImageMode::Stretch;
     bool m_systemBackdropTransitionGuardActive;
     quint64 m_systemBackdropTransitionEpoch;
     bool m_lastNativeSizeMaximized;

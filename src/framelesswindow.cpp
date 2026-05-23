@@ -3,6 +3,7 @@
 #include "diagnostics.h"
 #include "core/windowvisualstate.h"
 #ifdef Q_OS_WIN
+#include <qt_windows.h>
 #include "win32/windowcommand.h"
 #include "win32/systemmenu.h"
 #include "win32/windowhittest.h"
@@ -15,12 +16,16 @@
 #include <QEvent>
 #include <QLayout>
 #include <QMouseEvent>
+#include <QShortcut>
 #include <QGraphicsOpacityEffect>
 #include <QPropertyAnimation>
 #include <QObject>
 #include <QPainter>
+#include <QCloseEvent>
 #include <QColor>
+#include <QGuiApplication>
 #include <QPushButton>
+#include <QScreen>
 #include <QScopedValueRollback>
 #include <QSettings>
 #include <QShowEvent>
@@ -166,6 +171,53 @@ void FramelessWindow::setSystemDarkModeEnabled(bool enabled)
 void FramelessWindow::setSnapLayoutEnabled(bool enabled)
 {
     m_snapLayoutEnabled = enabled;
+}
+
+void FramelessWindow::setBackgroundImage(const QPixmap &image, BackgroundImageMode mode)
+{
+    m_backgroundImage = image;
+    m_backgroundImageMode = mode;
+    update();
+}
+
+void FramelessWindow::clearBackgroundImage()
+{
+    m_backgroundImage = QPixmap();
+    update();
+}
+
+QPixmap FramelessWindow::backgroundImage() const
+{
+    return m_backgroundImage;
+}
+
+FramelessWindow::BackgroundImageMode FramelessWindow::backgroundImageMode() const
+{
+    return m_backgroundImageMode;
+}
+
+void FramelessWindow::setTitleBarVisible(bool visible)
+{
+    if (m_titleBar != nullptr) {
+        m_titleBar->setVisible(visible);
+    }
+}
+
+bool FramelessWindow::isTitleBarVisible() const
+{
+    return m_titleBar != nullptr && m_titleBar->isVisible();
+}
+
+void FramelessWindow::setTitleBarHeight(int height)
+{
+    if (m_titleBar != nullptr) {
+        m_titleBar->setHeight(height);
+    }
+}
+
+int FramelessWindow::titleBarHeight() const
+{
+    return m_titleBar != nullptr ? m_titleBar->height() : 0;
 }
 
 void FramelessWindow::setThemeMode(ThemeManager::ThemeMode mode, bool persist, bool animated)
@@ -445,6 +497,12 @@ void FramelessWindow::initWindow()
     }
 
     applyTheme();
+
+    auto *altSpaceShortcut = new QShortcut(QKeySequence(Qt::ALT | Qt::Key_Space), this);
+    altSpaceShortcut->setContext(Qt::WindowShortcut);
+    connect(altSpaceShortcut, &QShortcut::activated, this, [this]() {
+        showSystemMenu(mapToGlobal(QPoint(0, 0)));
+    });
 }
 
 void FramelessWindow::initLayout()
@@ -512,15 +570,51 @@ void FramelessWindow::paintEvent(QPaintEvent *event)
     QStyleOption opt;
     opt.initFrom(this);
     style()->drawPrimitive(QStyle::PE_Widget, &opt, &painter, this);
+
+    if (m_backgroundImage.isNull()) {
+        return;
+    }
+
+    const QRect r = rect();
+    const QSize imgSize = m_backgroundImage.size();
+
+    switch (m_backgroundImageMode) {
+    case BackgroundImageMode::Stretch:
+        painter.drawPixmap(r, m_backgroundImage);
+        break;
+    case BackgroundImageMode::Fit: {
+        const QSize scaled = imgSize.scaled(r.size(), Qt::KeepAspectRatio);
+        const int x = (r.width() - scaled.width()) / 2;
+        const int y = (r.height() - scaled.height()) / 2;
+        painter.drawPixmap(QRect(x, y, scaled.width(), scaled.height()), m_backgroundImage);
+        break;
+    }
+    case BackgroundImageMode::Tile:
+        painter.drawTiledPixmap(r, m_backgroundImage);
+        break;
+    case BackgroundImageMode::Center: {
+        const int x = (r.width() - imgSize.width()) / 2;
+        const int y = (r.height() - imgSize.height()) / 2;
+        painter.drawPixmap(x, y, m_backgroundImage);
+        break;
+    }
+    }
 }
 
 void FramelessWindow::changeEvent(QEvent *event)
 {
     QWidget::changeEvent(event);
-    if (event->type() == QEvent::WindowStateChange) {
+    if (event->type() == QEvent::WindowTitleChange) {
+        if (m_titleBar != nullptr) {
+            m_titleBar->setTitle(windowTitle());
+        }
+    } else if (event->type() == QEvent::WindowStateChange) {
         // Keep maximize/restore edge tracking owned by WM_SIZE handling.
         // Mixing Qt-state writes here can clear the native transition flag
         // before SIZE_RESTORED arrives, which may skip systemBackdrop rebind guard.
+        if (m_titleBar != nullptr) {
+            m_titleBar->setVisible(!isFullScreen());
+        }
         scheduleStateVisualRefresh();
     } else if (event->type() == QEvent::ActivationChange) {
         if (isActiveWindow()) {
@@ -628,8 +722,66 @@ void FramelessWindow::applyTheme()
 void FramelessWindow::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
+    if (m_titleBar != nullptr) {
+        m_titleBar->setTitle(windowTitle());
+    }
     ensureNativeResizeStyle();
     scheduleStateVisualRefresh();
+}
+
+void FramelessWindow::closeEvent(QCloseEvent *event)
+{
+    saveWindowGeometry();
+    QWidget::closeEvent(event);
+}
+
+void FramelessWindow::saveWindowGeometry()
+{
+    if (isFullScreen() || isMinimized()) {
+        return;
+    }
+
+    QSettings settings(QStringLiteral("better-frameless-window"), QStringLiteral("settings"));
+    settings.setValue(QStringLiteral("geometry/maximized"), isMaximized());
+
+    if (!isMaximized()) {
+        settings.setValue(QStringLiteral("geometry/x"), x());
+        settings.setValue(QStringLiteral("geometry/y"), y());
+        settings.setValue(QStringLiteral("geometry/width"), width());
+        settings.setValue(QStringLiteral("geometry/height"), height());
+    }
+}
+
+void FramelessWindow::restoreWindowGeometry()
+{
+    QSettings settings(QStringLiteral("better-frameless-window"), QStringLiteral("settings"));
+
+    if (!settings.contains(QStringLiteral("geometry/width"))) {
+        return;
+    }
+
+    const int x = settings.value(QStringLiteral("geometry/x"), 0).toInt();
+    const int y = settings.value(QStringLiteral("geometry/y"), 0).toInt();
+    const int w = settings.value(QStringLiteral("geometry/width"), 960).toInt();
+    const int h = settings.value(QStringLiteral("geometry/height"), 640).toInt();
+    const bool wasMaximized = settings.value(QStringLiteral("geometry/maximized"), false).toBool();
+
+    const QRect savedRect(x, y, w, h);
+    bool onScreen = false;
+    for (QScreen *screen : QGuiApplication::screens()) {
+        if (screen->availableGeometry().intersects(savedRect)) {
+            onScreen = true;
+            break;
+        }
+    }
+
+    if (onScreen) {
+        setGeometry(x, y, w, h);
+    }
+
+    if (wasMaximized) {
+        showMaximized();
+    }
 }
 
 void FramelessWindow::forceNativeDwmRefresh()
@@ -669,6 +821,10 @@ void FramelessWindow::leaveEvent(QEvent *event)
 int FramelessWindow::hitTest(const QPoint &globalPos) const
 {
 #ifdef Q_OS_WIN
+    if (isFullScreen()) {
+        return HTCLIENT;
+    }
+
     WindowHitTest::Context context;
     context.hwnd = reinterpret_cast<void *>(winId());
     context.logicalWidth = width();
