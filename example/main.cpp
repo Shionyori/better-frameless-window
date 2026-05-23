@@ -20,7 +20,8 @@ int main(int argc, char *argv[])
     window.setWindowTitle("Example");
     window.setWindowIcon(QIcon(":/images/icon.png"));
     window.setBackgroundImage(QPixmap(":/images/bg.jpg"));
-    window.setBackgroundOpacity(0.85);
+    window.setWindowOpacity(1.0);
+    window.setBackgroundOpacity(0.30);
     window.restoreWindowGeometry();
 
     // ── Titlebar: theme toggle ──────────────────────────────────────────
@@ -122,7 +123,8 @@ int main(int argc, char *argv[])
 
         auto *val = new QLabel(QStringLiteral("%1%").arg(initial));
         val->setObjectName("ContentLabel");
-        val->setFixedWidth(36);
+        val->setFixedWidth(40);
+        val->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         QObject::connect(slider, &QSlider::valueChanged, [val](int v) {
             val->setText(QStringLiteral("%1%").arg(v));
         });
@@ -137,7 +139,7 @@ int main(int argc, char *argv[])
 
     auto *bgOpacityRow = makeOpacityRow("Bg:", [&window](int v) {
         window.setBackgroundOpacity(v / 100.0);
-    }, 85, 56);
+    }, 30, 56);
 
     // ── Backdrop preference buttons ─────────────────────────────────────
 
