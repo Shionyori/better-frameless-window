@@ -230,9 +230,17 @@ bool NativeMessageRouter::handle(FramelessWindow &window, void *message, qintptr
                                           result);
     case WM_NCRBUTTONUP:
         return NativeMessageRouter::handleNcRightButtonUpMessage(window,
-                                        static_cast<quintptr>(msg->wParam),
-                                        static_cast<qintptr>(msg->lParam),
-                                        result);
+                                     static_cast<quintptr>(msg->wParam),
+                                     static_cast<qintptr>(msg->lParam),
+                                     result);
+    case WM_SETTINGCHANGE:
+        if (msg->lParam != 0) {
+            const auto *changed = reinterpret_cast<LPCWSTR>(msg->lParam);
+            if (changed != nullptr && lstrcmpW(changed, L"ImmersiveColorSet") == 0) {
+                window.syncThemeWithSystemIfFollowing();
+            }
+        }
+        return false;
     default:
         return false;
     }
