@@ -160,7 +160,7 @@ void FramelessWindow::setSystemDarkModeEnabled(bool enabled)
     requestVisualRefresh();
 }
 
-void FramelessWindow::setThemeMode(ThemeManager::ThemeMode mode)
+void FramelessWindow::setThemeMode(ThemeManager::ThemeMode mode, bool persist)
 {
     if (m_themeManager.themeMode() == mode) {
         return;
@@ -168,11 +168,13 @@ void FramelessWindow::setThemeMode(ThemeManager::ThemeMode mode)
 
     m_themeManager.setThemeMode(mode);
 
-    QSettings settings(QStringLiteral("better-frameless-window"), QStringLiteral("settings"));
-    settings.setValue(QStringLiteral("theme/mode"),
-                      mode == ThemeManager::ThemeMode::Dark
-                          ? QStringLiteral("dark")
-                          : QStringLiteral("light"));
+    if (persist) {
+        QSettings settings(QStringLiteral("better-frameless-window"), QStringLiteral("settings"));
+        settings.setValue(QStringLiteral("theme/mode"),
+                          mode == ThemeManager::ThemeMode::Dark
+                              ? QStringLiteral("dark")
+                              : QStringLiteral("light"));
+    }
 
     requestVisualRefresh();
 }
@@ -344,7 +346,8 @@ void FramelessWindow::setFollowSystemTheme(bool enabled)
     if (enabled) {
         const bool systemDark = Utils::isSystemDarkModeEnabled();
         setThemeMode(systemDark ? ThemeManager::ThemeMode::Dark
-                                : ThemeManager::ThemeMode::Light);
+                                : ThemeManager::ThemeMode::Light,
+                     /*persist=*/false);
     }
 #endif
 }
@@ -367,7 +370,7 @@ void FramelessWindow::syncThemeWithSystemIfFollowing()
         : ThemeManager::ThemeMode::Light;
 
     if (m_themeManager.themeMode() != systemMode) {
-        setThemeMode(systemMode);
+        setThemeMode(systemMode, /*persist=*/false);
     }
 #endif
 }

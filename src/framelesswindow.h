@@ -32,7 +32,7 @@ public:
     void setSystemBackdropPreference(WindowEffect::SystemBackdropPreference preference);
     void setRoundedCornersEnabled(bool enabled);
     void setSystemDarkModeEnabled(bool enabled);
-    void setThemeMode(ThemeManager::ThemeMode mode);
+    void setThemeMode(ThemeManager::ThemeMode mode, bool persist = true);
     ThemeManager::ThemeMode themeMode() const;
     void setFollowSystemTheme(bool enabled);
     bool followsSystemTheme() const;
