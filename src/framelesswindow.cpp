@@ -759,7 +759,7 @@ void FramelessWindow::toggleMaximizeRestore()
         return;
     }
 
-    // Ensure the content panel has an opacity effect for fade
+    // Ensure content has an opacity effect
     auto *contentEffect = qobject_cast<QGraphicsOpacityEffect *>(m_contentPanel->graphicsEffect());
     if (contentEffect == nullptr) {
         contentEffect = new QGraphicsOpacityEffect(m_contentPanel);
@@ -767,28 +767,22 @@ void FramelessWindow::toggleMaximizeRestore()
         m_contentPanel->setGraphicsEffect(contentEffect);
     }
 
-    // Phase 1: fade content out (100ms)
-    {
-        auto *fadeOut = new QPropertyAnimation(contentEffect, "opacity", this);
-        fadeOut->setDuration(100);
-        fadeOut->setStartValue(1.0);
-        fadeOut->setEndValue(0.0);
-        fadeOut->start(QAbstractAnimation::DeleteWhenStopped);
-    }
+    // Fade content out, toggle during invisibility, fade back in.
+    // No setUpdatesEnabled freeze needed — the opacity effect hides
+    // the layout change while the DWM animation runs.
+    auto *fadeOut = new QPropertyAnimation(contentEffect, "opacity", this);
+    fadeOut->setDuration(100);
+    fadeOut->setStartValue(contentEffect->opacity());
+    fadeOut->setEndValue(0.0);
+    fadeOut->start(QAbstractAnimation::DeleteWhenStopped);
 
-    // Phase 2: freeze + toggle + DWM animation
     QTimer::singleShot(100, this, [this]() {
-        setUpdatesEnabled(false);
-
         if (!WindowCommand::toggleMaximizeRestore(reinterpret_cast<void *>(winId()), isMaximized())) {
-            setUpdatesEnabled(true);
-            Diagnostics::logWarning(QStringLiteral("toggleMaximizeRestore: null HWND, fallback"));
-
-            auto *effect = qobject_cast<QGraphicsOpacityEffect *>(m_contentPanel->graphicsEffect());
-            if (effect != nullptr) {
-                effect->setOpacity(1.0);
+            auto *fx = qobject_cast<QGraphicsOpacityEffect *>(m_contentPanel->graphicsEffect());
+            if (fx != nullptr) {
+                fx->setOpacity(1.0);
             }
-
+            Diagnostics::logWarning(QStringLiteral("toggleMaximizeRestore: null HWND, fallback"));
             if (isMaximized()) {
                 showNormal();
             } else {
@@ -797,14 +791,19 @@ void FramelessWindow::toggleMaximizeRestore()
             return;
         }
 
-        // Phase 3: after DWM animation settles, fade content back in
+        scheduleStateVisualRefresh();
+
+        // Fade content back in after the DWM animation settles
         QTimer::singleShot(250, this, [this]() {
-            setUpdatesEnabled(true);
+            if (!isVisible()) {
+                return;
+            }
+
             scheduleStateVisualRefresh();
 
-            auto *effect = qobject_cast<QGraphicsOpacityEffect *>(m_contentPanel->graphicsEffect());
-            if (effect != nullptr) {
-                auto *fadeIn = new QPropertyAnimation(effect, "opacity", this);
+            auto *fx = qobject_cast<QGraphicsOpacityEffect *>(m_contentPanel->graphicsEffect());
+            if (fx != nullptr) {
+                auto *fadeIn = new QPropertyAnimation(fx, "opacity", this);
                 fadeIn->setDuration(120);
                 fadeIn->setEasingCurve(QEasingCurve::OutCubic);
                 fadeIn->setStartValue(0.0);
