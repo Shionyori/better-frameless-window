@@ -579,6 +579,17 @@ void FramelessWindow::paintEvent(QPaintEvent *event)
     const QSize imgSize = m_backgroundImage.size();
 
     switch (m_backgroundImageMode) {
+    case BackgroundImageMode::Cover: {
+        const qreal scaleX = static_cast<qreal>(r.width()) / imgSize.width();
+        const qreal scaleY = static_cast<qreal>(r.height()) / imgSize.height();
+        const qreal scale = qMax(scaleX, scaleY);
+        const int sw = qRound(imgSize.width() * scale);
+        const int sh = qRound(imgSize.height() * scale);
+        const int x = (r.width() - sw) / 2;
+        const int y = (r.height() - sh) / 2;
+        painter.drawPixmap(QRect(x, y, sw, sh), m_backgroundImage);
+        break;
+    }
     case BackgroundImageMode::Stretch:
         painter.drawPixmap(r, m_backgroundImage);
         break;

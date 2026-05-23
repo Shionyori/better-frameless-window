@@ -54,13 +54,14 @@ public:
     void clearTitleBarWidgets();
 
     enum class BackgroundImageMode {
+        Cover,
         Stretch,
         Fit,
         Tile,
         Center
     };
 
-    void setBackgroundImage(const QPixmap &image, BackgroundImageMode mode = BackgroundImageMode::Stretch);
+    void setBackgroundImage(const QPixmap &image, BackgroundImageMode mode = BackgroundImageMode::Cover);
     void clearBackgroundImage();
     QPixmap backgroundImage() const;
     BackgroundImageMode backgroundImageMode() const;
@@ -141,7 +142,7 @@ private:
     bool m_systemDarkModeEnabled;
     bool m_snapLayoutEnabled;
     QPixmap m_backgroundImage;
-    BackgroundImageMode m_backgroundImageMode = BackgroundImageMode::Stretch;
+    BackgroundImageMode m_backgroundImageMode = BackgroundImageMode::Cover;
     bool m_systemBackdropTransitionGuardActive;
     quint64 m_systemBackdropTransitionEpoch;
     bool m_lastNativeSizeMaximized;

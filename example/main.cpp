@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
     FramelessWindow window;
     window.setWindowTitle("BFW - Example");
     window.setWindowIcon(QIcon(":/icon.png"));
-    window.setBackgroundImage(QPixmap(":/bk.png"), FramelessWindow::BackgroundImageMode::Fit);
+    window.setBackgroundImage(QPixmap(":/bk.png"));
     window.setWindowSizeLimits(QSize(520, 380), QSize());
     window.restoreWindowGeometry();
 
@@ -112,6 +112,7 @@ int main(int argc, char *argv[])
         row->addWidget(lbl);
 
         for (const auto &kv : {
+                 std::pair{QStringLiteral("Cover"), FramelessWindow::BackgroundImageMode::Cover},
                  std::pair{QStringLiteral("Fit"), FramelessWindow::BackgroundImageMode::Fit},
                  std::pair{QStringLiteral("Stretch"), FramelessWindow::BackgroundImageMode::Stretch},
                  std::pair{QStringLiteral("Tile"), FramelessWindow::BackgroundImageMode::Tile},
