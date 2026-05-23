@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
 
     FramelessWindow window;
     window.setWindowSizeLimits(QSize(520, 380), QSize());
-    window.setWindowTitle("Example");
+    window.setWindowTitle("BFS - Example");
     window.setWindowIcon(QIcon(":/images/icon.png"));
     window.setBackgroundImage(QPixmap(":/images/bg.jpg"));
     window.setWindowOpacity(1.0);
@@ -51,26 +51,34 @@ int main(int argc, char *argv[])
     headingFont.setBold(true);
     heading->setFont(headingFont);
 
-    auto *subtitle = new QLabel("A Qt6 C++17 frameless window library for Windows");
+    auto *subtitle = new QLabel("A Qt6 frameless window library for Windows");
     subtitle->setObjectName("ContentLabel");
     subtitle->setAlignment(Qt::AlignCenter);
     QFont subFont = subtitle->font();
     subFont.setPointSize(11);
     subtitle->setFont(subFont);
 
-    auto *infoLabel = new QLabel(
-        "Features: custom titlebar  |  8-direction resize  |  Mica / Acrylic backdrop\n"
-        "Rounded corners  |  System dark mode  |  HiDPI-aware hit testing\n"
-        "Drag-to-snap  |  Right-click system menu  |  Shadow control");
-    infoLabel->setObjectName("ContentLabel");
-    infoLabel->setAlignment(Qt::AlignCenter);
-    infoLabel->setWordWrap(true);
+    auto *infoLabel1 = new QLabel(
+        "Use the buttons below to change the background image mode,\n" 
+        "window and background opacity, and the system backdrop preference\n");
+    infoLabel1->setObjectName("ContentLabel");
+    infoLabel1->setAlignment(Qt::AlignCenter);
+    infoLabel1->setWordWrap(true);
+
+    auto *infoLabel2 = new QLabel(
+        "By the way,\n"
+        "system backdrop effects (Mica/Acrylic) only work on Windows 11.\n"
+        "Also conflict with background image,\n"
+        "it will only be enbled when the background image is off.");
+    infoLabel2->setObjectName("ContentLabel");
+    infoLabel2->setAlignment(Qt::AlignCenter);
+    infoLabel2->setWordWrap(true);
 
     // ── Background image mode ───────────────────────────────────────────
 
     auto *bgRow = new QHBoxLayout();
     bgRow->setSpacing(8);
-    auto *bgLabel = new QLabel("Bg:");
+    auto *bgLabel = new QLabel("Background Mode:");
     bgLabel->setObjectName("ContentLabel");
     bgRow->addStretch();
     bgRow->addWidget(bgLabel);
@@ -123,7 +131,7 @@ int main(int argc, char *argv[])
 
         auto *val = new QLabel(QStringLiteral("%1%").arg(initial));
         val->setObjectName("ContentLabel");
-        val->setFixedWidth(40);
+        val->setFixedWidth(50);
         val->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         QObject::connect(slider, &QSlider::valueChanged, [val](int v) {
             val->setText(QStringLiteral("%1%").arg(v));
@@ -135,11 +143,11 @@ int main(int argc, char *argv[])
 
     auto *winOpacityRow = makeOpacityRow("Window:", [&window](int v) {
         window.setWindowOpacity(v / 100.0);
-    }, 100, 56);
+    }, 100, 110);
 
-    auto *bgOpacityRow = makeOpacityRow("Bg:", [&window](int v) {
+    auto *bgOpacityRow = makeOpacityRow("Background:", [&window](int v) {
         window.setBackgroundOpacity(v / 100.0);
-    }, 30, 56);
+    }, 30, 110);
 
     // ── Backdrop preference buttons ─────────────────────────────────────
 
@@ -179,7 +187,9 @@ int main(int argc, char *argv[])
     layout->addSpacing(4);
     layout->addWidget(subtitle);
     layout->addSpacing(20);
-    layout->addWidget(infoLabel);
+    layout->addWidget(infoLabel1);
+    layout->addSpacing(20);
+    layout->addWidget(infoLabel2);
     layout->addSpacing(20);
     layout->addLayout(bgRow);
     layout->addSpacing(6);
