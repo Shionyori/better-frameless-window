@@ -177,22 +177,12 @@ void FramelessWindow::setBackgroundImage(const QPixmap &image, BackgroundImageMo
 {
     m_backgroundImage = image;
     m_backgroundImageMode = mode;
-
-    if (!image.isNull()) {
-        m_systemBackdropPreference = WindowEffect::SystemBackdropPreference::None;
-        m_systemBackdropEnabled = false;
-    }
-
-    performVisualRefreshPass();
     update();
 }
 
 void FramelessWindow::clearBackgroundImage()
 {
     m_backgroundImage = QPixmap();
-    m_systemBackdropPreference = WindowEffect::SystemBackdropPreference::None;
-    m_systemBackdropEnabled = false;
-    performVisualRefreshPass();
     update();
 }
 
@@ -596,8 +586,8 @@ void FramelessWindow::paintEvent(QPaintEvent *event)
         return;
     }
 
-    // Ensure an opaque backdrop so the background image blends toward the
-    // theme color rather than revealing the desktop when opacity < 1.0.
+    // Fill with opaque theme color so the image blends toward it as
+    // opacity decreases, rather than revealing the desktop behind.
     painter.fillRect(rect(), m_themeManager.windowBackgroundColor());
 
     painter.setOpacity(m_backgroundOpacity);
@@ -1251,6 +1241,10 @@ bool FramelessWindow::shouldUseDarkMode() const
 
 bool FramelessWindow::shouldUseTranslucentBackground() const
 {
+    // Keep Qt translucent-surface policy stable across maximize/restore guard.
+    // Native systemBackdrop can be temporarily forced to None, but coupling that
+    // transient state to QWidget translucency may cause delayed composition
+    // recovery on Windows after restore.
     return WindowVisualState::shouldUseTranslucentBackground(m_systemBackdropEnabled,
                                                               false,
                                                               m_systemBackdropPreference);
