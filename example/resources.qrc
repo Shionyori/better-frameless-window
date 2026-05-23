@@ -1,6 +1,6 @@
 <RCC>
-    <qresource prefix="/">
+    <qresource prefix="/images">
         <file>icon.png</file>
-        <file>bk.png</file>
+        <file>bg.jpg</file>
     </qresource>
 </RCC>
