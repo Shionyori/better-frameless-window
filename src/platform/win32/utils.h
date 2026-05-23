@@ -23,5 +23,6 @@ int hitFromEdges(Qt::Edges edges);
 void syncNativeWindowStyles(void *hwnd, bool includeExStyle);
 uint32_t windowsBuildNumber();
 WindowsCapabilities detectWindowsCapabilities();
+bool isSystemDarkModeEnabled();
 
 } // namespace Utils

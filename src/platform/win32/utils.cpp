@@ -2,6 +2,8 @@
 
 #include "diagnostics.h"
 
+#include <QSettings>
+
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
 #endif
@@ -154,6 +156,18 @@ WindowsCapabilities detectWindowsCapabilities()
 #endif
 
     return caps;
+}
+
+bool isSystemDarkModeEnabled()
+{
+#ifdef Q_OS_WIN
+    QSettings settings(
+        QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"),
+        QSettings::NativeFormat);
+    return settings.value(QStringLiteral("AppsUseLightTheme"), 1).toInt() == 0;
+#else
+    return false;
+#endif
 }
 
 } // namespace Utils
