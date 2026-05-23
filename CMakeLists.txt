@@ -79,7 +79,7 @@ if(WIN32)
 endif()
 
 # Example executable
-add_executable(bfw-example example/main.cpp)
+add_executable(bfw-example example/main.cpp example/resources.qrc)
 target_link_libraries(bfw-example PRIVATE ${TARGET_NAME})
 
 # Qt deployment (Windows / macOS) 

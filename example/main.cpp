@@ -9,33 +9,52 @@
 #include "thememanager.h"
 #include "win32/windoweffect.h"
 
+static QPushButton *makeSmallBtn(const QString &text, int width = 72)
+{
+    auto *btn = new QPushButton(text);
+    btn->setFixedHeight(26);
+    btn->setFixedWidth(width);
+    return btn;
+}
+
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
     app.setApplicationName("Better Frameless Window - Example");
 
     FramelessWindow window;
+    window.setWindowTitle("BFW - Example");
+    window.setWindowIcon(QIcon(":/icon.png"));
+    window.setBackgroundImage(QPixmap(":/bk.png"), FramelessWindow::BackgroundImageMode::Fit);
     window.setWindowSizeLimits(QSize(520, 380), QSize());
-    window.setWindowTitle("Example");
+    window.restoreWindowGeometry();
 
-    // ── Titlebar: theme toggle ──────────────────────────────────────────
+    // ── Titlebar: theme toggle + snap layout toggle ───────────────────────
 
-    auto *themeBtn = new QPushButton("Dark");
-    themeBtn->setFixedHeight(24);
+    auto *themeBtn = makeSmallBtn("Dark", 60);
     QObject::connect(themeBtn, &QPushButton::clicked, [&]() {
         const bool toDark = window.themeMode() != ThemeManager::ThemeMode::Dark;
         window.setThemeMode(toDark ? ThemeManager::ThemeMode::Dark
                                    : ThemeManager::ThemeMode::Light);
         themeBtn->setText(toDark ? "Light" : "Dark");
     });
+
+    auto *snapBtn = makeSmallBtn("Snap: ON", 80);
+    QObject::connect(snapBtn, &QPushButton::clicked, [&]() {
+        const bool next = !window.isSnapLayoutEnabled();
+        window.setSnapLayoutEnabled(next);
+        snapBtn->setText(next ? "Snap: ON" : "Snap: OFF");
+    });
+
     window.addTitleBarWidget(themeBtn);
+    window.addTitleBarWidget(snapBtn);
 
     // ── Content area ────────────────────────────────────────────────────
 
     auto *page = new QWidget();
     auto *layout = new QVBoxLayout(page);
     layout->setContentsMargins(40, 32, 40, 32);
-    layout->setSpacing(12);
+    layout->setSpacing(10);
 
     auto *heading = new QLabel("Better Frameless Window");
     heading->setObjectName("ContentLabel");
@@ -52,55 +71,163 @@ int main(int argc, char *argv[])
     subFont.setPointSize(11);
     subtitle->setFont(subFont);
 
-    auto *infoLabel = new QLabel(
-        "Features: custom titlebar  |  8-direction resize  |  Mica / Acrylic backdrop\n"
-        "Rounded corners  |  System dark mode  |  HiDPI-aware hit testing\n"
-        "Drag-to-snap  |  Right-click system menu  |  Shadow control");
-    infoLabel->setObjectName("ContentLabel");
-    infoLabel->setAlignment(Qt::AlignCenter);
-    infoLabel->setWordWrap(true);
+    // ── Backdrop preference ─────────────────────────────────────────────
 
-    // ── Backdrop preference buttons ─────────────────────────────────────
+    auto makeBdpRow = [&](const QString &label) -> QWidget * {
+        auto *w = new QWidget();
+        auto *row = new QHBoxLayout(w);
+        row->setContentsMargins(0, 0, 0, 0);
+        row->setSpacing(8);
+        auto *lbl = new QLabel(label);
+        lbl->setObjectName("ContentLabel");
+        lbl->setFixedWidth(56);
+        row->addWidget(lbl);
 
-    auto *bdpRow = new QHBoxLayout();
-    bdpRow->setSpacing(8);
-    auto *bdpLabel = new QLabel("Backdrop:");
-    bdpLabel->setObjectName("ContentLabel");
-    bdpRow->addStretch();
-    bdpRow->addWidget(bdpLabel);
-
-    auto makeBdpBtn = [&](const QString &text,
-                          WindowEffect::SystemBackdropPreference pref) {
-        auto *btn = new QPushButton(text);
-        btn->setFixedHeight(28);
-        btn->setFixedWidth(72);
-        QObject::connect(btn, &QPushButton::clicked, [&window, pref]() {
-            window.setSystemBackdropPreference(pref);
-        });
-        return btn;
+        for (const auto &kv : {
+                 std::pair{QStringLiteral("Auto"), WindowEffect::SystemBackdropPreference::Auto},
+                 std::pair{QStringLiteral("Mica"), WindowEffect::SystemBackdropPreference::Mica},
+                 std::pair{QStringLiteral("Acry"), WindowEffect::SystemBackdropPreference::Acrylic},
+                 std::pair{QStringLiteral("None"), WindowEffect::SystemBackdropPreference::None},
+             }) {
+            auto *btn = makeSmallBtn(kv.first, 52);
+            QObject::connect(btn, &QPushButton::clicked, [&window, p = kv.second]() {
+                window.setSystemBackdropPreference(p);
+            });
+            row->addWidget(btn);
+        }
+        row->addStretch();
+        return w;
     };
 
-    auto *autoBtn = makeBdpBtn("Auto", WindowEffect::SystemBackdropPreference::Auto);
-    auto *micaBtn = makeBdpBtn("Mica", WindowEffect::SystemBackdropPreference::Mica);
-    auto *acrylicBtn = makeBdpBtn("Acrylic", WindowEffect::SystemBackdropPreference::Acrylic);
-    auto *noneBtn = makeBdpBtn("None", WindowEffect::SystemBackdropPreference::None);
+    // ── Background image mode ───────────────────────────────────────────
 
-    bdpRow->addWidget(autoBtn);
-    bdpRow->addWidget(micaBtn);
-    bdpRow->addWidget(acrylicBtn);
-    bdpRow->addWidget(noneBtn);
-    bdpRow->addStretch();
+    auto makeBgRow = [&]() -> QWidget * {
+        auto *w = new QWidget();
+        auto *row = new QHBoxLayout(w);
+        row->setContentsMargins(0, 0, 0, 0);
+        row->setSpacing(8);
+        auto *lbl = new QLabel("Bg:");
+        lbl->setObjectName("ContentLabel");
+        lbl->setFixedWidth(56);
+        row->addWidget(lbl);
+
+        for (const auto &kv : {
+                 std::pair{QStringLiteral("Fit"), FramelessWindow::BackgroundImageMode::Fit},
+                 std::pair{QStringLiteral("Stretch"), FramelessWindow::BackgroundImageMode::Stretch},
+                 std::pair{QStringLiteral("Tile"), FramelessWindow::BackgroundImageMode::Tile},
+                 std::pair{QStringLiteral("Center"), FramelessWindow::BackgroundImageMode::Center},
+             }) {
+            auto *btn = makeSmallBtn(kv.first, 62);
+            QObject::connect(btn, &QPushButton::clicked, [&window, mode = kv.second]() {
+                window.setBackgroundImage(QPixmap(":/bk.png"), mode);
+            });
+            row->addWidget(btn);
+        }
+
+        auto *clearBtn = makeSmallBtn("Off", 52);
+        QObject::connect(clearBtn, &QPushButton::clicked, [&window]() {
+            window.clearBackgroundImage();
+        });
+        row->addWidget(clearBtn);
+        row->addStretch();
+        return w;
+    };
+
+    // ── Titlebar visibility / height ────────────────────────────────────
+
+    auto makeTitleBarRow = [&]() -> QWidget * {
+        auto *w = new QWidget();
+        auto *row = new QHBoxLayout(w);
+        row->setContentsMargins(0, 0, 0, 0);
+        row->setSpacing(8);
+        auto *lbl = new QLabel("TitleBar:");
+        lbl->setObjectName("ContentLabel");
+        lbl->setFixedWidth(56);
+        row->addWidget(lbl);
+
+        auto *visBtn = makeSmallBtn("Hide", 62);
+        QObject::connect(visBtn, &QPushButton::clicked, [&window, visBtn]() {
+            const bool vis = !window.isTitleBarVisible();
+            window.setTitleBarVisible(vis);
+            visBtn->setText(vis ? "Hide" : "Show");
+        });
+        row->addWidget(visBtn);
+
+        const int heights[] = {32, 44, 56};
+        int heightIdx = 1; // default 44
+        auto *hBtn = makeSmallBtn("44px", 56);
+        QObject::connect(hBtn, &QPushButton::clicked, [&window, hBtn, &heightIdx, &heights]() {
+            heightIdx = (heightIdx + 1) % 3;
+            const int h = heights[heightIdx];
+            window.setTitleBarHeight(h);
+            hBtn->setText(QStringLiteral("%1px").arg(h));
+        });
+        row->addWidget(hBtn);
+        row->addStretch();
+        return w;
+    };
+
+    // ── Misc toggles ────────────────────────────────────────────────────
+
+    auto makeMiscRow = [&]() -> QWidget * {
+        auto *w = new QWidget();
+        auto *row = new QHBoxLayout(w);
+        row->setContentsMargins(0, 0, 0, 0);
+        row->setSpacing(8);
+        auto *lbl = new QLabel("More:");
+        lbl->setObjectName("ContentLabel");
+        lbl->setFixedWidth(56);
+        row->addWidget(lbl);
+
+        auto *fsBtn = makeSmallBtn("FullScr", 68);
+        QObject::connect(fsBtn, &QPushButton::clicked, [&window]() {
+            if (window.isFullScreen()) {
+                window.showNormal();
+            } else {
+                window.showFullScreen();
+            }
+        });
+        row->addWidget(fsBtn);
+
+        auto *shadowBtn = makeSmallBtn("Shadow: ON", 88);
+        QObject::connect(shadowBtn, &QPushButton::clicked, [&window, shadowBtn]() {
+            const bool next = !window.isShadowEnabled();
+            window.setSystemShadowEnabled(next);
+            shadowBtn->setText(next ? "Shadow: ON" : "Shadow: OFF");
+        });
+        row->addWidget(shadowBtn);
+
+        auto *roundBtn = makeSmallBtn("Round: ON", 88);
+        QObject::connect(roundBtn, &QPushButton::clicked, [&window, roundBtn]() {
+            const bool next = !window.isRoundedCornersEnabled();
+            window.setRoundedCornersEnabled(next);
+            roundBtn->setText(next ? "Round: ON" : "Round: OFF");
+        });
+        row->addWidget(roundBtn);
+
+        auto *dmBtn = makeSmallBtn("DarkFrm: ON", 92);
+        QObject::connect(dmBtn, &QPushButton::clicked, [&window, dmBtn]() {
+            const bool next = !window.isSystemDarkModeEnabled();
+            window.setSystemDarkModeEnabled(next);
+            dmBtn->setText(next ? "DarkFrm: ON" : "DarkFrm: OFF");
+        });
+        row->addWidget(dmBtn);
+
+        row->addStretch();
+        return w;
+    };
 
     // ── Assemble ────────────────────────────────────────────────────────
 
     layout->addStretch();
     layout->addWidget(heading);
-    layout->addSpacing(4);
+    layout->addSpacing(2);
     layout->addWidget(subtitle);
-    layout->addSpacing(20);
-    layout->addWidget(infoLabel);
-    layout->addSpacing(20);
-    layout->addLayout(bdpRow);
+    layout->addSpacing(16);
+    layout->addWidget(makeBdpRow("Backdrop:"), 0, Qt::AlignCenter);
+    layout->addWidget(makeBgRow(), 0, Qt::AlignCenter);
+    layout->addWidget(makeTitleBarRow(), 0, Qt::AlignCenter);
+    layout->addWidget(makeMiscRow(), 0, Qt::AlignCenter);
     layout->addStretch();
 
     window.setCentralWidget(page);
