@@ -55,6 +55,7 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_lastAppliedStyleSheet()
     , m_loggedNullWindowHandle(false)
     , m_borderColor()
+    , m_loggedNullWinId(false)
     , m_visualRefreshCoordinator(this)
     , m_followSystemTheme(false)
 {
@@ -770,6 +771,13 @@ void FramelessWindow::applyTheme()
 void FramelessWindow::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
+
+    // Native window handle may have been destroyed and recreated during
+    // hide/show cycles. Reset null-handle logging guards so a null handle
+    // in the new window is logged rather than silently suppressed.
+    m_loggedNullWindowHandle = false;
+    m_loggedNullWinId = false;
+
     if (m_titleBar != nullptr) {
         m_titleBar->setTitle(windowTitle());
         m_titleBar->setIcon(windowIcon());
@@ -1132,6 +1140,7 @@ void FramelessWindow::applyVisualEffects()
     }
 
     m_loggedNullWindowHandle = false;
+    m_loggedNullWinId = false;
 
     // Sync WA_TranslucentBackground with expected state before applying native effects.
     // Guards against direct applyVisualEffects() calls that bypass applyTheme().
@@ -1153,7 +1162,11 @@ void FramelessWindow::applyVisualEffects()
 
     void *hwnd = reinterpret_cast<void *>(winId());
     if (hwnd == nullptr) {
-        Diagnostics::logWarning(QStringLiteral("applyVisualEffects skipped: winId returned null handle"));
+        if (!m_loggedNullWinId) {
+            Diagnostics::logWarning(QStringLiteral("applyVisualEffects skipped: winId returned null handle"));
+            m_loggedNullWinId = true;
+        }
+
         QTimer::singleShot(0, this, [this]() {
             if (windowHandle() != nullptr) {
                 scheduleStateVisualRefresh();
