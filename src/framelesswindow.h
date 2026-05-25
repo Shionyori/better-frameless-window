@@ -156,6 +156,7 @@ private:
     QString m_lastAppliedStyleSheet;
     QColor m_borderColor;
     bool m_loggedNullWindowHandle;
+    bool m_loggedNullWinId;
     bool m_resizing = false;
     VisualRefreshCoordinator m_visualRefreshCoordinator;
     ThemeManager m_themeManager;
