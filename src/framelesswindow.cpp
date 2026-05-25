@@ -54,6 +54,7 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_applyingTheme(false)
     , m_lastAppliedStyleSheet()
     , m_loggedNullWindowHandle(false)
+    , m_borderColor()
     , m_visualRefreshCoordinator(this)
     , m_followSystemTheme(false)
 {
@@ -484,6 +485,21 @@ void FramelessWindow::syncThemeWithSystemIfFollowing()
 QColor FramelessWindow::accentColor() const
 {
     return m_themeManager.accentColor();
+}
+
+void FramelessWindow::setBorderColor(const QColor &color)
+{
+    if (m_borderColor == color) {
+        return;
+    }
+
+    m_borderColor = color;
+    requestVisualRefresh();
+}
+
+QColor FramelessWindow::borderColor() const
+{
+    return m_borderColor;
 }
 
 void FramelessWindow::initWindow()
@@ -1252,7 +1268,7 @@ bool FramelessWindow::shouldUseTranslucentBackground() const
 
 QColor FramelessWindow::preferredBorderColor() const
 {
-    return QColor();
+    return m_borderColor;
 }
 
 Qt::CursorShape FramelessWindow::cursorForEdges(Qt::Edges edges) const
