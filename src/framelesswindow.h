@@ -46,6 +46,9 @@ public:
     void setAccentColor(const QColor &accentColor);
     QColor accentColor() const;
 
+    void setBorderColor(const QColor &color);
+    QColor borderColor() const;
+
     void setCentralWidget(QWidget *widget);
     QWidget *centralWidget() const;
     QWidget *takeCentralWidget();
@@ -151,6 +154,7 @@ private:
     bool m_lastNativeSizeMaximized;
     bool m_applyingTheme;
     QString m_lastAppliedStyleSheet;
+    QColor m_borderColor;
     bool m_loggedNullWindowHandle;
     bool m_resizing = false;
     VisualRefreshCoordinator m_visualRefreshCoordinator;
