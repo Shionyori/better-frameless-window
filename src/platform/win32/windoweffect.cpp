@@ -172,25 +172,23 @@ void WindowEffect::applyShadow(void *hwnd, bool enabled, bool maximized, bool mi
 
     const bool enableShadow = enabled && !maximized && !minimized;
     const DWMNCRENDERINGPOLICY policy = enableShadow ? DWMNCRP_ENABLED : DWMNCRP_DISABLED;
-    static bool ncRenderingPolicyValid = true;
-    if (ncRenderingPolicyValid) {
+    if (m_ncRenderingPolicyValid) {
         const HRESULT policyHr = DwmSetWindowAttribute(win,
                                                        DWMWA_NCRENDERING_POLICY,
                                                        &policy,
                                                        sizeof(policy));
         if (FAILED(policyHr)) {
-            ncRenderingPolicyValid = false;
+            m_ncRenderingPolicyValid = false;
             Diagnostics::logWarning(QStringLiteral("applyShadow: DWMWA_NCRENDERING_POLICY failed (hr=0x%1), disable subsequent calls")
                                         .arg(QString::number(static_cast<qulonglong>(policyHr), 16)));
         }
     }
 
     const MARGINS margins = enableShadow ? MARGINS{1, 1, 1, 1} : MARGINS{0, 0, 0, 0};
-    static bool extendFrameValid = true;
-    if (extendFrameValid) {
+    if (m_extendFrameValid) {
         const HRESULT marginsHr = DwmExtendFrameIntoClientArea(win, &margins);
         if (FAILED(marginsHr)) {
-            extendFrameValid = false;
+            m_extendFrameValid = false;
             Diagnostics::logWarning(QStringLiteral("applyShadow: DwmExtendFrameIntoClientArea failed (hr=0x%1), disable subsequent calls")
                                         .arg(QString::number(static_cast<qulonglong>(marginsHr), 16)));
         }
@@ -212,8 +210,7 @@ void WindowEffect::applyRoundedCorners(void *hwnd, bool enabled, bool maximized,
         return;
     }
 
-    static bool roundedCornersAttributeValid = true;
-    if (!roundedCornersAttributeValid) {
+    if (!m_roundedCornersAttributeValid) {
         return;
     }
 
@@ -224,7 +221,7 @@ void WindowEffect::applyRoundedCorners(void *hwnd, bool enabled, bool maximized,
                                              &corner,
                                              sizeof(corner));
     if (FAILED(hr)) {
-        roundedCornersAttributeValid = false;
+        m_roundedCornersAttributeValid = false;
         Diagnostics::logWarning(QStringLiteral("applyRoundedCorners: DWMWA_WINDOW_CORNER_PREFERENCE failed (hr=0x%1), disable subsequent calls")
                                     .arg(QString::number(static_cast<qulonglong>(hr), 16)));
     }
@@ -245,14 +242,12 @@ void WindowEffect::applySystemDarkMode(void *hwnd, bool enabled, bool useDarkMod
         return;
     }
 
-    static bool darkMode20Valid = true;
-    static bool darkMode19Valid = true;
-    if (!darkMode20Valid && !darkMode19Valid) {
+    if (!m_darkMode20Valid && !m_darkMode19Valid) {
         return;
     }
 
     const BOOL darkEnabled = (enabled && useDarkMode) ? TRUE : FALSE;
-    if (darkMode20Valid) {
+    if (m_darkMode20Valid) {
         const HRESULT result = DwmSetWindowAttribute(win,
                                                      DWMWA_USE_SYSTEM_DARK_MODE,
                                                      &darkEnabled,
@@ -261,18 +256,18 @@ void WindowEffect::applySystemDarkMode(void *hwnd, bool enabled, bool useDarkMod
             return;
         }
 
-        darkMode20Valid = false;
+        m_darkMode20Valid = false;
         Diagnostics::logWarning(QStringLiteral("applySystemDarkMode: DWMWA_USE_SYSTEM_DARK_MODE failed (hr=0x%1), fallback to legacy attribute")
                                     .arg(QString::number(static_cast<qulonglong>(result), 16)));
     }
 
-    if (darkMode19Valid) {
+    if (m_darkMode19Valid) {
         const HRESULT legacyResult = DwmSetWindowAttribute(win,
                                                             DWMWA_USE_SYSTEM_DARK_MODE_BEFORE_20H1,
                                                             &darkEnabled,
                                                             sizeof(darkEnabled));
         if (FAILED(legacyResult)) {
-            darkMode19Valid = false;
+            m_darkMode19Valid = false;
             Diagnostics::logWarning(QStringLiteral("applySystemDarkMode: legacy dark mode attribute failed (hr=0x%1), disable subsequent calls")
                                         .arg(QString::number(static_cast<qulonglong>(legacyResult), 16)));
         }
@@ -365,11 +360,8 @@ void WindowEffect::applySystemBackdropEffects(void *hwnd,
         return;
     }
 
-    static bool systemBackdropAttributeSupported = true;
-    static bool legacyMicaAttributeSupported = true;
-
     auto setSystemBackdropType = [&](DWORD type, const QString &reason) -> HRESULT {
-        if (!systemBackdropAttributeSupported) {
+        if (!m_systemBackdropAttributeSupported) {
             return E_NOTIMPL;
         }
 
@@ -378,7 +370,7 @@ void WindowEffect::applySystemBackdropEffects(void *hwnd,
                                                  &type,
                                                  sizeof(type));
         if (hr == E_INVALIDARG) {
-            systemBackdropAttributeSupported = false;
+            m_systemBackdropAttributeSupported = false;
             Diagnostics::logWarning(QStringLiteral("applySystemBackdropEffects: DWMWA_SYSTEMBACKDROP_TYPE unsupported (hr=0x%1, reason=%2)")
                                         .arg(QString::number(static_cast<qulonglong>(hr), 16), reason));
         } else if (FAILED(hr)) {
@@ -389,7 +381,7 @@ void WindowEffect::applySystemBackdropEffects(void *hwnd,
     };
 
     auto setLegacyMica = [&](BOOL value, const QString &reason) -> HRESULT {
-        if (!legacyMicaAttributeSupported) {
+        if (!m_legacyMicaAttributeSupported) {
             return E_NOTIMPL;
         }
 
@@ -398,7 +390,7 @@ void WindowEffect::applySystemBackdropEffects(void *hwnd,
                                                  &value,
                                                  sizeof(value));
         if (hr == E_INVALIDARG) {
-            legacyMicaAttributeSupported = false;
+            m_legacyMicaAttributeSupported = false;
             Diagnostics::logWarning(QStringLiteral("applySystemBackdropEffects: DWMWA_MICA_EFFECT unsupported (hr=0x%1, reason=%2)")
                                         .arg(QString::number(static_cast<qulonglong>(hr), 16), reason));
         } else if (FAILED(hr)) {
@@ -434,7 +426,7 @@ void WindowEffect::applySystemBackdropEffects(void *hwnd,
         const HRESULT hr = setSystemBackdropType(DWMSBT_MAINWINDOW, QStringLiteral("apply-mica"));
         if (SUCCEEDED(hr)) {
             applied = true;
-        } else if (caps.supportsLegacyMica && legacyMicaAttributeSupported) {
+        } else if (caps.supportsLegacyMica && m_legacyMicaAttributeSupported) {
             mode = SystemBackdropMode::MicaLegacy;
         } else if (caps.supportsAcrylic && getSetWindowCompositionAttribute() != nullptr) {
             mode = SystemBackdropMode::Acrylic;
@@ -491,8 +483,7 @@ void WindowEffect::applyBorderColor(void *hwnd, const QColor &borderColor) const
         return;
     }
 
-    static bool borderColorAttributeValid = true;
-    if (!borderColorAttributeValid) {
+    if (!m_borderColorAttributeValid) {
         return;
     }
 
@@ -507,7 +498,7 @@ void WindowEffect::applyBorderColor(void *hwnd, const QColor &borderColor) const
                                              &colorRef,
                                              sizeof(colorRef));
     if (FAILED(hr)) {
-        borderColorAttributeValid = false;
+        m_borderColorAttributeValid = false;
         Diagnostics::logWarning(QStringLiteral("applyBorderColor: DWMWA_BORDER_COLOR failed (hr=0x%1), disable subsequent calls")
                                     .arg(QString::number(static_cast<qulonglong>(hr), 16)));
     }
