@@ -56,4 +56,15 @@ private:
     // restore transitions bypasses this cache via enabled=false→true cycle.
     mutable SystemBackdropMode m_lastAppliedMode = SystemBackdropMode::None;
     mutable bool m_lastAppliedSuccessfully = false;
+
+    // Per-window failure flags. Once a DWM attribute fails for a specific
+    // HWND, subsequent calls skip that attribute for that window only.
+    mutable bool m_ncRenderingPolicyValid = true;
+    mutable bool m_extendFrameValid = true;
+    mutable bool m_roundedCornersAttributeValid = true;
+    mutable bool m_darkMode20Valid = true;
+    mutable bool m_darkMode19Valid = true;
+    mutable bool m_systemBackdropAttributeSupported = true;
+    mutable bool m_legacyMicaAttributeSupported = true;
+    mutable bool m_borderColorAttributeValid = true;
 };
