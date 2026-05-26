@@ -171,7 +171,8 @@ Closes #<issue>
 
 - **不要自行合并自己的 PR**（除非紧急修复且有明确授权）
 - 等 CI 全绿再合并
-- 合并方式：**Squash merge**（将 PR 内所有 commit 压缩为一条干净的 commit 到 main）
+- 合并方式：**Merge commit**（保留 PR 内所有细粒度 commit 原样合入 main，生成 `Merge pull request #X` 记录）
+- 不使用 squash merge — 本仓库重视 commit 粒度和历史追溯性，拆分良好的 commit 应该在 main 上保留而非压扁
 
 ### PR 依赖链
 
@@ -268,7 +269,7 @@ EOF
 )"
 
 # 4. 等待审查和 CI
-# 5. 审查通过后由 reviewer squash merge
+# 5. 审查通过后由 reviewer 以 merge commit 方式合并
 
 # 6. 清理
 git checkout main
