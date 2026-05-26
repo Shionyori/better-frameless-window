@@ -3,6 +3,11 @@ cmake_minimum_required(VERSION 3.16)
 set(TARGET_NAME better-frameless-window)
 project(${TARGET_NAME} VERSION 0.1.0 LANGUAGES CXX)
 
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/version.h
+)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -63,6 +68,7 @@ endif()
 target_include_directories(${TARGET_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/platform
+    ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 
 target_link_libraries(${TARGET_NAME} PUBLIC
