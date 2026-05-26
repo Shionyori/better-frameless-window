@@ -66,9 +66,11 @@ if(WIN32)
 endif()
 
 target_include_directories(${TARGET_NAME} PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/platform
-    ${CMAKE_CURRENT_BINARY_DIR}/generated
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/platform>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/${TARGET_NAME}>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/${TARGET_NAME}/platform>
 )
 
 target_link_libraries(${TARGET_NAME} PUBLIC
@@ -143,3 +145,55 @@ function(deploy_qt target)
 endfunction()
 
 deploy_qt(bfw-example)
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+install(TARGETS ${TARGET_NAME}
+    EXPORT ${TARGET_NAME}-targets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+install(FILES
+    src/framelesswindow.h
+    src/titlebar.h
+    src/thememanager.h
+    src/diagnostics.h
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/version.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${TARGET_NAME}
+)
+
+install(FILES
+    src/core/visualrefreshcoordinator.h
+    src/core/windowvisualstate.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${TARGET_NAME}/core
+)
+
+if(WIN32)
+    install(FILES
+        src/platform/win32/nativemessagerouter.h
+        src/platform/win32/systemmenu.h
+        src/platform/win32/windowcommand.h
+        src/platform/win32/windowframe.h
+        src/platform/win32/windowhittest.h
+        src/platform/win32/windoweffect.h
+        src/platform/win32/utils.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${TARGET_NAME}/platform/win32
+    )
+endif()
+
+install(EXPORT ${TARGET_NAME}-targets
+    FILE ${TARGET_NAME}-targets.cmake
+    NAMESPACE ${TARGET_NAME}::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${TARGET_NAME}
+)
+
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/${TARGET_NAME}-config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_NAME}-config.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${TARGET_NAME}
+)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_NAME}-config.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${TARGET_NAME}
+)
