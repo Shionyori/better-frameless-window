@@ -208,3 +208,4 @@ function(add_bfw_test name)
 endfunction()
 
 add_bfw_test(version)
+add_bfw_test(thememanager)
