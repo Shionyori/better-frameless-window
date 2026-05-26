@@ -42,6 +42,8 @@ set(LIB_SOURCES
     src/thememanager.h
     src/diagnostics.cpp
     src/diagnostics.h
+    src/platform/win32/utils.cpp
+    src/platform/win32/utils.h
 )
 
 set(WIN32_SOURCES
@@ -57,8 +59,6 @@ set(WIN32_SOURCES
     src/platform/win32/windowhittest.h
     src/platform/win32/windoweffect.cpp
     src/platform/win32/windoweffect.h
-    src/platform/win32/utils.cpp
-    src/platform/win32/utils.h
 )
 
 target_sources(${TARGET_NAME} PRIVATE ${LIB_SOURCES})
