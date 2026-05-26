@@ -23,6 +23,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Core
     Gui
     Widgets
+    Test
 )
 
 # Static library
@@ -197,3 +198,13 @@ configure_package_config_file(
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_NAME}-config.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${TARGET_NAME}
 )
+
+enable_testing()
+
+function(add_bfw_test name)
+    add_executable(test-${name} tests/test_${name}.cpp)
+    target_link_libraries(test-${name} PRIVATE ${TARGET_NAME} Qt6::Test)
+    add_test(NAME ${name} COMMAND test-${name})
+endfunction()
+
+add_bfw_test(version)
