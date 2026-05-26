@@ -209,3 +209,4 @@ endfunction()
 
 add_bfw_test(version)
 add_bfw_test(thememanager)
+add_bfw_test(visualstate)
