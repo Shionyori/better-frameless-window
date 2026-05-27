@@ -75,6 +75,12 @@ public:
     bool isTitleBarVisible() const;
     void setTitleBarHeight(int height);
     int titleBarHeight() const;
+    void setMinimizeButtonVisible(bool visible);
+    bool isMinimizeButtonVisible() const;
+    void setMaximizeButtonVisible(bool visible);
+    bool isMaximizeButtonVisible() const;
+    void setCloseButtonVisible(bool visible);
+    bool isCloseButtonVisible() const;
 
     void saveWindowGeometry();
     void restoreWindowGeometry();

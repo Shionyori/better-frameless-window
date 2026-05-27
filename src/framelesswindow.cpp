@@ -233,6 +233,42 @@ int FramelessWindow::titleBarHeight() const
     return m_titleBar != nullptr ? m_titleBar->height() : 0;
 }
 
+void FramelessWindow::setMinimizeButtonVisible(bool visible)
+{
+    if (m_titleBar != nullptr) {
+        m_titleBar->setMinimizeButtonVisible(visible);
+    }
+}
+
+bool FramelessWindow::isMinimizeButtonVisible() const
+{
+    return m_titleBar != nullptr && m_titleBar->isMinimizeButtonVisible();
+}
+
+void FramelessWindow::setMaximizeButtonVisible(bool visible)
+{
+    if (m_titleBar != nullptr) {
+        m_titleBar->setMaximizeButtonVisible(visible);
+    }
+}
+
+bool FramelessWindow::isMaximizeButtonVisible() const
+{
+    return m_titleBar != nullptr && m_titleBar->isMaximizeButtonVisible();
+}
+
+void FramelessWindow::setCloseButtonVisible(bool visible)
+{
+    if (m_titleBar != nullptr) {
+        m_titleBar->setCloseButtonVisible(visible);
+    }
+}
+
+bool FramelessWindow::isCloseButtonVisible() const
+{
+    return m_titleBar != nullptr && m_titleBar->isCloseButtonVisible();
+}
+
 void FramelessWindow::setThemeMode(ThemeManager::ThemeMode mode, bool persist, bool animated)
 {
     if (m_themeManager.themeMode() == mode) {
