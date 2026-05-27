@@ -8,6 +8,7 @@ class QLabel;
 class QPushButton;
 class QMouseEvent;
 class QHBoxLayout;
+class QSpacerItem;
 class QGraphicsOpacityEffect;
 class QPropertyAnimation;
 
@@ -36,6 +37,12 @@ public:
     void setMaximized(bool maximized);
     void addCenterWidget(QWidget *widget);
     void clearCenterWidgets();
+    void setMinimizeButtonVisible(bool visible);
+    bool isMinimizeButtonVisible() const;
+    void setMaximizeButtonVisible(bool visible);
+    bool isMaximizeButtonVisible() const;
+    void setCloseButtonVisible(bool visible);
+    bool isCloseButtonVisible() const;
     HitRegion hitRegionAt(const QPoint &pos) const;
 
 signals:
@@ -78,6 +85,9 @@ private:
     QPushButton *m_minimizeButton;
     QPushButton *m_maximizeButton;
     QPushButton *m_closeButton;
+    QSpacerItem *m_minimizeSpacer = nullptr;
+    QSpacerItem *m_maximizeSpacer = nullptr;
+    QSpacerItem *m_closeSpacer = nullptr;
     bool m_leftPressed;
     bool m_dragInitiated;
     QPoint m_pressPos;
