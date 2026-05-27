@@ -102,7 +102,7 @@ git commit -m "feat: update code"
 | CI 修复 + 测试修复 | 各自独立的 `fix:` commit |
 | 基础设施 + 使用它 | `chore:` → `feat:` / `test:` 分层 |
 
-### 示例：添加单元测试基础设施
+### 示例
 
 ```bash
 # ✓ 正确 — 6 个独立 commit
@@ -114,7 +114,7 @@ test: add Utils unit tests
 test: add WindowHitTest unit tests
 
 # ✗ 错误 — 全部塞一起
-test: add unit test infrastructure with Qt Test (5 modules)
+test: add all unit tests
 ```
 
 ---
@@ -130,13 +130,14 @@ test: add unit test infrastructure with Qt Test (5 modules)
 | `refactor/` | 重构 | `refactor/theme-manager` |
 | `revert/` | 回退 | `revert/undo-pr-20` |
 | `release/` | 发布准备 | `release/v0.2.0` |
+| `test/` | 测试 | `test/theme-manager-coverage` |
+| `ci/` | CI/CD | `ci/add-macos-build` |
+| `perf/` | 性能优化 | `perf/cache-capability-detection` |
 
 ### 规则
 
 - 使用 kebab-case（小写 + 连字符）
-- 避免数字后缀（`fix/foo-2`），重新 force-push 原分支即可
-- 合并后**立即删除远程分支**
-- 本地 stale 分支定期清理：`git remote prune origin`
+- 避免数字后缀（`fix/foo-2`），起一个更具体的描述性名称即可
 
 ---
 
@@ -191,6 +192,9 @@ feature/c  → feature/b     # PR #3: 依赖 PR #2
 合并顺序即为 PR 编号顺序，每个合并后将后续 PR rebase 到 main。
 
 ### PR 合并后
+
+- 合并且确认无误后**及时删除远程分支**
+- 本地 stale 分支定期清理：`git remote prune origin`
 
 ```bash
 git checkout main
@@ -258,7 +262,7 @@ git commit -m "test: add unit tests for new feature"
 
 # 3. 推送并创建 PR
 git push -u origin feature/my-feature
-gh pr create --repo owner/repo --base main \
+gh pr create --base main \
   --title "feat: add new feature" \
   --body "$(cat <<'EOF'
 ## Summary
@@ -273,7 +277,7 @@ EOF
 )"
 
 # 4. 等待审查和 CI
-# 5. 审查通过后由 reviewer 合并（≤2 个 commit 用 squash，≥3 个用 merge commit）
+# 5. 审查通过后由 reviewer 合并
 
 # 6. 清理
 git checkout main
