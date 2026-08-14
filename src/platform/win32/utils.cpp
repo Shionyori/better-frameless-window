@@ -69,7 +69,19 @@ void syncNativeWindowStyles(void *hwnd, bool includeExStyle)
     if (includeExStyle) {
         style &= ~static_cast<LONG_PTR>(WS_POPUP);
     }
-    style |= WS_OVERLAPPED | WS_THICKFRAME | WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU;
+    // Keep WS_CAPTION OFF on the native frame. With WS_CAPTION present, DWM
+    // treats the frameless window as owning native caption buttons and arms a
+    // 3-button strip (DWMWA_CAPTION_BUTTON_BOUNDS) the first time the window is
+    // maximized. After restore the shell uses those stale bounds to decide and
+    // position the Windows 11 Snap Layout flyout, so the flyout stops appearing
+    // until a real activation clears the bounds. Without WS_CAPTION, DWM never
+    // arms the strip, and the shell falls back to the app's own WM_NCHITTEST
+    // (HTMAXBUTTON), which stays correct. Explicitly clear it because Qt 6.9+
+    // FramelessWindowHint leaves WS_CAPTION set on the native style. WS_THICKFRAME
+    // / WS_MAXIMIZEBOX / WS_MINIMIZEBOX / WS_SYSMENU still give resizing,
+    // maximize and minimize.
+    style &= ~static_cast<LONG_PTR>(WS_CAPTION);
+    style |= WS_OVERLAPPED | WS_THICKFRAME | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU;
 
     SetLastError(0);
     if (SetWindowLongPtr(win, GWL_STYLE, style) == 0 && GetLastError() != 0) {
