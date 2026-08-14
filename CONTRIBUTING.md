@@ -20,7 +20,7 @@
 
 <详细说明（可选）>
 
-<关联 issue（可选）>
+<关联 issue（可选，仅 Refs #N；关闭 issue 的 Closes #N 放 PR 描述）>
 ```
 
 ### Type 类型
@@ -44,7 +44,7 @@
 - 首行不超过 72 字符
 - 使用祈使语气（`add` 而非 `added` 或 `adds`）
 - 首行末尾不加句号
-- 关联 issue 使用 GitHub 关键字：`Closes #14` / `Refs #6` / `Fixes #28`
+- 关联 issue 使用 GitHub 关键字：`Closes #14` / `Fixes #28` —— **写进 PR 描述，不写进 commit message**（原因见「PR 工作流 · Issue 关联」）。commit 里如需提及，用 `Refs #N`
 
 ### 正确示例
 
@@ -60,9 +60,16 @@ utils.cpp was only compiled on Windows, causing linker errors on Linux
 and macOS. The file already uses #ifdef Q_OS_WIN guards for
 platform-specific code paths.
 
-Fixes #28
+Refs #28
 EOF
 )"
+
+# 关闭 issue 的 `Closes #N` 写在 PR 描述里，不写进 commit：
+gh pr create --base main --title "fix: move utils.cpp to cross-platform sources" \
+  --body "## Summary
+...
+
+Closes #28"
 ```
 
 ### 错误示例
@@ -145,8 +152,9 @@ test: add all unit tests
 
 ### 创建 PR 前
 
-- [ ] 在本地确认构建通过（`cmake --build`）
-- [ ] 运行全部测试（`ctest`），确保 100% 通过
+- [ ] 在本地确认构建通过（`cmake --build`），Debug **和 Release** 各跑一次
+- [ ] 运行全部测试（`ctest`），确保 100% 通过；**用与 CI 相同的条件复现**：相同的 `QT_QPA_PLATFORM`（headless 用 `offscreen`，涉及原生窗口/样式的测试用真实平台）、尽量相同的 Qt 版本——版本差异会暴露只在 CI 出现的问题
+- [ ] 仅平台特有、本机无法复现的问题（如 macOS SDK），先核实环境（Qt 版本可用性、SDK 变更）再推送，不要盲推
 - [ ] 检查是否有未提交的 debug 代码、`cout`/`printf`
 - [ ] 确认 commit history 干净、拆分合理
 - [ ] 确认 `.gitignore` 未遗漏 `build/`、`install/` 等产物目录
@@ -167,6 +175,24 @@ test: add all unit tests
 
 Closes #<issue>
 ```
+
+### Issue 关联
+
+- `Closes #N` / `Fixes #N` 的唯一作用是让 GitHub 在 PR 合并时自动关闭对应 issue。
+- **只写在 PR 描述末尾**（见上模板）。合并时 GitHub 会生成一条标准的关闭记录。
+- **不要**写进 commit message：如果该 commit 之后被 force-push 重写（SHA 变化），GitHub 会在
+  issue 时间线**重复追加** "referenced this issue from a commit" 记录，污染 issue 历史。
+- commit 里如需提及，用 `Refs #N`（仅引用、不关闭），且只用在一次性 commit 中。
+
+### 提交历史纪律
+
+- **创建 PR 前**：把 commit 历史整理好（数量、消息、拆分），再推送。重写在这个阶段随意。
+- **创建 PR 后**：
+  - 应对审查意见优先**追加新 commit**，不要重写历史。
+  - **默认禁用 force-push，不到万不得已不使用**（如合并前 squash、修正严重错误）。确需使用时，
+    **只做一次**，做完立即停止。
+  - 反复 force-push 的代价：reviewer 无法追踪改动、丢失评论定位、重复触发 CI；若 commit 带
+    issue 关键字，还会在 issue 时间线产生重复引用记录，并永久污染主仓库记录。
 
 ### PR 审查规则
 
