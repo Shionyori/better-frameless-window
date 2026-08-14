@@ -1,6 +1,11 @@
 #include <QtTest>
 #include <win32/utils.h>
 
+#ifdef Q_OS_WIN
+#include <qt_windows.h>
+#include <QWidget>
+#endif
+
 class TestUtils : public QObject
 {
     Q_OBJECT
@@ -57,6 +62,29 @@ private slots:
         const bool enabled = Utils::isSystemDarkModeEnabled();
         Q_UNUSED(enabled);
     }
+
+#ifdef Q_OS_WIN
+    void syncNativeWindowStylesKeepsCaptionDisabled()
+    {
+        // Regression: the native frame must keep WS_CAPTION off. With WS_CAPTION
+        // set, DWM arms a native caption-button strip (DWMWA_CAPTION_BUTTON_BOUNDS)
+        // on maximize; after restore the shell uses those stale bounds for the
+        // Snap Layout flyout, so the flyout stops appearing until a real
+        // activation clears them. A plain QWidget starts with WS_CAPTION set, so
+        // this only passes if syncNativeWindowStyles explicitly clears it.
+        QWidget host;
+        const HWND hwnd = reinterpret_cast<HWND>(host.winId());
+        QVERIFY(hwnd != nullptr);
+
+        Utils::syncNativeWindowStyles(hwnd, true);
+
+        const LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
+        QVERIFY(style & WS_THICKFRAME);
+        QVERIFY(style & WS_MAXIMIZEBOX);
+        QVERIFY(style & WS_MINIMIZEBOX);
+        QVERIFY(!(style & WS_CAPTION));
+    }
+#endif
 };
 
 QTEST_MAIN(TestUtils)
