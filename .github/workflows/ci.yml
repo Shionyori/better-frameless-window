@@ -8,7 +8,10 @@ on:
 
 env:
   BUILD_TYPE: Release
-  QT_VERSION: '6.8.3'
+  # 6.9.2+ drops the AGL.framework link (QTBUG-137687), which Apple removed
+  # from the macOS 26 / Xcode 26 SDK used by the macos-latest runner. The last
+  # 6.8 patch (6.8.3) still links AGL, so it cannot build on that runner.
+  QT_VERSION: '6.9.3'
 
 jobs:
   build:
@@ -89,4 +92,7 @@ jobs:
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
       run: ctest --build-config ${{ matrix.build_type }} --output-on-failure
       env:
-        QT_QPA_PLATFORM: offscreen
+        # The utils regression test inspects the native GWL_STYLE, which needs
+        # the real windows platform. Windows runners have a desktop; headless
+        # platforms (offscreen) are used on Linux/macOS.
+        QT_QPA_PLATFORM: ${{ runner.os == 'Windows' && 'windows' || 'offscreen' }}
