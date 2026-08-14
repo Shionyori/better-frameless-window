@@ -1,52 +1,52 @@
-# 提交规范
+# Contributing Guide
 
-## 目录
+## Table of Contents
 
-- [Commit Message 格式](#commit-message-格式)
-- [拆分原则](#拆分原则)
-- [分支命名](#分支命名)
-- [PR 工作流](#pr-工作流)
-- [代码审查清单](#代码审查清单)
-- [示例](#示例)
+- [Commit Message Format](#commit-message-format)
+- [Splitting Commits](#splitting-commits)
+- [Branch Naming](#branch-naming)
+- [PR Workflow](#pr-workflow)
+- [Code Review Checklist](#code-review-checklist)
+- [Examples](#examples)
 
 ---
 
-## Commit Message 格式
+## Commit Message Format
 
-本项目采用 [Conventional Commits](https://www.conventionalcommits.org/) 规范。每条提交信息必须遵循以下格式：
+This project follows [Conventional Commits](https://www.conventionalcommits.org/). Every commit message must follow this format:
 
 ```
-<type>: <简短描述>
+<type>: <short description>
 
-<详细说明（可选）>
+<optional detail>
 
-<关联 issue（可选，仅 Refs #N；关闭 issue 的 Closes #N 放 PR 描述）>
+<optional issue reference — Refs #N only; put the closing Closes #N in the PR description>
 ```
 
-### Type 类型
+### Types
 
-| Type | 用途 | 示例 |
-|------|------|------|
-| `feat` | 新功能、新特性 | `feat: add public version header` |
-| `fix` | 缺陷修复 | `fix: move utils.cpp to cross-platform sources` |
-| `test` | 添加或修改测试 | `test: add ThemeManager unit tests` |
-| `chore` | 构建、工具、基础设施 | `chore: add test infrastructure with Qt Test` |
-| `docs` | 文档变更 | `docs: update README with build instructions` |
-| `refactor` | 重构（不改变功能） | `refactor: extract hit-test logic` |
-| `ci` | CI/CD 配置变更 | `ci: add macOS to build matrix` |
-| `revert` | 回退提交 | `revert: undo PR #20` |
-| `style` | 格式化、代码风格 | `style: apply clang-format` |
-| `perf` | 性能优化 | `perf: cache window capabilities detection` |
+| Type | Use | Example |
+|------|-----|---------|
+| `feat` | New feature | `feat: add public version header` |
+| `fix` | Bug fix | `fix: move utils.cpp to cross-platform sources` |
+| `test` | Add or modify tests | `test: add ThemeManager unit tests` |
+| `chore` | Build, tooling, infrastructure | `chore: add test infrastructure with Qt Test` |
+| `docs` | Documentation | `docs: update README with build instructions` |
+| `refactor` | Refactor (no behavior change) | `refactor: extract hit-test logic` |
+| `ci` | CI/CD config | `ci: add macOS to build matrix` |
+| `revert` | Revert a commit | `revert: undo PR #20` |
+| `style` | Formatting, code style | `style: apply clang-format` |
+| `perf` | Performance improvement | `perf: cache window capabilities detection` |
 
-### 描述规则
+### Description rules
 
-- 使用英文、小写开头
-- 首行不超过 72 字符
-- 使用祈使语气（`add` 而非 `added` 或 `adds`）
-- 首行末尾不加句号
-- 关联 issue 使用 GitHub 关键字：`Closes #14` / `Fixes #28` —— **写进 PR 描述，不写进 commit message**（原因见「PR 工作流 · Issue 关联」）。commit 里如需提及，用 `Refs #N`
+- Use English, lowercase start
+- First line ≤ 72 characters
+- Imperative mood (`add`, not `added` or `adds`)
+- No trailing period on the first line
+- Issue keywords `Closes #14` / `Fixes #28` go in the **PR description, not the commit message** (see [PR Workflow · Issue References](#issue-references)). Use `Refs #N` in a commit if you need to mention an issue.
 
-### 正确示例
+### Good examples
 
 ```bash
 git commit -m "feat: add public version header from CMake project version"
@@ -64,7 +64,7 @@ Refs #28
 EOF
 )"
 
-# 关闭 issue 的 `Closes #N` 写在 PR 描述里，不写进 commit：
+# Put the closing `Closes #N` in the PR description, not the commit:
 gh pr create --base main --title "fix: move utils.cpp to cross-platform sources" \
   --body "## Summary
 ...
@@ -72,47 +72,47 @@ gh pr create --base main --title "fix: move utils.cpp to cross-platform sources"
 Closes #28"
 ```
 
-### 错误示例
+### Bad examples
 
 ```bash
-# 不要省略 type
+# Missing type
 git commit -m "add version header"
 
-# 不要使用过去式
+# Past tense
 git commit -m "feat: added version header"
 
-# 不要把所有改动塞进一个 commit
+# Cramming everything into one commit
 git commit -m "feat: add version header, install rules, unit tests"
 
-# 不要使用模糊的描述
+# Vague description
 git commit -m "fix: fix stuff"
 git commit -m "feat: update code"
 ```
 
 ---
 
-## 拆分原则
+## Splitting Commits
 
-**一次提交只做一件事。** 每个 commit 应：
+**One commit should do one thing.** Each commit should be:
 
-1. **原子性** — 可独立 revert，不破坏构建
-2. **自包含** — commit message 完整解释为什么做这个改动
-3. **可审查** — reviewer 可以逐个理解每步改动
+1. **Atomic** — independently revertable without breaking the build
+2. **Self-contained** — the message fully explains why the change was made
+3. **Reviewable** — a reviewer can understand each step
 
-### 何时拆分
+### When to split
 
-| 场景 | 拆分方式 |
-|------|----------|
-| 多个独立模块的测试 | 每个模块一个 `test:` commit |
-| 新增功能 + 测试 | `feat:` → `test:` 两个 commit |
-| 重构 + 新功能 | `refactor:` → `feat:` 两个 commit |
-| CI 修复 + 测试修复 | 各自独立的 `fix:` commit |
-| 基础设施 + 使用它 | `chore:` → `feat:` / `test:` 分层 |
+| Scenario | Split as |
+|----------|----------|
+| Tests for multiple independent modules | one `test:` commit per module |
+| New feature + tests | `feat:` then `test:` (two commits) |
+| Refactor + new feature | `refactor:` then `feat:` (two commits) |
+| CI fix + test fix | separate `fix:` commits |
+| Infrastructure + its usage | `chore:` then `feat:` / `test:` |
 
-### 示例
+### Example
 
 ```bash
-# ✓ 正确 — 6 个独立 commit
+# ✓ Correct — 6 independent commits
 chore: add test infrastructure with Qt Test and CTest
 test: add version header verification test
 test: add ThemeManager unit tests
@@ -120,173 +120,170 @@ test: add WindowVisualState unit tests
 test: add Utils unit tests
 test: add WindowHitTest unit tests
 
-# ✗ 错误 — 全部塞一起
+# ✗ Wrong — everything in one commit
 test: add all unit tests
 ```
 
 ---
 
-## 分支命名
+## Branch Naming
 
-| 前缀 | 用途 | 示例 |
-|------|------|------|
-| `feature/` | 新功能 | `feature/public-version-header` |
-| `fix/` | 缺陷修复 | `fix/cross-platform-utils` |
-| `chore/` | 构建/工具 | `chore/update-cmake-minimum` |
-| `docs/` | 文档 | `docs/api-reference` |
-| `refactor/` | 重构 | `refactor/theme-manager` |
-| `revert/` | 回退 | `revert/undo-pr-20` |
-| `release/` | 发布准备 | `release/v0.2.0` |
-| `test/` | 测试 | `test/theme-manager-coverage` |
+| Prefix | Use | Example |
+|--------|-----|---------|
+| `feature/` | New feature | `feature/public-version-header` |
+| `fix/` | Bug fix | `fix/cross-platform-utils` |
+| `chore/` | Build / tooling | `chore/update-cmake-minimum` |
+| `docs/` | Documentation | `docs/api-reference` |
+| `refactor/` | Refactor | `refactor/theme-manager` |
+| `revert/` | Revert | `revert/undo-pr-20` |
+| `release/` | Release prep | `release/v0.2.0` |
+| `test/` | Tests | `test/theme-manager-coverage` |
 | `ci/` | CI/CD | `ci/add-macos-build` |
-| `perf/` | 性能优化 | `perf/cache-capability-detection` |
+| `perf/` | Performance | `perf/cache-capability-detection` |
 
-### 规则
+### Rules
 
-- 使用 kebab-case（小写 + 连字符）
-- 避免数字后缀（`fix/foo-2`），起一个更具体的描述性名称即可
+- Use kebab-case (lowercase + hyphens)
+- Avoid numeric suffixes (`fix/foo-2`); pick a more specific descriptive name
 
 ---
 
-## PR 工作流
+## PR Workflow
 
-### 创建 PR 前
+### Before opening a PR
 
-- [ ] 在本地确认构建通过（`cmake --build`），Debug **和 Release** 各跑一次
-- [ ] 运行全部测试（`ctest`），确保 100% 通过；**用与 CI 相同的条件复现**：相同的 `QT_QPA_PLATFORM`（headless 用 `offscreen`，涉及原生窗口/样式的测试用真实平台）、尽量相同的 Qt 版本——版本差异会暴露只在 CI 出现的问题
-- [ ] 仅平台特有、本机无法复现的问题（如 macOS SDK），先核实环境（Qt 版本可用性、SDK 变更）再推送，不要盲推
-- [ ] 检查是否有未提交的 debug 代码、`cout`/`printf`
-- [ ] 确认 commit history 干净、拆分合理
-- [ ] 确认 `.gitignore` 未遗漏 `build/`、`install/` 等产物目录
+- [ ] Build passes locally (`cmake --build`) in **both Debug and Release**
+- [ ] All tests pass (`ctest`), 100%; **reproduce CI conditions locally**: the same `QT_QPA_PLATFORM` (use `offscreen` headless; use the real platform for tests that touch native windows/styles) and preferably the same Qt version — version differences surface issues that only CI sees
+- [ ] For platform-only issues that can't be reproduced locally (e.g. macOS SDK), verify the environment first (Qt version availability, SDK changes) before pushing — don't push blind
+- [ ] No leftover debug code, `cout` / `printf`
+- [ ] Commit history is clean and well-split
+- [ ] `.gitignore` doesn't miss artifact dirs like `build/`, `install/`
 
-### PR 标题与描述
+### PR title and description
 
-- 标题遵循与 commit 相同的 `<type>: <描述>` 格式
-- 描述使用模板：
+- Title follows the same `<type>: <description>` format as commits
+- Description uses the template:
 
 ```markdown
 ## Summary
-<1-3 条要点，说明做了什么、为什么>
+<1-3 bullets: what was done and why>
 
 ## Test plan
-- [ ] 构建通过
-- [ ] 测试通过
-- [ ] 手动验证步骤
+- [ ] Build passes
+- [ ] Tests pass
+- [ ] Manual verification steps
 
 Closes #<issue>
 ```
 
-### Issue 关联
+### Issue References
 
-- `Closes #N` / `Fixes #N` 的唯一作用是让 GitHub 在 PR 合并时自动关闭对应 issue。
-- **只写在 PR 描述末尾**（见上模板）。合并时 GitHub 会生成一条标准的关闭记录。
-- **不要**写进 commit message：如果该 commit 之后被 force-push 重写（SHA 变化），GitHub 会在
-  issue 时间线**重复追加** "referenced this issue from a commit" 记录，污染 issue 历史。
-- commit 里如需提及，用 `Refs #N`（仅引用、不关闭），且只用在一次性 commit 中。
+- The only purpose of `Closes #N` / `Fixes #N` is to let GitHub auto-close the issue when the PR merges.
+- **Write it only at the end of the PR description** (see template above). GitHub creates one standard close record on merge.
+- **Do NOT put it in a commit message**: if that commit is later rewritten by a force-push (the SHA changes), GitHub appends duplicate "referenced this issue from a commit" records to the issue timeline, polluting its history.
+- If a commit needs to mention an issue, use `Refs #N` (reference only, does not close), and only in one-time commits.
 
-### 提交历史纪律
+### Commit history discipline
 
-- **创建 PR 前**：把 commit 历史整理好（数量、消息、拆分），再推送。重写在这个阶段随意。
-- **创建 PR 后**：
-  - 应对审查意见优先**追加新 commit**，不要重写历史。
-  - **默认禁用 force-push，不到万不得已不使用**（如合并前 squash、修正严重错误）。确需使用时，
-    **只做一次**，做完立即停止。
-  - 反复 force-push 的代价：reviewer 无法追踪改动、丢失评论定位、重复触发 CI；若 commit 带
-    issue 关键字，还会在 issue 时间线产生重复引用记录，并永久污染主仓库记录。
+- **Before opening the PR**: settle the commit history (count, messages, splitting), then push. Rewriting is fine at this stage.
+- **After the PR is open**:
+  - Prefer **adding new commits** in response to review feedback; don't rewrite history.
+  - **Force-push is disabled by default; don't use it unless absolutely necessary** (e.g. pre-merge squash, fixing a serious mistake). If you must, do it **once**, then stop.
+  - Repeated force-pushes cost: reviewers can't track changes, review comments lose their anchor, CI re-runs repeatedly, and — if a commit carries an issue keyword — each rewrite appends a duplicate reference to the issue timeline and permanently pollutes the main repository's history.
 
-### PR 审查规则
+### PR review rules
 
-- **不要自行合并自己的 PR**（除非紧急修复且有明确授权）
-- 等 CI 全绿再合并
-- 合并方式根据 PR 内 commit 数量决定：
+- **Don't merge your own PR** (unless an urgent fix with explicit authorization)
+- Wait for CI to be green before merging
+- Merge method depends on the number of commits in the PR:
 
-| PR 内 commit 数 | 合并方式 | 理由 |
-|-----------------|----------|------|
-| 1 ~ 2 个 | **Squash merge** | 改动简单，压缩为一条 commit 保持 main 干净 |
-| 3 个及以上 | **Merge commit** | 保留细粒度 commit 历史，便于追溯和 revert |
+| Commits in PR | Merge method | Rationale |
+|---------------|--------------|-----------|
+| 1–2 | **Squash merge** | Simple change; one clean commit keeps main tidy |
+| 3+ | **Merge commit** | Preserve granular history for tracing and reverting |
 
-### PR 依赖链
+### PR dependency chain
 
-当多个 PR 有依赖关系时，按顺序创建 base 指向：
+When multiple PRs depend on each other, create them in order with chained bases:
 
 ```
-feature/a  → main          # PR #1: 基础功能
-feature/b  → feature/a     # PR #2: 依赖 PR #1
-feature/c  → feature/b     # PR #3: 依赖 PR #2
+feature/a  → main      # PR #1: base feature
+feature/b  → feature/a # PR #2: depends on PR #1
+feature/c  → feature/b # PR #3: depends on PR #2
 ```
 
-合并顺序即为 PR 编号顺序，每个合并后将后续 PR rebase 到 main。
+Merge in PR number order; rebase subsequent PRs onto main after each merge.
 
-### PR 合并后
+### After the PR merges
 
-- 合并且确认无误后**及时删除远程分支**
-- 本地 stale 分支定期清理：`git remote prune origin`
+- **Delete the remote branch promptly** after merging and confirming
+- Clean up stale local branches periodically: `git remote prune origin`
 
 ```bash
 git checkout main
 git pull origin main
-git branch -D feature/xxx          # 删除本地分支
-git push origin --delete feature/xxx  # 删除远程分支（GitHub 通常自动完成）
+git branch -D feature/xxx          # delete local branch
+git push origin --delete feature/xxx  # delete remote branch (GitHub usually does this automatically)
 ```
 
 ---
 
-## 代码审查清单
+## Code Review Checklist
 
-### 功能性
+### Functionality
 
-- [ ] 改动实现了 issue/需求描述的完整功能
-- [ ] 没有引入未在需求中提及的 "顺便修改"
-- [ ] 跨平台兼容（Windows / Linux / macOS）
-- [ ] 边界条件处理正确（nullptr、空输入、极值）
+- [ ] Change implements the full feature / requirement described in the issue
+- [ ] No unrequested "drive-by" changes
+- [ ] Cross-platform compatible (Windows / Linux / macOS)
+- [ ] Edge cases handled (nullptr, empty input, extreme values)
 
-### 代码质量
+### Code quality
 
-- [ ] 无注释代码（commented-out code）
-- [ ] 无调试输出（`qDebug()`、`std::cout`、`printf`）
-- [ ] 命名清晰、符合项目风格
-- [ ] 没有不必要的抽象或过度设计
+- [ ] No commented-out code
+- [ ] No debug output (`qDebug()`, `std::cout`, `printf`)
+- [ ] Clear naming, matches project style
+- [ ] No unnecessary abstraction or over-engineering
 
-### 测试
+### Tests
 
-- [ ] 新功能有对应的测试
-- [ ] 修复的 bug 有回归测试
-- [ ] 测试可在无 GUI 环境运行（CI headless）
-- [ ] 平台特定代码使用 `#ifdef Q_OS_WIN` 等守卫
+- [ ] New features have tests
+- [ ] Fixed bugs have regression tests
+- [ ] Tests run without a GUI (CI headless)
+- [ ] Platform-specific code guarded with `#ifdef Q_OS_WIN` etc.
 
 ### CI
 
-- [ ] 所有平台 CI 通过
-- [ ] `ctest` 100% 通过
-- [ ] 无新增编译警告
+- [ ] CI passes on all platforms
+- [ ] `ctest` 100% pass
+- [ ] No new compiler warnings
 
 ---
 
-## 示例
+## Examples
 
-### 完整的 feature PR 流程
+### Full feature PR flow
 
 ```bash
-# 1. 从最新 main 创建分支
+# 1. Branch from latest main
 git checkout main
 git pull origin main
 git checkout -b feature/my-feature
 
-# 2. 逐步开发、逐步提交
-# Commit 1: 核心实现
+# 2. Develop and commit incrementally
+# Commit 1: core implementation
 git add src/newfile.cpp src/newfile.h CMakeLists.txt
 git commit -m "$(cat <<'EOF'
 feat: add new feature
 
-<详细描述>
+<detailed description>
 EOF
 )"
 
-# Commit 2: 测试
+# Commit 2: tests
 git add tests/test_newfile.cpp CMakeLists.txt
 git commit -m "test: add unit tests for new feature"
 
-# 3. 推送并创建 PR
+# 3. Push and open a PR
 git push -u origin feature/my-feature
 gh pr create --base main \
   --title "feat: add new feature" \
@@ -302,10 +299,10 @@ Closes #N
 EOF
 )"
 
-# 4. 等待审查和 CI
-# 5. 审查通过后由 reviewer 合并
+# 4. Wait for review and CI
+# 5. Reviewer merges once approved
 
-# 6. 清理
+# 6. Cleanup
 git checkout main
 git pull origin main
 git branch -D feature/my-feature
