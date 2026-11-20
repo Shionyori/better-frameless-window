@@ -8,28 +8,112 @@
 #include <qt_windows.h>
 #endif
 
+namespace {
+
+#ifdef Q_OS_WIN
+// Frame metrics only change with the DPI factor. Caching them keeps the
+// per-mouse-move cursor update (and every WM_NCHITTEST) free of system calls.
+int nativeResizeBorder(UINT dpi)
+{
+    static UINT cachedDpi = 0;
+    static int cachedBorder = 0;
+
+    if (cachedDpi == dpi) {
+        return cachedBorder;
+    }
+
+    const int frame = GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi);
+    const int padded = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+    cachedDpi = dpi;
+    cachedBorder = frame + padded;
+    return cachedBorder;
+}
+#endif
+
+} // namespace
+
 namespace WindowHitTest {
 
 int resizeBorderThickness(void *hwnd)
 {
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
-    const UINT dpi = win ? GetDpiForWindow(win) : 96;
-    const int frame = GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi);
-    const int padded = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
-    const int nativeBorder = frame + padded;
-    return qBound(4, nativeBorder, 6);
+    const UINT dpi = win != nullptr ? GetDpiForWindow(win) : 96;
+    if (dpi == 0) {
+        return 4;
+    }
+
+    // Windows scales the frame metrics with the DPI, so converting back to
+    // logical pixels keeps the grab area the same physical size on every
+    // monitor instead of shrinking to 4px on a 150% display.
+    const int native = nativeResizeBorder(dpi);
+    const int logical = (native * 96 + static_cast<int>(dpi) / 2) / static_cast<int>(dpi);
+    return qBound(4, logical, 12);
 #else
     Q_UNUSED(hwnd)
     return 4;
 #endif
 }
 
+Qt::Edges edgesAtLocalPos(const QPoint &localPos,
+                          const QSize &logicalSize,
+                          int borderThickness,
+                          bool maximized,
+                          bool fullScreen)
+{
+    if (maximized || fullScreen || borderThickness <= 0) {
+        return Qt::Edges();
+    }
+
+    const int w = logicalSize.width();
+    const int h = logicalSize.height();
+    if (w <= 0 || h <= 0) {
+        return Qt::Edges();
+    }
+
+    const int x = localPos.x();
+    const int y = localPos.y();
+    if (x < 0 || y < 0 || x >= w || y >= h) {
+        return Qt::Edges();
+    }
+
+    const int corner = borderThickness + 2;
+
+    if (x < corner && y < corner) {
+        return Qt::TopEdge | Qt::LeftEdge;
+    }
+    if (x >= w - corner && y < corner) {
+        return Qt::TopEdge | Qt::RightEdge;
+    }
+    if (x < corner && y >= h - corner) {
+        return Qt::BottomEdge | Qt::LeftEdge;
+    }
+    if (x >= w - corner && y >= h - corner) {
+        return Qt::BottomEdge | Qt::RightEdge;
+    }
+
+    Qt::Edges edges;
+    if (x < borderThickness) {
+        edges |= Qt::LeftEdge;
+    }
+    if (x >= w - borderThickness) {
+        edges |= Qt::RightEdge;
+    }
+    if (y < borderThickness) {
+        edges |= Qt::TopEdge;
+    }
+    if (y >= h - borderThickness) {
+        edges |= Qt::BottomEdge;
+    }
+
+    return edges;
+}
+
 int nonClientHitTest(const Context &context, const QPoint &globalPos)
 {
 #ifdef Q_OS_WIN
     const HWND hwnd = static_cast<HWND>(context.hwnd);
-    if (hwnd == nullptr) {
+    if (hwnd == nullptr || context.fullScreen) {
         return HTCLIENT;
     }
 
@@ -37,12 +121,6 @@ int nonClientHitTest(const Context &context, const QPoint &globalPos)
     if (!GetWindowRect(hwnd, &windowRect)) {
         return HTCLIENT;
     }
-
-    const UINT dpi = GetDpiForWindow(hwnd);
-    const int frame = GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi);
-    const int padded = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
-    const int border = qBound(4, frame + padded, 12);
-    const int corner = border + 2;
 
     const int left = windowRect.left;
     const int top = windowRect.top;
@@ -85,32 +163,11 @@ int nonClientHitTest(const Context &context, const QPoint &globalPos)
         return onTitleBarCaptionArea ? HTCAPTION : HTCLIENT;
     }
 
-    Qt::Edges edges;
-
-    const bool onLeftCorner = (x >= left - corner && x < left + corner);
-    const bool onRightCorner = (x <= right + corner && x > right - corner);
-    const bool onTopCorner = (y >= top - corner && y < top + corner);
-    const bool onBottomCorner = (y <= bottom + corner && y > bottom - corner);
-
-    if (onLeftCorner && onTopCorner)
-        edges = Qt::TopEdge | Qt::LeftEdge;
-    else if (onRightCorner && onTopCorner)
-        edges = Qt::TopEdge | Qt::RightEdge;
-    else if (onLeftCorner && onBottomCorner)
-        edges = Qt::BottomEdge | Qt::LeftEdge;
-    else if (onRightCorner && onBottomCorner)
-        edges = Qt::BottomEdge | Qt::RightEdge;
-    else {
-        if (x >= left - border && x < left + border)
-            edges |= Qt::LeftEdge;
-        if (x <= right + border && x > right - border)
-            edges |= Qt::RightEdge;
-        if (y >= top - border && y < top + border)
-            edges |= Qt::TopEdge;
-        if (y <= bottom + border && y > bottom - border)
-            edges |= Qt::BottomEdge;
-    }
-
+    const Qt::Edges edges = edgesAtLocalPos(localPos,
+                                            QSize(logicalWidth, logicalHeight),
+                                            resizeBorderThickness(context.hwnd),
+                                            false,
+                                            false);
     if (edges != Qt::Edges()) {
         return Utils::hitFromEdges(edges);
     }

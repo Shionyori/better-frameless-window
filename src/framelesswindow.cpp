@@ -14,10 +14,10 @@
 #include "titlebar.h"
 
 #include <QEvent>
+#include <QGraphicsOpacityEffect>
 #include <QLayout>
 #include <QMouseEvent>
 #include <QShortcut>
-#include <QGraphicsOpacityEffect>
 #include <QPropertyAnimation>
 #include <QObject>
 #include <QPainter>
@@ -923,6 +923,7 @@ int FramelessWindow::hitTest(const QPoint &globalPos) const
     context.logicalWidth = width();
     context.logicalHeight = height();
     context.maximized = isMaximized();
+    context.fullScreen = isFullScreen();
     context.snapLayoutEnabled = m_snapLayoutEnabled;
     context.titleRegionResolver = [this](const QPoint &localPos) {
         if (m_titleBar == nullptr || !m_titleBar->geometry().contains(localPos)) {
@@ -964,48 +965,21 @@ int FramelessWindow::resizeBorderThickness() const
 
 Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
 {
-    if (isMaximized()) {
+    if (isMaximized() || isFullScreen()) {
         return Qt::Edges();
     }
 
-    const int border = resizeBorderThickness();
-    const int corner = border + 2;
-    const int x = localPos.x();
-    const int y = localPos.y();
-    const int w = width();
-    const int h = height();
-
-    if (x < 0 || y < 0 || x >= w || y >= h) {
-        return Qt::Edges();
-    }
-
+    // Buttons must not be swallowed by the resize border.
     QWidget *hovered = childAt(localPos);
-    const bool onButton = qobject_cast<QPushButton *>(hovered) != nullptr;
-    if (onButton) {
+    if (qobject_cast<QPushButton *>(hovered) != nullptr) {
         return Qt::Edges();
     }
 
-    Qt::Edges edges;
-
-    if (x < corner && y < corner)
-        return Qt::TopEdge | Qt::LeftEdge;
-    if (x >= w - corner && y < corner)
-        return Qt::TopEdge | Qt::RightEdge;
-    if (x < corner && y >= h - corner)
-        return Qt::BottomEdge | Qt::LeftEdge;
-    if (x >= w - corner && y >= h - corner)
-        return Qt::BottomEdge | Qt::RightEdge;
-
-    if (x < border)
-        edges |= Qt::LeftEdge;
-    if (x >= w - border)
-        edges |= Qt::RightEdge;
-    if (y < border)
-        edges |= Qt::TopEdge;
-    if (y >= h - border)
-        edges |= Qt::BottomEdge;
-
-    return edges;
+    return WindowHitTest::edgesAtLocalPos(localPos,
+                                          size(),
+                                          resizeBorderThickness(),
+                                          false,
+                                          false);
 }
 
 void FramelessWindow::toggleMaximizeRestore()
