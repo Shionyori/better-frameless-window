@@ -86,7 +86,6 @@ public:
     void restoreWindowGeometry();
 
     void setDiagnosticsEnabled(bool enabled);
-    void setResizing(bool resizing);
     bool isShadowEnabled() const;
     bool isSystemBackdropEnabled() const;
     WindowEffect::SystemBackdropPreference systemBackdropPreference() const;
@@ -106,6 +105,8 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     void leaveEvent(QEvent *event) override;
 
+    // Called by NativeMessageRouter on WM_ENTERSIZEMOVE / WM_EXITSIZEMOVE.
+    void setResizing(bool resizing);
     void initWindow();
     void initLayout();
     void initMouseTracking();

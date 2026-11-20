@@ -176,12 +176,22 @@ Windows 11 22H2+ → Mica → MicaLegacy → Acrylic → None
 | `setDiagnosticsEnabled(bool)` | Enable debug logging for DWM / visual effect calls |
 | `isDiagnosticsEnabled()` | Check diagnostics logging state |
 
+## Scope
+
+Native window integration is Windows-only. The library builds and its tests pass
+on Linux and macOS, but on those platforms the window is a plain frameless
+widget: no native shadow, blur, backdrop, rounded corners, dark-mode titlebar or
+Snap Layout. Porting those is tracked in #7 (Linux) and #8 (macOS).
+
 ## Known Issues
 
 | Issue | Details |
 |---|---|
 | Snap Layout may not appear | Depends on `HTMAXBUTTON` hit-test forwarding; toggle with `setSnapLayoutEnabled(true)` |
-| Resize jitter | Slight visual jitter during active window resize |
-| Backdrop flash after restore | Mica/Acrylic may briefly flash after maximize→restore transition |
-| Dark mode titlebar | Dark mode may show incorrect background when not maximized |
-| Background + backdrop conflict | Background image and Mica/Acrylic are not designed to be used together; clear the image to enable backdrop effects |
+| Resize jitter | Slight jitter while dragging a window edge; the native resize loop and DWM own that frame, and further suppression did not remove it without breaking resize continuity |
+| Background + backdrop conflict | Background image and Mica/Acrylic are not designed to be used together; clear the image to enable backdrop effects (#10) |
+| Accent color is not animated | Theme changes animate over 300ms, `setAccentColor()` applies immediately (#12) |
+| Window state is per library, not per app | Window geometry and theme are stored under the library's own settings key, so applications using the library share one record |
+
+See [docs/release-checklist.md](docs/release-checklist.md) for the manual
+regression pass to run before tagging a release.
