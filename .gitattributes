@@ -1,0 +1,12 @@
+# Store text files with LF in the repository and check them out with LF on
+# every platform. Without this, Windows editors and tools rewrite the whole
+# tree with CRLF, and `git diff` reports a whitespace-only diff for every file
+# (6300+ lines), which makes review and `git status` useless.
+* text=auto eol=lf
+
+# Binary assets must never be converted or diffed as text.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.ico  binary
+*.bmp  binary
