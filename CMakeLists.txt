@@ -205,6 +205,19 @@ function(add_bfw_test name)
     add_executable(test-${name} tests/test_${name}.cpp)
     target_link_libraries(test-${name} PRIVATE ${TARGET_NAME} Qt6::Test)
     add_test(NAME ${name} COMMAND test-${name})
+
+    # windeployqt only runs for the example target, so Qt6Test.dll never lands
+    # next to the test binaries. Without it ctest dies with STATUS_DLL_NOT_FOUND
+    # (0xc0000135) unless Qt's bin directory happens to be on PATH. Qt6Test only
+    # depends on Qt6Core, which the example deployment already provides.
+    if(WIN32)
+        add_custom_command(TARGET test-${name} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:Qt6::Test>
+                $<TARGET_FILE_DIR:test-${name}>
+            COMMENT "Copying Qt6Test runtime next to test-${name}"
+        )
+    endif()
 endfunction()
 
 add_bfw_test(version)
