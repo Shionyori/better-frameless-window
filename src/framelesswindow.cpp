@@ -964,6 +964,7 @@ int FramelessWindow::resizeBorderThickness() const
 
 Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
 {
+#ifdef Q_OS_WIN
     if (isMaximized() || isFullScreen()) {
         return Qt::Edges();
     }
@@ -979,6 +980,10 @@ Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
                                           resizeBorderThickness(),
                                           false,
                                           false);
+#else
+    Q_UNUSED(localPos)
+    return Qt::Edges();
+#endif
 }
 
 void FramelessWindow::toggleMaximizeRestore()
