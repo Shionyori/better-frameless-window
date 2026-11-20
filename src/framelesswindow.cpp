@@ -847,6 +847,7 @@ void FramelessWindow::saveWindowGeometry()
     // event-based copy ends up holding the maximized geometry.
     QRect rect = geometry();
     if (maximized) {
+#ifdef Q_OS_WIN
         const QRect nativeRestore = WindowFrame::restoreGeometry(reinterpret_cast<void *>(winId()));
         if (!nativeRestore.isValid()) {
             return;
@@ -859,6 +860,11 @@ void FramelessWindow::saveWindowGeometry()
                            qRound(nativeRestore.width() / dpr),
                            qRound(nativeRestore.height() / dpr))
                    : nativeRestore;
+#else
+        // No window-manager source for the restore rectangle on this platform:
+        // keep whatever was persisted rather than writing the maximized size.
+        return;
+#endif
     }
     settings.setValue(QStringLiteral("geometry/x"), rect.x());
     settings.setValue(QStringLiteral("geometry/y"), rect.y());
