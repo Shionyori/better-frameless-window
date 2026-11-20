@@ -138,6 +138,8 @@ int main(int argc, char *argv[])
 | `isSystemDarkModeEnabled()` | Check dark mode state |
 | `setSnapLayoutEnabled(bool)` | Enable / disable Snap Layout overlay |
 | `isSnapLayoutEnabled()` | Check Snap Layout state |
+| `setBorderColor(color)` | Set the native window border color (`DWMWA_BORDER_COLOR`, Windows 11) |
+| `borderColor()` | Get the current border color |
 
 ### Theme
 
