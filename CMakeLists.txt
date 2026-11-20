@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 set(TARGET_NAME better-frameless-window)
-project(${TARGET_NAME} VERSION 0.1.0 LANGUAGES CXX)
+project(${TARGET_NAME} VERSION 0.2.0 LANGUAGES CXX)
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
