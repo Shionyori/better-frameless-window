@@ -14,7 +14,6 @@
 #include "titlebar.h"
 
 #include <QEvent>
-#include <QGraphicsOpacityEffect>
 #include <QLayout>
 #include <QMouseEvent>
 #include <QShortcut>
@@ -985,68 +984,21 @@ Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
 void FramelessWindow::toggleMaximizeRestore()
 {
 #ifdef Q_OS_WIN
-    if (m_contentPanel == nullptr) {
+    // Let DWM run its own maximize/restore animation: the window state changes
+    // immediately and the content is never hidden. The previous version faded
+    // the content out for 60ms, toggled, then faded back in 200ms later, which
+    // read as a flash and made the button behave differently from double-click
+    // or Win+Up (both go through the native path). It also relied on a
+    // QGraphicsOpacityEffect on the content panel, which forces the whole
+    // content widget through an off-screen render pass.
+    if (!WindowCommand::toggleMaximizeRestore(reinterpret_cast<void *>(winId()), isMaximized())) {
+        Diagnostics::logWarning(QStringLiteral("toggleMaximizeRestore: null HWND, fallback"));
         if (isMaximized()) {
             showNormal();
         } else {
             showMaximized();
         }
-        return;
     }
-
-    // Ensure content has an opacity effect
-    auto *contentEffect = qobject_cast<QGraphicsOpacityEffect *>(m_contentPanel->graphicsEffect());
-    if (contentEffect == nullptr) {
-        contentEffect = new QGraphicsOpacityEffect(m_contentPanel);
-        contentEffect->setOpacity(1.0);
-        m_contentPanel->setGraphicsEffect(contentEffect);
-    }
-
-    // Fade content out, toggle during invisibility, fade back in.
-    // No setUpdatesEnabled freeze needed — the opacity effect hides
-    // the layout change while the DWM animation runs.
-    auto *fadeOut = new QPropertyAnimation(contentEffect, "opacity", this);
-    fadeOut->setDuration(60);
-    fadeOut->setStartValue(contentEffect->opacity());
-    fadeOut->setEndValue(0.0);
-    fadeOut->start(QAbstractAnimation::DeleteWhenStopped);
-
-    QTimer::singleShot(60, this, [this]() {
-        if (!WindowCommand::toggleMaximizeRestore(reinterpret_cast<void *>(winId()), isMaximized())) {
-            auto *fx = qobject_cast<QGraphicsOpacityEffect *>(m_contentPanel->graphicsEffect());
-            if (fx != nullptr) {
-                fx->setOpacity(1.0);
-            }
-            Diagnostics::logWarning(QStringLiteral("toggleMaximizeRestore: null HWND, fallback"));
-            if (isMaximized()) {
-                showNormal();
-            } else {
-                showMaximized();
-            }
-            return;
-        }
-
-        scheduleStateVisualRefresh();
-
-        // Fade content back in after the DWM animation settles
-        QTimer::singleShot(200, this, [this]() {
-            if (!isVisible()) {
-                return;
-            }
-
-            scheduleStateVisualRefresh();
-
-            auto *fx = qobject_cast<QGraphicsOpacityEffect *>(m_contentPanel->graphicsEffect());
-            if (fx != nullptr) {
-                auto *fadeIn = new QPropertyAnimation(fx, "opacity", this);
-                fadeIn->setDuration(100);
-                fadeIn->setEasingCurve(QEasingCurve::OutCubic);
-                fadeIn->setStartValue(0.0);
-                fadeIn->setEndValue(1.0);
-                fadeIn->start(QAbstractAnimation::DeleteWhenStopped);
-            }
-        });
-    });
 #else
     if (isMaximized()) {
         showNormal();
