@@ -43,7 +43,8 @@ public:
                               bool useDarkMode,
                               bool maximized,
                               bool minimized,
-                              SystemBackdropPreference systemBackdropPreference) const;
+                              SystemBackdropPreference systemBackdropPreference,
+                              bool forceRebind = false) const;
     void applyBorderColor(void *hwnd, const QColor &borderColor) const;
 
 private:
@@ -53,9 +54,12 @@ private:
 
     // Per-instance tracking to avoid redundant DWM calls during normal
     // visual refresh (window move, focus change). Force-rebind during
-    // restore transitions bypasses this cache via enabled=false→true cycle.
+    // restore transitions bypasses this cache.
     mutable SystemBackdropMode m_lastAppliedMode = SystemBackdropMode::None;
     mutable bool m_lastAppliedSuccessfully = false;
+    // The Acrylic tint is part of the applied accent gradient, so the cached
+    // state has to remember which theme it was applied for.
+    mutable bool m_lastAppliedUseDarkMode = false;
 
     // Per-window failure flags. Once a DWM attribute fails for a specific
     // HWND, subsequent calls skip that attribute for that window only.

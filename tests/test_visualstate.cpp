@@ -93,6 +93,109 @@ private slots:
             ThemeManager::ThemeMode::Dark, false);
         QVERIFY(tokenLight != tokenDark);
     }
+
+    void shouldClearBackdropBeforeApply_data()
+    {
+        QTest::addColumn<int>("appliedMode");
+        QTest::addColumn<int>("requestedMode");
+        QTest::addColumn<bool>("expected");
+
+        QTest::newRow("none -> none")
+            << static_cast<int>(WindowEffect::SystemBackdropMode::None)
+            << static_cast<int>(WindowEffect::SystemBackdropMode::None) << false;
+        QTest::newRow("none -> mica")
+            << static_cast<int>(WindowEffect::SystemBackdropMode::None)
+            << static_cast<int>(WindowEffect::SystemBackdropMode::Mica) << false;
+        QTest::newRow("none -> acrylic")
+            << static_cast<int>(WindowEffect::SystemBackdropMode::None)
+            << static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic) << false;
+
+        // Stored DWM attributes (Mica) can only be replaced by resetting them.
+        QTest::newRow("mica -> mica")
+            << static_cast<int>(WindowEffect::SystemBackdropMode::Mica)
+            << static_cast<int>(WindowEffect::SystemBackdropMode::Mica) << true;
+        QTest::newRow("mica -> acrylic")
+            << static_cast<int>(WindowEffect::SystemBackdropMode::Mica)
+            << static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic) << true;
+        QTest::newRow("legacy mica -> acrylic")
+            << static_cast<int>(WindowEffect::SystemBackdropMode::MicaLegacy)
+            << static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic) << true;
+
+        // Acrylic lives in the accent policy: re-applying it is idempotent, so
+        // clearing first would drop the blur for a frame.
+        QTest::newRow("acrylic -> acrylic")
+            << static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic)
+            << static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic) << false;
+        QTest::newRow("acrylic -> mica")
+            << static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic)
+            << static_cast<int>(WindowEffect::SystemBackdropMode::Mica) << true;
+        QTest::newRow("acrylic -> none")
+            << static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic)
+            << static_cast<int>(WindowEffect::SystemBackdropMode::None) << true;
+    }
+
+    void shouldClearBackdropBeforeApply()
+    {
+        QFETCH(int, appliedMode);
+        QFETCH(int, requestedMode);
+        QFETCH(bool, expected);
+
+        QCOMPARE(WindowVisualState::shouldClearBackdropBeforeApply(
+                     static_cast<WindowEffect::SystemBackdropMode>(appliedMode),
+                     static_cast<WindowEffect::SystemBackdropMode>(requestedMode)),
+                 expected);
+    }
+
+    void isBackdropApplyRedundant_data()
+    {
+        QTest::addColumn<int>("requestedMode");
+        QTest::addColumn<bool>("requestedUseDarkMode");
+        QTest::addColumn<int>("appliedMode");
+        QTest::addColumn<bool>("appliedUseDarkMode");
+        QTest::addColumn<bool>("appliedSuccessfully");
+        QTest::addColumn<bool>("expected");
+
+        const int acrylic = static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic);
+        const int mica = static_cast<int>(WindowEffect::SystemBackdropMode::Mica);
+        const int none = static_cast<int>(WindowEffect::SystemBackdropMode::None);
+
+        QTest::newRow("same everything")
+            << acrylic << true << acrylic << true << true << true;
+        QTest::newRow("previous apply failed")
+            << acrylic << true << acrylic << true << false << false;
+        QTest::newRow("mode changed")
+            << mica << true << acrylic << true << true << false;
+        QTest::newRow("nothing applied yet")
+            << none << false << none << false << true << true;
+
+        // Acrylic tint is baked into the accent gradient, so a theme switch must
+        // re-apply it even though the backdrop mode itself did not change.
+        QTest::newRow("acrylic theme switch")
+            << acrylic << false << acrylic << true << true << false;
+
+        // Mica carries no colour of its own (dark mode is a separate attribute),
+        // so a theme switch must not force a redundant backdrop round-trip.
+        QTest::newRow("mica theme switch")
+            << mica << false << mica << true << true << true;
+    }
+
+    void isBackdropApplyRedundant()
+    {
+        QFETCH(int, requestedMode);
+        QFETCH(bool, requestedUseDarkMode);
+        QFETCH(int, appliedMode);
+        QFETCH(bool, appliedUseDarkMode);
+        QFETCH(bool, appliedSuccessfully);
+        QFETCH(bool, expected);
+
+        QCOMPARE(WindowVisualState::isBackdropApplyRedundant(
+                     static_cast<WindowEffect::SystemBackdropMode>(requestedMode),
+                     requestedUseDarkMode,
+                     static_cast<WindowEffect::SystemBackdropMode>(appliedMode),
+                     appliedUseDarkMode,
+                     appliedSuccessfully),
+                 expected);
+    }
 };
 
 QTEST_MAIN(TestVisualState)
