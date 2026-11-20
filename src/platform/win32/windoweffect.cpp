@@ -1,5 +1,6 @@
 #include "windoweffect.h"
 
+#include "core/windowvisualstate.h"
 #include "diagnostics.h"
 #include "utils.h"
 
@@ -342,7 +343,8 @@ void WindowEffect::applySystemBackdropEffects(void *hwnd,
                                            bool useDarkMode,
                                            bool maximized,
                                            bool minimized,
-                                           SystemBackdropPreference systemBackdropPreference) const
+                                           SystemBackdropPreference systemBackdropPreference,
+                                           bool forceRebind) const
 {
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
@@ -356,7 +358,12 @@ void WindowEffect::applySystemBackdropEffects(void *hwnd,
 
     // Per-instance caching: skip redundant DWM calls during frequent visual
     // refreshes (window move, focus change) when nothing actually changed.
-    if (mode == m_lastAppliedMode && m_lastAppliedSuccessfully) {
+    if (!forceRebind
+        && WindowVisualState::isBackdropApplyRedundant(mode,
+                                                      useDarkMode,
+                                                      m_lastAppliedMode,
+                                                      m_lastAppliedUseDarkMode,
+                                                      m_lastAppliedSuccessfully)) {
         return;
     }
 
@@ -400,14 +407,20 @@ void WindowEffect::applySystemBackdropEffects(void *hwnd,
         return hr;
     };
 
-    // Phase 1: Clear the previously applied effect so that re-applying the
-    // same backdrop type is recognized by DWM as a genuine state change.
-    if (m_lastAppliedMode == SystemBackdropMode::Acrylic) {
-        applyAcrylicAccent(win, false, useDarkMode);
-    } else if (m_lastAppliedMode == SystemBackdropMode::Mica) {
-        setSystemBackdropType(DWMSBT_NONE, QStringLiteral("clear-mica"));
-    } else if (m_lastAppliedMode == SystemBackdropMode::MicaLegacy) {
-        setLegacyMica(FALSE, QStringLiteral("clear-legacy-mica"));
+    // Phase 1: reset the previously applied effect when DWM stores it as a
+    // window attribute (Mica / legacy Mica), so that re-applying the same type
+    // is recognized as a genuine state change. Acrylic lives in the accent
+    // policy instead and is idempotent, so it is re-applied in place: clearing
+    // it first drops the blur for a frame, which is the flicker seen after a
+    // maximize/restore transition.
+    if (WindowVisualState::shouldClearBackdropBeforeApply(m_lastAppliedMode, mode)) {
+        if (m_lastAppliedMode == SystemBackdropMode::Mica) {
+            setSystemBackdropType(DWMSBT_NONE, QStringLiteral("clear-mica"));
+        } else if (m_lastAppliedMode == SystemBackdropMode::MicaLegacy) {
+            setLegacyMica(FALSE, QStringLiteral("clear-legacy-mica"));
+        } else if (m_lastAppliedMode == SystemBackdropMode::Acrylic) {
+            applyAcrylicAccent(win, false, useDarkMode);
+        }
     }
 
     m_lastAppliedMode = SystemBackdropMode::None;
@@ -416,6 +429,7 @@ void WindowEffect::applySystemBackdropEffects(void *hwnd,
     // Phase 2: If no backdrop is desired, done after clearing.
     if (mode == SystemBackdropMode::None) {
         m_lastAppliedSuccessfully = true;
+        m_lastAppliedUseDarkMode = useDarkMode;
         return;
     }
 
@@ -450,6 +464,7 @@ void WindowEffect::applySystemBackdropEffects(void *hwnd,
     if (applied) {
         m_lastAppliedMode = mode;
         m_lastAppliedSuccessfully = true;
+        m_lastAppliedUseDarkMode = useDarkMode;
 
         if (mode != SystemBackdropMode::Acrylic) {
             SetWindowPos(win,

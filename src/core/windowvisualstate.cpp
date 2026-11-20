@@ -9,6 +9,39 @@ bool shouldUseDarkMode(ThemeManager::ThemeMode themeMode)
     return themeMode == ThemeManager::ThemeMode::Dark;
 }
 
+bool shouldClearBackdropBeforeApply(WindowEffect::SystemBackdropMode appliedMode,
+                                    WindowEffect::SystemBackdropMode requestedMode)
+{
+    switch (appliedMode) {
+    case WindowEffect::SystemBackdropMode::Mica:
+    case WindowEffect::SystemBackdropMode::MicaLegacy:
+        return true;
+    case WindowEffect::SystemBackdropMode::Acrylic:
+        return requestedMode != WindowEffect::SystemBackdropMode::Acrylic;
+    case WindowEffect::SystemBackdropMode::None:
+        return false;
+    }
+
+    return false;
+}
+
+bool isBackdropApplyRedundant(WindowEffect::SystemBackdropMode requestedMode,
+                              bool requestedUseDarkMode,
+                              WindowEffect::SystemBackdropMode appliedMode,
+                              bool appliedUseDarkMode,
+                              bool appliedSuccessfully)
+{
+    if (!appliedSuccessfully || requestedMode != appliedMode) {
+        return false;
+    }
+
+    if (requestedMode == WindowEffect::SystemBackdropMode::Acrylic) {
+        return requestedUseDarkMode == appliedUseDarkMode;
+    }
+
+    return true;
+}
+
 bool shouldUseTranslucentBackground(bool systemBackdropEnabled,
                                     bool minimized,
                                     WindowEffect::SystemBackdropPreference systemBackdropPreference)

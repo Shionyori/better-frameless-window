@@ -1233,22 +1233,18 @@ void FramelessWindow::forceSystemBackdropRebind()
     const bool maximized = isMaximized();
     const bool minimized = isMinimized();
 
-    // Force DWM to see a genuine state transition by clearing to None
-    // first, then re-applying the target. This bypasses the per-instance
-    // cache in applySystemBackdropEffects and ensures backdrop recovery
-    // after maximize/restore transitions.
-    m_windowEffect.applySystemBackdropEffects(hwnd,
-                                        false,
-                                        useDarkMode,
-                                        maximized,
-                                        minimized,
-                                        m_systemBackdropPreference);
+    // Ask DWM to re-evaluate the backdrop after a maximize/restore or theme
+    // transition. WindowEffect decides whether the previously applied effect
+    // has to be reset first: Mica is a stored attribute and needs the reset,
+    // while Acrylic is re-applied in place because clearing the accent policy
+    // drops the blur for a frame.
     m_windowEffect.applySystemBackdropEffects(hwnd,
                                         true,
                                         useDarkMode,
                                         maximized,
                                         minimized,
-                                        m_systemBackdropPreference);
+                                        m_systemBackdropPreference,
+                                        true);
 #else
     Q_UNUSED(0)
 #endif
