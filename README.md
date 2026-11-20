@@ -108,6 +108,12 @@ int main(int argc, char *argv[])
 | `isTitleBarVisible()` | Check titlebar visibility |
 | `setTitleBarHeight(int)` | Set titlebar height in pixels (default 44) |
 | `titleBarHeight()` | Get current titlebar height |
+| `setMinimizeButtonVisible(bool)` | Show or hide the minimize button |
+| `isMinimizeButtonVisible()` | Check minimize button visibility |
+| `setMaximizeButtonVisible(bool)` | Show or hide the maximize button |
+| `isMaximizeButtonVisible()` | Check maximize button visibility |
+| `setCloseButtonVisible(bool)` | Show or hide the close button |
+| `isCloseButtonVisible()` | Check close button visibility |
 
 ### Background Image
 
@@ -151,6 +157,7 @@ int main(int argc, char *argv[])
 | `accentColor()` | Get current accent color |
 | `setFollowSystemTheme(bool)` | Auto-follow Windows dark/light setting |
 | `followsSystemTheme()` | Check if system theme following is enabled |
+| `syncThemeWithSystemIfFollowing()` | Re-read the Windows theme and apply it unanimated, when following is enabled and the theme changed |
 | `themeTransitionProgress()` | Get current theme transition progress (0.0–1.0 Q_PROPERTY) |
 
 ### Theme Enums
@@ -167,6 +174,7 @@ Windows 11 22H2+ → Mica → MicaLegacy → Acrylic → None
 | Method | Description |
 |---|---|
 | `setDiagnosticsEnabled(bool)` | Enable debug logging for DWM / visual effect calls |
+| `isDiagnosticsEnabled()` | Check diagnostics logging state |
 
 ## Known Issues
 
