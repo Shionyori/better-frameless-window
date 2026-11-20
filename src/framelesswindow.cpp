@@ -1,6 +1,7 @@
 #include "framelesswindow.h"
 
 #include "diagnostics.h"
+#include "core/windowgeometry.h"
 #include "core/windowvisualstate.h"
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
@@ -834,15 +835,35 @@ void FramelessWindow::saveWindowGeometry()
         return;
     }
 
+    const bool maximized = isMaximized();
     QSettings settings(QStringLiteral("better-frameless-window"), QStringLiteral("settings"));
-    settings.setValue(QStringLiteral("geometry/maximized"), isMaximized());
+    settings.setValue(QStringLiteral("geometry/maximized"), maximized);
 
-    if (!isMaximized()) {
-        settings.setValue(QStringLiteral("geometry/x"), x());
-        settings.setValue(QStringLiteral("geometry/y"), y());
-        settings.setValue(QStringLiteral("geometry/width"), width());
-        settings.setValue(QStringLiteral("geometry/height"), height());
+    // Persist the restore size even while maximized: otherwise closing a
+    // maximized window would keep whatever was saved the last time the window
+    // happened to be restored, which can be arbitrarily stale. The window
+    // manager owns that rectangle, so ask it instead of tracking it here --
+    // Qt updates its own maximized state after the resize event, so an
+    // event-based copy ends up holding the maximized geometry.
+    QRect rect = geometry();
+    if (maximized) {
+        const QRect nativeRestore = WindowFrame::restoreGeometry(reinterpret_cast<void *>(winId()));
+        if (!nativeRestore.isValid()) {
+            return;
+        }
+
+        const qreal dpr = devicePixelRatioF();
+        rect = dpr > 0.0
+                   ? QRect(qRound(nativeRestore.x() / dpr),
+                           qRound(nativeRestore.y() / dpr),
+                           qRound(nativeRestore.width() / dpr),
+                           qRound(nativeRestore.height() / dpr))
+                   : nativeRestore;
     }
+    settings.setValue(QStringLiteral("geometry/x"), rect.x());
+    settings.setValue(QStringLiteral("geometry/y"), rect.y());
+    settings.setValue(QStringLiteral("geometry/width"), rect.width());
+    settings.setValue(QStringLiteral("geometry/height"), rect.height());
 }
 
 void FramelessWindow::restoreWindowGeometry()
@@ -859,18 +880,18 @@ void FramelessWindow::restoreWindowGeometry()
     const int h = settings.value(QStringLiteral("geometry/height"), 640).toInt();
     const bool wasMaximized = settings.value(QStringLiteral("geometry/maximized"), false).toBool();
 
-    const QRect savedRect(x, y, w, h);
-    bool onScreen = false;
-    for (QScreen *screen : QGuiApplication::screens()) {
-        if (screen->availableGeometry().intersects(savedRect)) {
-            onScreen = true;
-            break;
-        }
+    QList<QRect> available;
+    const auto screens = QGuiApplication::screens();
+    available.reserve(screens.size());
+    for (const QScreen *screen : screens) {
+        available.append(screen->availableGeometry());
     }
 
-    if (onScreen) {
-        setGeometry(x, y, w, h);
-    }
+    // A rectangle that only touches a monitor by a few pixels is not usable, so
+    // pull it back onto the nearest screen instead of dropping it entirely.
+    const QRect target = WindowGeometry::clampToNearestScreen(QRect(x, y, qMax(1, w), qMax(1, h)),
+                                                              available);
+    setGeometry(target);
 
     if (wasMaximized) {
         showMaximized();
