@@ -35,9 +35,17 @@ void showForWindow(void *hwnd, const QPoint &globalPos, const WindowState &windo
 
     DrawMenuBar(win);
 
+    // Win32 requires the owning window to be foreground, otherwise the popup
+    // menu keeps floating after the user clicks somewhere else. The trailing
+    // WM_NULL posts a no-op so the menu is torn down even when the user
+    // dismisses it by clicking away.
+    SetForegroundWindow(win);
+
     const POINT cursorPos{globalPos.x(), globalPos.y()};
     const UINT flags = TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON;
     const int command = TrackPopupMenu(menu, flags, cursorPos.x, cursorPos.y, 0, win, nullptr);
+    PostMessage(win, WM_NULL, 0, 0);
+
     if (command == 0) {
         return;
     }
