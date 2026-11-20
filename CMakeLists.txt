@@ -38,6 +38,8 @@ set(LIB_SOURCES
     src/core/windowvisualstate.h
     src/core/visualrefreshcoordinator.cpp
     src/core/visualrefreshcoordinator.h
+    src/core/windowgeometry.cpp
+    src/core/windowgeometry.h
     src/thememanager.cpp
     src/thememanager.h
     src/diagnostics.cpp
@@ -166,6 +168,7 @@ install(FILES
 
 install(FILES
     src/core/visualrefreshcoordinator.h
+    src/core/windowgeometry.h
     src/core/windowvisualstate.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${TARGET_NAME}/core
 )
@@ -224,6 +227,7 @@ add_bfw_test(version)
 add_bfw_test(titlebar)
 add_bfw_test(thememanager)
 add_bfw_test(visualstate)
+add_bfw_test(windowgeometry)
 add_bfw_test(utils)
 if(WIN32)
     add_bfw_test(windowhittest)

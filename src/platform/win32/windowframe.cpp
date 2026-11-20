@@ -41,4 +41,33 @@ void forceDwmRefresh(void *hwnd)
 #endif
 }
 
+QRect restoreGeometry(void *hwnd)
+{
+#ifdef Q_OS_WIN
+    const HWND win = static_cast<HWND>(hwnd);
+    if (win == nullptr) {
+        return QRect();
+    }
+
+    WINDOWPLACEMENT placement{};
+    placement.length = sizeof(placement);
+    if (!GetWindowPlacement(win, &placement)) {
+        return QRect();
+    }
+
+    if (placement.showCmd == SW_SHOWMINIMIZED) {
+        return QRect();
+    }
+
+    const RECT &rect = placement.rcNormalPosition;
+    return QRect(rect.left,
+                 rect.top,
+                 rect.right - rect.left,
+                 rect.bottom - rect.top);
+#else
+    Q_UNUSED(hwnd)
+    return QRect();
+#endif
+}
+
 } // namespace WindowFrame
