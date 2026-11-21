@@ -9,14 +9,12 @@ public:
         Auto,
         None,
         Mica,
-        MicaLegacy,
         Acrylic
     };
 
     enum class SystemBackdropMode {
         None,
         Mica,
-        MicaLegacy,
         Acrylic
     };
 
@@ -69,6 +67,5 @@ private:
     mutable bool m_darkMode20Valid = true;
     mutable bool m_darkMode19Valid = true;
     mutable bool m_systemBackdropAttributeSupported = true;
-    mutable bool m_legacyMicaAttributeSupported = true;
     mutable bool m_borderColorAttributeValid = true;
 };

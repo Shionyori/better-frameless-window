@@ -161,9 +161,9 @@ int main(int argc, char *argv[])
                 window.setBorderColor(QColor());
             })});
 
-    // System backdrop: Auto -> Mica -> MicaLegacy -> Acrylic -> None fallback
-    // chain. "None" also drops the translucent surface, so the window looks
-    // exactly like the background-image build.
+    // System backdrop: Auto -> Mica -> Acrylic -> None fallback chain. "None"
+    // also drops the translucent surface, so the window looks exactly like the
+    // background-image build.
     addRow(QStringLiteral("Backdrop"),
            {makeButton(QStringLiteral("Auto"), [&window]() {
                 window.setSystemBackdropPreference(WindowEffect::SystemBackdropPreference::Auto);
@@ -173,9 +173,6 @@ int main(int argc, char *argv[])
             }),
             makeButton(QStringLiteral("Mica"), [&window]() {
                 window.setSystemBackdropPreference(WindowEffect::SystemBackdropPreference::Mica);
-            }),
-            makeButton(QStringLiteral("MicaLegacy"), [&window]() {
-                window.setSystemBackdropPreference(WindowEffect::SystemBackdropPreference::MicaLegacy);
             }),
             makeButton(QStringLiteral("Acrylic"), [&window]() {
                 window.setSystemBackdropPreference(WindowEffect::SystemBackdropPreference::Acrylic);

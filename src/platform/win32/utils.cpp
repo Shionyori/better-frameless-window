@@ -163,7 +163,6 @@ WindowsCapabilities detectWindowsCapabilities()
     caps.supportsSystemDarkMode = caps.buildNumber >= 17763;
     caps.supportsRoundedCorners = caps.buildNumber >= 22000;
     caps.supportsSystemSystemBackdrop = caps.buildNumber >= 22621;
-    caps.supportsLegacyMica = caps.buildNumber >= 22000;
     caps.supportsAcrylic = caps.buildNumber >= 17763;
 #endif
 

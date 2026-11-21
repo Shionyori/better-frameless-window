@@ -164,10 +164,10 @@ int main(int argc, char *argv[])
 
 **ThemeMode** — `Light` / `Dark`
 
-**SystemBackdropPreference** — `Auto` / `None` / `Mica` / `MicaLegacy` / `Acrylic`
+**SystemBackdropPreference** — `Auto` / `None` / `Mica` / `Acrylic`
 
 The `Auto` mode selects the best available backdrop for the current OS:
-Windows 11 22H2+ → Mica → MicaLegacy → Acrylic → None
+Windows 11 22H2+ → Mica → Acrylic → None
 
 ### Diagnostics
 

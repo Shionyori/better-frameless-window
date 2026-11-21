@@ -14,7 +14,6 @@ bool shouldClearBackdropBeforeApply(WindowEffect::SystemBackdropMode appliedMode
 {
     switch (appliedMode) {
     case WindowEffect::SystemBackdropMode::Mica:
-    case WindowEffect::SystemBackdropMode::MicaLegacy:
         return true;
     case WindowEffect::SystemBackdropMode::Acrylic:
         return requestedMode != WindowEffect::SystemBackdropMode::Acrylic;
@@ -53,7 +52,6 @@ bool shouldUseTranslucentBackground(bool systemBackdropEnabled,
 
     const Utils::WindowsCapabilities caps = Utils::detectWindowsCapabilities();
     const bool autoChainAvailable = caps.supportsSystemSystemBackdrop
-                                    || caps.supportsLegacyMica
                                     || caps.supportsAcrylic;
 
     switch (systemBackdropPreference) {
@@ -63,8 +61,6 @@ bool shouldUseTranslucentBackground(bool systemBackdropEnabled,
         return false;
     case WindowEffect::SystemBackdropPreference::Mica:
         return caps.supportsSystemSystemBackdrop ? true : autoChainAvailable;
-    case WindowEffect::SystemBackdropPreference::MicaLegacy:
-        return caps.supportsLegacyMica ? true : autoChainAvailable;
     case WindowEffect::SystemBackdropPreference::Acrylic:
         return caps.supportsAcrylic ? true : autoChainAvailable;
     }

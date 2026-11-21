@@ -117,9 +117,6 @@ private slots:
         QTest::newRow("mica -> acrylic")
             << static_cast<int>(WindowEffect::SystemBackdropMode::Mica)
             << static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic) << true;
-        QTest::newRow("legacy mica -> acrylic")
-            << static_cast<int>(WindowEffect::SystemBackdropMode::MicaLegacy)
-            << static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic) << true;
 
         // Acrylic lives in the accent policy: re-applying it is idempotent, so
         // clearing first would drop the blur for a frame.

@@ -14,7 +14,6 @@ struct WindowsCapabilities {
 	bool supportsSystemDarkMode = false;
 	bool supportsRoundedCorners = false;
 	bool supportsSystemSystemBackdrop = false;
-	bool supportsLegacyMica = false;
 	bool supportsAcrylic = false;
 };
 
