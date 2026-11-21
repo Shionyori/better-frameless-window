@@ -9,6 +9,8 @@
 // the same surface, #10).
 
 #include <QApplication>
+#include <QButtonGroup>
+#include <QGuiApplication>
 #include <QCheckBox>
 #include <QColorDialog>
 #include <QHBoxLayout>
@@ -16,6 +18,7 @@
 #include <QList>
 #include <QPushButton>
 #include <QSlider>
+#include <QStyleHints>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -46,6 +49,35 @@ QPushButton *makeButton(const QString &text, std::function<void()> onClick)
     button->setFixedHeight(26);
     QObject::connect(button, &QPushButton::clicked, std::move(onClick));
     return button;
+}
+
+// A checkable button: mutually exclusive groups use these so the current
+// selection is visible, unlike a plain push button that looks identical in
+// every state.
+QPushButton *makeChoice(const QString &text, std::function<void()> onClick)
+{
+    auto *button = new QPushButton(text);
+    button->setFixedHeight(26);
+    button->setCheckable(true);
+    QObject::connect(button, &QPushButton::clicked, std::move(onClick));
+    return button;
+}
+
+// Shows the current colour on the button itself; an invalid colour means the
+// platform default and falls back to a plain label.
+void applyColorSwatch(QPushButton *button, const QColor &color, const QString &fallbackText)
+{
+    if (!color.isValid()) {
+        button->setText(fallbackText);
+        button->setStyleSheet(QString());
+        return;
+    }
+
+    button->setText(color.name().toUpper());
+    const QString label = color.lightnessF() > 0.55 ? QStringLiteral("#1A1A1A")
+                                                    : QStringLiteral("#FFFFFF");
+    button->setStyleSheet(QStringLiteral("background-color: %1; color: %2;")
+                              .arg(color.name(), label));
 }
 
 QCheckBox *makeSwitch(const QString &text, bool checked, std::function<void(bool)> onToggled)
@@ -92,7 +124,8 @@ int main(int argc, char *argv[])
     layout->setContentsMargins(28, 20, 28, 20);
     layout->setSpacing(10);
 
-    auto addRow = [&layout](const QString &title, const QList<QWidget *> &widgets) {
+    auto addRow = [&layout](const QString &title,
+                            const std::initializer_list<QWidget *> &widgets) {
         auto *row = new QHBoxLayout;
         row->setSpacing(8);
         row->addWidget(makeLabel(title));
@@ -124,59 +157,145 @@ int main(int argc, char *argv[])
         addRow(title, {slider, valueLabel});
     };
 
-    // Theme: animated Light / Dark switch, plus Windows theme following.
-    addRow(QStringLiteral("Theme"),
-           {makeButton(QStringLiteral("Light"), [&window]() {
-                window.setThemeMode(ThemeManager::ThemeMode::Light);
-            }),
-            makeButton(QStringLiteral("Dark"), [&window]() {
-                window.setThemeMode(ThemeManager::ThemeMode::Dark);
-            }),
-            makeSwitch(QStringLiteral("Follow system"), window.followsSystemTheme(),
-                       [&window](bool enabled) {
-                           window.setFollowSystemTheme(enabled);
-                           // Call syncThemeWithSystemIfFollowing() when Windows
-                           // reports a colour change while following.
-                       })});
+    // Theme: exactly one of System / Light / Dark is active, so they are one
+    // exclusive group instead of two buttons plus a "follow system" switch that
+    // silently overrides them.
+    std::function<void()> syncThemeButtons;
+    auto *systemThemeButton = makeChoice(QStringLiteral("System"), [&]() {
+        window.setFollowSystemTheme(true);
+        window.syncThemeWithSystemIfFollowing();
+        syncThemeButtons();
+    });
+    auto *lightThemeButton = makeChoice(QStringLiteral("Light"), [&]() {
+        window.setFollowSystemTheme(false);
+        window.setThemeMode(ThemeManager::ThemeMode::Light);
+        syncThemeButtons();
+    });
+    auto *darkThemeButton = makeChoice(QStringLiteral("Dark"), [&]() {
+        window.setFollowSystemTheme(false);
+        window.setThemeMode(ThemeManager::ThemeMode::Dark);
+        syncThemeButtons();
+    });
 
-    // Accent colour drives titlebar hover/pressed states; border colour is the
-    // Win11 DWMWA_BORDER_COLOR (invalid QColor restores the system default).
-    addRow(QStringLiteral("Accent"),
-           {makeButton(QStringLiteral("Choose…"), [&window]() {
-                const QColor color = QColorDialog::getColor(window.accentColor(), &window,
-                                                            QStringLiteral("Accent color"));
-                if (color.isValid()) {
-                    window.setAccentColor(color);
-                }
-            })});
-    addRow(QStringLiteral("Border"),
-           {makeButton(QStringLiteral("Choose…"), [&window]() {
-                const QColor color = QColorDialog::getColor(window.borderColor(), &window,
-                                                            QStringLiteral("Border color"));
-                if (color.isValid()) {
-                    window.setBorderColor(color);
-                }
-            }),
-            makeButton(QStringLiteral("Default"), [&window]() {
-                window.setBorderColor(QColor());
-            })});
+    auto *themeGroup = new QButtonGroup(&window);
+    themeGroup->setExclusive(true);
+    themeGroup->addButton(systemThemeButton);
+    themeGroup->addButton(lightThemeButton);
+    themeGroup->addButton(darkThemeButton);
+
+    syncThemeButtons = [&window, systemThemeButton, lightThemeButton, darkThemeButton]() {
+        const bool following = window.followsSystemTheme();
+        systemThemeButton->setChecked(following);
+        lightThemeButton->setChecked(!following
+                                     && window.themeMode() == ThemeManager::ThemeMode::Light);
+        darkThemeButton->setChecked(!following
+                                    && window.themeMode() == ThemeManager::ThemeMode::Dark);
+    };
+    syncThemeButtons();
+
+    // Windows also reports its own colour-scheme changes while following.
+    QObject::connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged, &window,
+                     [&window, syncThemeButtons](Qt::ColorScheme) {
+                         if (!window.followsSystemTheme()) {
+                             return;
+                         }
+                         window.syncThemeWithSystemIfFollowing();
+                         syncThemeButtons();
+                     });
+
+    addRow(QStringLiteral("Theme"),
+           {systemThemeButton, lightThemeButton, darkThemeButton});
+
+    // Accent colour drives the titlebar hover, the selected state of every
+    // checkable button and the border colour picker. The button shows the value
+    // that is currently in effect.
+    auto *accentSwatch = new QPushButton;
+    accentSwatch->setFixedHeight(26);
+    accentSwatch->setMinimumWidth(96);
+    applyColorSwatch(accentSwatch, window.accentColor(), QStringLiteral("Pick…"));
+    QObject::connect(accentSwatch, &QPushButton::clicked, &window, [&window, accentSwatch]() {
+        // No parent on purpose: a dialog parented to the window inherits its
+        // style sheet (theme text colours) while it is painted with the OS
+        // palette, which can make the OK/Cancel buttons invisible when the app
+        // theme and the system theme disagree.
+        const QColor color = QColorDialog::getColor(window.accentColor(), nullptr,
+                                                    QStringLiteral("Accent color"));
+        if (color.isValid()) {
+            window.setAccentColor(color);
+            applyColorSwatch(accentSwatch, window.accentColor(), QStringLiteral("Pick…"));
+        }
+    });
+    addRow(QStringLiteral("Accent"), {accentSwatch});
+
+    auto *borderSwatch = new QPushButton;
+    borderSwatch->setFixedHeight(26);
+    borderSwatch->setMinimumWidth(96);
+    auto *borderDefaultButton = new QPushButton(QStringLiteral("Default"));
+    borderDefaultButton->setFixedHeight(26);
+    QObject::connect(borderDefaultButton, &QPushButton::clicked, &window,
+                     [&window, borderSwatch, borderDefaultButton]() {
+                         window.setBorderColor(QColor());
+                         applyColorSwatch(borderSwatch, window.borderColor(),
+                                          QStringLiteral("\u2014"));
+                         borderDefaultButton->setEnabled(false);
+                     });
+
+    QObject::connect(borderSwatch, &QPushButton::clicked, &window,
+                     [&window, borderSwatch, borderDefaultButton]() {
+                         const QColor color = QColorDialog::getColor(window.borderColor(), nullptr,
+                                                                     QStringLiteral("Border color"));
+                         if (!color.isValid()) {
+                             return;
+                         }
+                         window.setBorderColor(color);
+                         applyColorSwatch(borderSwatch, window.borderColor(), QStringLiteral("\u2014"));
+                         borderDefaultButton->setEnabled(true);
+                     });
+
+    applyColorSwatch(borderSwatch, window.borderColor(), QStringLiteral("\u2014"));
+    borderDefaultButton->setEnabled(window.borderColor().isValid());
+    addRow(QStringLiteral("Border"), {borderSwatch, borderDefaultButton});
 
     // Backdrop: Auto resolves to Mica -> Acrylic -> None on the running OS.
     // None also drops the translucent surface, so the window looks exactly like
     // the background-image build.
+    auto *autoBackdropButton = makeChoice(QStringLiteral("Auto"), [&window]() {
+        window.setBackdropMode(WindowEffect::BackdropMode::Auto);
+    });
+    auto *noBackdropButton = makeChoice(QStringLiteral("None"), [&window]() {
+        window.setBackdropMode(WindowEffect::BackdropMode::None);
+    });
+    auto *micaBackdropButton = makeChoice(QStringLiteral("Mica"), [&window]() {
+        window.setBackdropMode(WindowEffect::BackdropMode::Mica);
+    });
+    auto *acrylicBackdropButton = makeChoice(QStringLiteral("Acrylic"), [&window]() {
+        window.setBackdropMode(WindowEffect::BackdropMode::Acrylic);
+    });
+
+    auto *backdropGroup = new QButtonGroup(&window);
+    backdropGroup->setExclusive(true);
+    for (QPushButton *button : {autoBackdropButton, noBackdropButton,
+                                micaBackdropButton, acrylicBackdropButton}) {
+        backdropGroup->addButton(button);
+    }
+
+    switch (window.backdropMode()) {
+    case WindowEffect::BackdropMode::Auto:
+        autoBackdropButton->setChecked(true);
+        break;
+    case WindowEffect::BackdropMode::None:
+        noBackdropButton->setChecked(true);
+        break;
+    case WindowEffect::BackdropMode::Mica:
+        micaBackdropButton->setChecked(true);
+        break;
+    case WindowEffect::BackdropMode::Acrylic:
+        acrylicBackdropButton->setChecked(true);
+        break;
+    }
+
     addRow(QStringLiteral("Backdrop"),
-           {makeButton(QStringLiteral("Auto"), [&window]() {
-                window.setBackdropMode(WindowEffect::BackdropMode::Auto);
-            }),
-            makeButton(QStringLiteral("None"), [&window]() {
-                window.setBackdropMode(WindowEffect::BackdropMode::None);
-            }),
-            makeButton(QStringLiteral("Mica"), [&window]() {
-                window.setBackdropMode(WindowEffect::BackdropMode::Mica);
-            }),
-            makeButton(QStringLiteral("Acrylic"), [&window]() {
-                window.setBackdropMode(WindowEffect::BackdropMode::Acrylic);
-            })});
+           {autoBackdropButton, noBackdropButton, micaBackdropButton, acrylicBackdropButton});
 
     // ── Background image (commented out while testing the backdrop) ─────
     // A background image and a backdrop write to the same surface (#10), so the
