@@ -232,11 +232,12 @@ int main(int argc, char *argv[])
             makeSwitch(QStringLiteral("Close"), window.isCloseButtonVisible(),
                        [&window](bool visible) { window.setCloseButtonVisible(visible); })});
 
-    // DWM visual effects and diagnostics.
+    // DWM visual effects and diagnostics. The shadow switch is left out on
+    // purpose: the window surface is translucent by default (Mica), and DWM
+    // draws no frame shadow for a layered window, so the toggle would look
+    // broken. setShadowEnabled() still works for opaque surfaces.
     addRow(QStringLiteral("Effects"),
-           {makeSwitch(QStringLiteral("Shadow"), window.isShadowEnabled(),
-                       [&window](bool enabled) { window.setShadowEnabled(enabled); }),
-            makeSwitch(QStringLiteral("Rounded corners"), window.isRoundedCornersEnabled(),
+           {makeSwitch(QStringLiteral("Rounded corners"), window.isRoundedCornersEnabled(),
                        [&window](bool enabled) { window.setRoundedCornersEnabled(enabled); })});
     addRow(QStringLiteral("Extras"),
            {makeSwitch(QStringLiteral("Snap Layout"), window.isSnapLayoutEnabled(),
