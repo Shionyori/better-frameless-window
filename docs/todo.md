@@ -55,6 +55,14 @@ live in the commit history and in [`architecture.md`](architecture.md).
 
 ## API polish
 
+- [ ] **The theme style sheet is installed on the top-level window**, so any
+      dialog parented to it inherits the theme's text colours while Qt paints
+      the dialog with the OS palette. When the app theme and the system theme
+      disagree, dialog buttons (e.g. QColorDialog's OK) become invisible; the
+      example works around it by opening the colour dialog without a parent.
+      Consider applying the sheet to a content container instead of the window,
+      or exposing the sheet so apps can scope it themselves.
+
 - [ ] Decide whether `backdropMode()` should report the resolved kind
       (`Mica` when `Auto` resolved to Mica) in addition to the requested mode.
 - [ ] `followsSystemTheme()` only applies on demand: nothing in the library
