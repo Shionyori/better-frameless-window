@@ -126,6 +126,13 @@ See [`todo.md`](todo.md) for the open items here.
 - `NativeMessageRouter` translates `WM_NCHITTEST`, `WM_NCCALCSIZE`,
   `WM_ENTERSIZEMOVE`/`WM_EXITSIZEMOVE`, `WM_GETMINMAXINFO`, `WM_SYSCOMMAND`
   and forwards the ones that change state to `FramelessWindow`.
+- Maximize and restore are animated in the library: the geometry moves to the
+  target rectangle over 170ms (`InOutCubic`) and the window state flips only
+  when it arrives (`WindowCommand::setMaximized()` → `ShowWindow`). Windows
+  will not animate this window itself: the native transition belongs to the
+  frame, and the frame is ours. `QWidget::showMaximized()` cannot be used for
+  the flip either — once the geometry equals the maximized rectangle, Qt
+  thinks the window is already maximized and never tells Windows.
 - While resizing, the visual refresh pass is suppressed: calling
   `SetWindowPos(SWP_FRAMECHANGED)` or `DwmSetWindowAttribute` mid-drag fights
   the system loop and produces jitter.
@@ -182,7 +189,11 @@ library, not per application — that is a known limitation, not an accident.
 rectangles it answers "is this restorable" and "where should it go instead".
 `FramelessWindow` only converts that answer into a `setGeometry()` call.
 Saved geometry is validated on restore: off-screen and multi-monitor cases are
-clamped, and the restore size is kept even when closing maximized.
+clamped, and the restore size is kept even when closing maximized. That
+restore rectangle is tracked by the window itself (`rememberRestoreGeometry()`,
+fed from move/resize while normal); it is preferred over
+`GetWindowPlacement()`, whose "normal" rectangle the maximize animation would
+otherwise overwrite with the work area.
 
 ---
 

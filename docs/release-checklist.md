@@ -44,6 +44,16 @@ the real `windows` platform plugin, so keep `QT_QPA_PLATFORM=windows` on Windows
 - [ ] Move the window to a second monitor, close, relaunch with that monitor disconnected: window comes back inside the primary work area
 - [ ] Taskbar is never covered by a maximized window
 
+## Window chrome
+
+- [ ] Caption buttons sit flush with the right edge and span the full titlebar height
+- [ ] Close button hover fill reaches the window corner (no rounded gap)
+- [ ] Maximize: geometry animates to the work area (~170ms), then the button glyph flips
+- [ ] Restore: geometry animates back to the previous size, no jump or flash
+- [ ] A second click during the animation completes it instead of stacking
+- [ ] Dragging the caption or an edge during the animation takes over cleanly
+- [ ] Closing while maximized, then relaunching: maximized, and restore returns the pre-maximize size
+
 ## Theme and backdrop
 
 - [ ] Light ↔ Dark: 300ms transition, title bar, background and backdrop tint all follow

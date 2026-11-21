@@ -34,7 +34,8 @@
 - **DWM visual effects** — shadow, rounded corners, Mica / Acrylic backdrop with auto fallback chain
 - **Snap Layout** — native DWM hit-test forwarding, toggleable via `setSnapLayoutEnabled()`
 - **Theme manager** — Light / Dark with 300ms animated transitions, persistence, and system theme following
-- **Titlebar customization** — visibility toggle, adjustable height, widget extension slot
+- **Titlebar customization** — visibility toggle, adjustable height, widget extension slot, caption buttons flush with the window edge
+- **Smooth maximize / restore** — the geometry is animated (170ms, InOutCubic) before the window state flips
 - **Fullscreen support** — auto-hides titlebar, disables resize edges
 - **Window geometry persistence** — automatic save/restore with multi-monitor validation
 
