@@ -213,5 +213,10 @@ Snap Layout. Porting those is tracked in #7 (Linux) and #8 (macOS).
 | Accent color is not animated | Theme changes animate over 300ms, `setAccentColor()` applies immediately (#12) |
 | Window state is per library, not per app | Window geometry and theme are stored under the library's own settings key, so applications using the library share one record |
 
-See [docs/release-checklist.md](docs/release-checklist.md) for the manual
-regression pass to run before tagging a release.
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [docs/architecture.md](docs/architecture.md) | Layer map, the resolved-surface model, state machine, naming rules |
+| [docs/release-checklist.md](docs/release-checklist.md) | Manual regression pass to run before tagging a release |
+| [docs/todo.md](docs/todo.md) | Open work: materials, platform coverage, API polish |
