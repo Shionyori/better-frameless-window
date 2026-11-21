@@ -208,7 +208,8 @@ Snap Layout. Porting those is tracked in #7 (Linux) and #8 (macOS).
 |---|---|
 | Snap Layout may not appear | Depends on `HTMAXBUTTON` hit-test forwarding; toggle with `setSnapLayoutEnabled(true)` |
 | Resize jitter | Slight jitter while dragging a window edge; the native resize loop and DWM own that frame, and further suppression did not remove it without breaking resize continuity |
-| Background + backdrop conflict | Background image and Mica/Acrylic are not designed to be used together; clear the image to enable backdrop effects (#10) |
+| Mica can look like a solid background | Mica does not blur what is behind the window; it samples the desktop wallpaper, desaturates it and applies a near-neutral tint (`#f3f3f3` light, `#202020` dark). On a light, low-contrast wallpaper the light variant differs from the theme background by ~2 RGB levels, so it is invisible to the eye. Check `DWMWA_SYSTEMBACKDROP_TYPE` (2 = Mica) instead of trusting the screenshot. |
+| Acrylic is a flat tint on Windows 11 | The library falls back to `ACCENT_ENABLE_ACRYLICBLURBEHIND`, which no longer blurs on Windows 11; it renders as a solid tint. Mica is the supported material there. |
 | Accent color is not animated | Theme changes animate over 300ms, `setAccentColor()` applies immediately (#12) |
 | Window state is per library, not per app | Window geometry and theme are stored under the library's own settings key, so applications using the library share one record |
 
