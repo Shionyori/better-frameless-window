@@ -43,7 +43,7 @@ private slots:
         for (auto mode : {WindowEffect::BackdropMode::Auto,
                           WindowEffect::BackdropMode::Mica,
                           WindowEffect::BackdropMode::Acrylic}) {
-            const auto policy = WindowVisualState::resolveSurfacePolicy(mode, false, false, none);
+            const auto policy = WindowVisualState::resolveSurfacePolicy(mode, false, none);
             QCOMPARE(policy.kind, WindowVisualState::SurfaceKind::Opaque);
             QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::None);
         }
@@ -52,7 +52,7 @@ private slots:
     void surfaceStaysOpaqueForRequestedNone()
     {
         const auto policy = WindowVisualState::resolveSurfacePolicy(
-            WindowEffect::BackdropMode::None, false, false, bothBackdrops());
+            WindowEffect::BackdropMode::None, false, bothBackdrops());
         QCOMPARE(policy.kind, WindowVisualState::SurfaceKind::Opaque);
         QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::None);
     }
@@ -60,27 +60,38 @@ private slots:
     void surfaceDropsBackdropWhileMinimized()
     {
         const auto policy = WindowVisualState::resolveSurfacePolicy(
-            WindowEffect::BackdropMode::Auto, true, false, bothBackdrops());
+            WindowEffect::BackdropMode::Auto, true, bothBackdrops());
         QCOMPARE(policy.kind, WindowVisualState::SurfaceKind::Opaque);
         QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::None);
     }
 
-    void backgroundImageWinsOverBackdrop()
+    // BackdropMode::None is the application-painted surface: the material is
+    // not requested, so no backdrop is applied even on a capable OS.
+    void noneIsTheApplicationSurface()
     {
-        for (auto mode : {WindowEffect::BackdropMode::Auto,
-                          WindowEffect::BackdropMode::Mica,
+        const auto policy = WindowVisualState::resolveSurfacePolicy(
+            WindowEffect::BackdropMode::None, false, bothBackdrops());
+        QCOMPARE(policy.kind, WindowVisualState::SurfaceKind::Opaque);
+        QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::None);
+    }
+
+    // The requested material owns the surface; nothing about the app-painted
+    // background can turn it opaque again.
+    void materialOwnsTheSurface()
+    {
+        for (auto mode : {WindowEffect::BackdropMode::Mica,
                           WindowEffect::BackdropMode::Acrylic}) {
-            const auto policy = WindowVisualState::resolveSurfacePolicy(mode, false, true,
+            const auto policy = WindowVisualState::resolveSurfacePolicy(mode, false,
                                                                        bothBackdrops());
-            QCOMPARE(policy.kind, WindowVisualState::SurfaceKind::Opaque);
-            QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::None);
+            QCOMPARE(policy.kind, WindowVisualState::SurfaceKind::Translucent);
+            QVERIFY(policy.backdrop != WindowEffect::BackdropKind::None);
         }
     }
 
     void autoPrefersMica()
     {
         const auto policy = WindowVisualState::resolveSurfacePolicy(
-            WindowEffect::BackdropMode::Auto, false, false, bothBackdrops());
+            WindowEffect::BackdropMode::Auto, false, bothBackdrops());
         QCOMPARE(policy.kind, WindowVisualState::SurfaceKind::Translucent);
         QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::Mica);
     }
@@ -90,7 +101,7 @@ private slots:
         WindowVisualState::BackdropCapabilities acrylicOnly;
         acrylicOnly.acrylic = true;
         const auto policy = WindowVisualState::resolveSurfacePolicy(
-            WindowEffect::BackdropMode::Auto, false, false, acrylicOnly);
+            WindowEffect::BackdropMode::Auto, false, acrylicOnly);
         QCOMPARE(policy.kind, WindowVisualState::SurfaceKind::Translucent);
         QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::Acrylic);
     }
@@ -100,7 +111,7 @@ private slots:
         WindowVisualState::BackdropCapabilities acrylicOnly;
         acrylicOnly.acrylic = true;
         const auto policy = WindowVisualState::resolveSurfacePolicy(
-            WindowEffect::BackdropMode::Mica, false, false, acrylicOnly);
+            WindowEffect::BackdropMode::Mica, false, acrylicOnly);
         QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::Acrylic);
     }
 
@@ -109,7 +120,7 @@ private slots:
         WindowVisualState::BackdropCapabilities micaOnly;
         micaOnly.mica = true;
         const auto policy = WindowVisualState::resolveSurfacePolicy(
-            WindowEffect::BackdropMode::Acrylic, false, false, micaOnly);
+            WindowEffect::BackdropMode::Acrylic, false, micaOnly);
         QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::Mica);
     }
 
@@ -122,13 +133,11 @@ private slots:
                           WindowEffect::BackdropMode::Mica,
                           WindowEffect::BackdropMode::Acrylic}) {
             for (bool minimized : {false, true}) {
-                for (bool hasImage : {false, true}) {
-                    const auto policy = WindowVisualState::resolveSurfacePolicy(
-                        mode, minimized, hasImage, bothBackdrops());
-                    const bool translucent = WindowVisualState::usesTranslucentSurface(policy);
-                    QCOMPARE(translucent,
-                             policy.backdrop != WindowEffect::BackdropKind::None);
-                }
+                const auto policy = WindowVisualState::resolveSurfacePolicy(
+                    mode, minimized, bothBackdrops());
+                const bool translucent = WindowVisualState::usesTranslucentSurface(policy);
+                QCOMPARE(translucent,
+                         policy.backdrop != WindowEffect::BackdropKind::None);
             }
         }
     }

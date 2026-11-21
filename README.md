@@ -30,7 +30,7 @@
 
 - **Frameless window** — custom titlebar with icon, drag-to-move, double-click maximize/restore, right-click system menu, Alt+Space shortcut
 - **8-direction resize** — HiDPI-aware hit testing with corner detection
-- **Background image** — Cover / Fit / Stretch / Tile / Center modes with independent opacity control
+- **Application-painted background** (`BackdropMode::None`) — custom colour, image in Cover / Fit / Stretch / Tile / Center modes, and an independent opacity; mutually exclusive with the materials
 - **DWM visual effects** — rounded corners and a Mica / Acrylic backdrop with auto fallback chain
   (the DWM frame shadow is available on opaque surfaces only, see *Known Issues*)
 - **Snap Layout** — native DWM hit-test forwarding, toggleable via `setSnapLayoutEnabled()`
@@ -117,8 +117,14 @@ int main(int argc, char *argv[])
 
 ### Background Image
 
+These describe the application-painted surface, i.e. `BackdropMode::None`. While a
+material (Mica/Acrylic) is active it owns the window background and none of them
+is painted; the values are kept, so switching back to `None` restores them.
+
 | Method | Description |
 |---|---|
+| `setBackgroundColor(color)` | Custom solid background colour (`QColor()` = theme colour) |
+| `backgroundColor()` | Get the custom background colour |
 | `setBackgroundImage(pixmap, mode)` | Set background image with display mode |
 | `clearBackgroundImage()` | Remove the background image |
 | `backgroundImage()` | Get current background image |
@@ -136,7 +142,7 @@ int main(int argc, char *argv[])
 | `isShadowEnabled()` | Check shadow state |
 | `setBackdropMode(mode)` | Request a backdrop; `None` switches it off |
 | `backdropMode()` | Get the requested backdrop mode |
-| `setRoundedCornersEnabled(bool)` | Enable / disable rounded window corners |
+| `setRoundedCornersEnabled(bool)` | Enable / disable the rounded window frame (`DWMWA_WINDOW_CORNER_PREFERENCE`, on by default). It drives the whole DWM-drawn frame, not just the corners: the border colour and shadow shape follow it |
 | `isRoundedCornersEnabled()` | Check rounded corners state |
 | `setSnapLayoutEnabled(bool)` | Enable / disable Snap Layout overlay |
 | `isSnapLayoutEnabled()` | Check Snap Layout state |
@@ -145,8 +151,16 @@ int main(int argc, char *argv[])
 
 **BackdropMode** — `Auto` (default) / `None` / `Mica` / `Acrylic`
 
-`Auto` resolves to the best backdrop the running OS supports:
-Windows 11 22H2+ → Mica → Acrylic → None.
+| Mode | Surface | Who paints the background |
+|---|---|---|
+| `None` | opaque | the application: background colour, image, opacity |
+| `Mica` | translucent | the system: a near-solid colour derived from the wallpaper |
+| `Acrylic` | translucent | the system: translucent frosted material |
+
+`Auto` resolves to the best material the running OS supports
+(Windows 11 22H2+ → Mica → Acrylic), falling back to `None`.
+`isBackdropActive()` tells an application whether a material currently owns the
+surface, which is what UI should use to enable or disable background controls.
 
 ### Rendering rules
 
@@ -157,17 +171,17 @@ are derived from that single result. The rules, highest precedence first:
 | Rule | Result |
 |---|---|
 | Window is minimized | DWM drops the backdrop; the Qt surface stays translucent across the transition, because flipping that attribute mid-restore delays composition recovery |
-| A background image is set | opaque, no backdrop (the image owns the surface) |
-| `BackdropMode::None` | opaque, no backdrop |
-| Backdrop requested and supported | translucent surface + that backdrop |
+| `BackdropMode::None` | opaque, no backdrop — the application paints the background |
+| Backdrop requested and supported | translucent surface + that backdrop, the application background is not painted |
 | Backdrop requested, nothing supported | opaque, no backdrop |
 
 Consequences:
 
 - A translucent surface always has a backdrop behind it, so the window can never
   show the desktop through an unbacked wash.
-- Background image and backdrop never compete: setting an image drops the
-  backdrop, so the two features can be used one after the other, not at once.
+- The requested mode owns the surface. A material never competes with the
+  application background: while Mica/Acrylic is active the colour/image/opacity
+  are dormant, and they come back when `None` is selected again.
 - The dark variant of the backdrop is not a switch. DWM reads it from
   `DWMWA_USE_IMMERSIVE_DARK_MODE`, which the library always keeps in sync with
   `themeMode()`; toggling it independently would paint the dark wash over light

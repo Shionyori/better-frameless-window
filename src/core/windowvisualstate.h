@@ -33,23 +33,28 @@ struct SurfacePolicy {
 
 // Single source of truth for the window surface.
 //
-// Precedence, highest first:
-//   1. minimized            -> opaque, no backdrop (the window manager owns it)
-//   2. background image set -> opaque, no backdrop (the image owns the pixels)
-//   3. requested None       -> opaque, no backdrop
-//   4. requested Auto/Mica/Acrylic -> best supported backdrop, otherwise opaque
+// Three surface families, each owning its background completely:
+//
+//   BackdropMode::None  -> opaque, painted by the application: background
+//                          colour, image and opacity are its business.
+//   Mica                -> translucent, the system material (a solid-looking
+//                          colour derived from the wallpaper) owns the surface.
+//   Acrylic             -> translucent, the frosted material owns the surface.
+//
+// Precedence:
+//   1. minimized -> the window manager owns the state, DWM drops the backdrop
+//   2. requested None -> opaque, no backdrop
+//   3. requested Auto/Mica/Acrylic -> best supported backdrop, otherwise opaque
 //
 // A translucent surface without a backdrop never happens: it would expose the
-// desktop instead of blending with anything.
+// desktop instead of blending with anything. Because the material owns the
+// surface, the application-painted background is not used while it is active.
 SurfacePolicy resolveSurfacePolicy(WindowEffect::BackdropMode requested,
                                    bool minimized,
-                                   bool hasBackgroundImage,
                                    const BackdropCapabilities &capabilities);
 
 // Same as above, using the capabilities of the running OS.
-SurfacePolicy resolveSurfacePolicy(WindowEffect::BackdropMode requested,
-                                   bool minimized,
-                                   bool hasBackgroundImage);
+SurfacePolicy resolveSurfacePolicy(WindowEffect::BackdropMode requested, bool minimized);
 
 bool usesTranslucentSurface(const SurfacePolicy &policy);
 

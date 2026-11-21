@@ -150,6 +150,21 @@ void FramelessWindow::setSnapLayoutEnabled(bool enabled)
     m_snapLayoutEnabled = enabled;
 }
 
+void FramelessWindow::setBackgroundColor(const QColor &color)
+{
+    if (m_backgroundColor == color) {
+        return;
+    }
+
+    m_backgroundColor = color;
+    requestVisualRefresh();
+}
+
+QColor FramelessWindow::backgroundColor() const
+{
+    return m_backgroundColor;
+}
+
 void FramelessWindow::setBackgroundImage(const QPixmap &image, BackgroundImageMode mode)
 {
     m_backgroundImage = image;
@@ -325,14 +340,31 @@ void FramelessWindow::performVisualRefreshPass()
 {
     applyTheme();
 
+    const WindowVisualState::SurfacePolicy policy = surfacePolicy();
+    const bool surfaceChanged = m_lastAppliedSurfaceKind != policy.kind;
+    m_lastAppliedSurfaceKind = policy.kind;
+
     // Suppress native frame sync and DWM visual effects during an active
     // system resize (WM_ENTERSIZEMOVE → WM_EXITSIZEMOVE) and while the
     // maximize/restore transition animates the geometry. Calling
     // SetWindowPos(SWP_FRAMECHANGED) or DwmSetWindowAttribute mid-transition
     // fights the moving frame and causes visible jitter.
     if (!m_resizing && !m_animatingWindowTransition) {
+        // Surface changes are ordered so the window content never disagrees
+        // with the composited backdrop for a frame. Switching to the opaque
+        // surface has to paint first, then drop the material; the other
+        // direction applies the material first and then paints the wash over
+        // it. Both otherwise flash the desktop through an unstyled frame.
+        if (surfaceChanged && policy.kind == WindowVisualState::SurfaceKind::Opaque) {
+            repaint();
+        }
+
         syncNativeWindowFrame();
         applyVisualEffects();
+
+        if (surfaceChanged && policy.kind == WindowVisualState::SurfaceKind::Translucent) {
+            repaint();
+        }
     }
 
     updateMaximizeButtonState();
@@ -431,6 +463,11 @@ WindowEffect::BackdropMode FramelessWindow::backdropMode() const
     return m_backdropMode;
 }
 
+bool FramelessWindow::isBackdropActive() const
+{
+    return usesTranslucentSurface();
+}
+
 bool FramelessWindow::isRoundedCornersEnabled() const
 {
     return m_roundedCornersEnabled;
@@ -519,6 +556,11 @@ void FramelessWindow::initWindow()
     setMinimumSize(480, 320);
     resize(960, 640);
     setAttribute(Qt::WA_StyledBackground, true);
+    // The native surface keeps its alpha capability for the whole lifetime.
+    // Toggling WA_TranslucentBackground at runtime makes Qt rebuild the window,
+    // which flashes; the opaque (BackdropMode::None) surface instead paints an
+    // opaque background over the same surface.
+    setAttribute(Qt::WA_TranslucentBackground, true);
 
     setObjectName("FramelessWindow");
 
@@ -609,13 +651,25 @@ void FramelessWindow::paintEvent(QPaintEvent *event)
     opt.initFrom(this);
     style()->drawPrimitive(QStyle::PE_Widget, &opt, &painter, this);
 
-    if (m_backgroundImage.isNull()) {
+    // The application owns the background only on an opaque surface; a
+    // material (Mica/Acrylic) paints itself and must not be covered.
+    if (usesTranslucentSurface()) {
         return;
     }
 
-    // Fill with opaque theme color so the image blends toward it as
-    // opacity decreases, rather than revealing the desktop behind.
-    painter.fillRect(rect(), m_themeManager.windowBackgroundColor());
+    if (!m_backgroundColor.isValid() && m_backgroundImage.isNull()) {
+        return;
+    }
+
+    // Fill with the custom colour (or the theme colour) so the image blends
+    // toward it as opacity decreases, rather than revealing the desktop.
+    painter.fillRect(rect(),
+                     m_backgroundColor.isValid() ? m_backgroundColor
+                                                 : m_themeManager.windowBackgroundColor());
+
+    if (m_backgroundImage.isNull()) {
+        return;
+    }
 
     painter.setOpacity(m_backgroundOpacity);
 
@@ -766,10 +820,10 @@ void FramelessWindow::applyTheme()
     }
 
     QScopedValueRollback<bool> applyingGuard(m_applyingTheme, true);
-    const bool useTranslucentBackground = usesTranslucentSurface();
-    setAttribute(Qt::WA_TranslucentBackground, useTranslucentBackground);
-
-    const QString styleSheet = m_themeManager.buildStyleSheet(useTranslucentBackground);
+    // Only the style sheet follows the surface: opaque surfaces paint a solid
+    // background, materials get the wash. The window attribute itself never
+    // changes, so switching modes is a repaint instead of a window rebuild.
+    const QString styleSheet = m_themeManager.buildStyleSheet(usesTranslucentSurface());
     if (m_lastAppliedStyleSheet != styleSheet) {
         setStyleSheet(styleSheet);
         m_lastAppliedStyleSheet = styleSheet;
@@ -790,6 +844,13 @@ void FramelessWindow::showEvent(QShowEvent *event)
         m_titleBar->setTitle(windowTitle());
         m_titleBar->setIcon(windowIcon());
     }
+    // A style sheet set before the window was shown can be dropped by the first
+    // polish, leaving the window painted with the initial colours until the
+    // theme changes again. Force one application now that the native window
+    // exists.
+    m_lastAppliedStyleSheet.clear();
+    applyTheme();
+
     ensureNativeResizeStyle();
     scheduleStateVisualRefresh();
 }
@@ -1254,14 +1315,8 @@ void FramelessWindow::applyVisualEffects()
     m_loggedNullWindowHandle = false;
     m_loggedNullWinId = false;
 
-    // Sync WA_TranslucentBackground with the resolved surface before applying
-    // native effects. Guards against direct applyVisualEffects() calls that
-    // bypass applyTheme().
     const WindowVisualState::SurfacePolicy policy = surfacePolicy();
     const bool shouldBeTranslucent = WindowVisualState::usesTranslucentSurface(policy);
-    if (shouldBeTranslucent != testAttribute(Qt::WA_TranslucentBackground)) {
-        setAttribute(Qt::WA_TranslucentBackground, shouldBeTranslucent);
-    }
 
     // DWM tears the backdrop down on minimize. Telling WindowEffect about it
     // keeps its cache honest, so the restore transition re-applies the backdrop
@@ -1393,9 +1448,7 @@ WindowVisualState::SurfacePolicy FramelessWindow::surfacePolicy() const
     // translucent attribute stable across minimize/restore, because flipping it
     // mid-transition delays composition recovery on Windows. DWM drops the
     // backdrop on its own while the window is minimized.
-    return WindowVisualState::resolveSurfacePolicy(m_backdropMode,
-                                                   false,
-                                                   !m_backgroundImage.isNull());
+    return WindowVisualState::resolveSurfacePolicy(m_backdropMode, false);
 }
 
 bool FramelessWindow::usesTranslucentSurface() const

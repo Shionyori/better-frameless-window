@@ -32,6 +32,32 @@ private slots:
         QCOMPARE(window.backdropMode(), WindowEffect::BackdropMode::Auto);
     }
 
+    // Background colour / image / opacity belong to BackdropMode::None; the
+    // setters stay usable but only that surface paints them.
+    void backgroundColourRoundTrip()
+    {
+        FramelessWindow window;
+        QVERIFY(!window.backgroundColor().isValid());
+
+        window.setBackgroundColor(QColor(12, 34, 56));
+        QCOMPARE(window.backgroundColor(), QColor(12, 34, 56));
+
+        window.setBackgroundColor(QColor());
+        QVERIFY(!window.backgroundColor().isValid());
+    }
+
+    void noBackdropMeansTheApplicationPaints()
+    {
+        FramelessWindow window;
+        window.setBackdropMode(WindowEffect::BackdropMode::None);
+        QVERIFY(!window.isBackdropActive());
+
+        // Setting an application background does not turn a material back into
+        // an opaque surface: the requested mode keeps ownership.
+        window.setBackgroundImage(QPixmap(4, 4));
+        QVERIFY(!window.isBackdropActive());
+    }
+
     void titleBarHeightIsAdjustable()
     {
         FramelessWindow window;

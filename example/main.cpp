@@ -102,10 +102,21 @@ int main(int argc, char *argv[])
     window.setWindowIcon(QIcon(QStringLiteral(":/images/icon.png")));
     window.setWindowSizeLimits(QSize(640, 520));
 
+    // Follow the Windows theme by default; the panel can pin Light or Dark.
+    window.setFollowSystemTheme(true);
+
     // BackdropMode::Auto lets the library pick the best backdrop this machine
     // supports; BackdropMode::None is the "off" switch. The buttons in the
     // panel force a specific mode.
     window.setBackdropMode(WindowEffect::BackdropMode::Auto);
+
+    // The application-painted surface starts empty (Image: Off); the photo is
+    // blended 30% over the theme colour once selected. Dormant while a material
+    // owns the surface, painted on None.
+    const QPixmap backgroundImage(QStringLiteral(":/images/bg.jpg"));
+    window.setBackgroundOpacity(0.30);
+
+    window.setTitleBarHeight(40);
 
     window.restoreWindowGeometry(); // saved automatically on close
 
@@ -124,8 +135,7 @@ int main(int argc, char *argv[])
     layout->setContentsMargins(28, 20, 28, 20);
     layout->setSpacing(10);
 
-    auto addRow = [&layout](const QString &title,
-                            const std::initializer_list<QWidget *> &widgets) {
+    auto addRow = [&layout](const QString &title, const QList<QWidget *> &widgets) {
         auto *row = new QHBoxLayout;
         row->setSpacing(8);
         row->addWidget(makeLabel(title));
@@ -138,7 +148,7 @@ int main(int argc, char *argv[])
 
     auto addSliderRow = [&addRow](const QString &title, int minimum, int maximum, int value,
                                   const QString &suffix,
-                                  const std::function<void(int)> &onChange) {
+                                  const std::function<void(int)> &onChange) -> QList<QWidget *> {
         auto *valueLabel = new QLabel(QString::number(value) + suffix);
         valueLabel->setObjectName(QStringLiteral("ContentLabel"));
         valueLabel->setStyleSheet(QStringLiteral("font-size: 12px;"));
@@ -155,6 +165,7 @@ int main(int argc, char *argv[])
         QObject::connect(slider, &QSlider::valueChanged, onChange);
 
         addRow(title, {slider, valueLabel});
+        return {slider, valueLabel};
     };
 
     // Theme: exactly one of System / Light / Dark is active, so they are one
@@ -227,6 +238,143 @@ int main(int argc, char *argv[])
     });
     addRow(QStringLiteral("Accent"), {accentSwatch});
 
+
+    // Three surface families, kept apart on purpose:
+    //   None    - the application paints the background (colour / image / opacity)
+    //   Mica    - the system derives a near-solid colour from the wallpaper
+    //   Acrylic - a translucent frosted surface
+    // The material owns the surface, so the background controls are disabled
+    // while one is active instead of silently doing nothing.
+    QList<QWidget *> backgroundControlList;
+    std::function<void()> syncBackgroundControls;
+
+    auto *autoBackdropButton = makeChoice(QStringLiteral("Auto"), [&]() {
+        window.setBackdropMode(WindowEffect::BackdropMode::Auto);
+        syncBackgroundControls();
+    });
+    auto *noBackdropButton = makeChoice(QStringLiteral("None"), [&]() {
+        window.setBackdropMode(WindowEffect::BackdropMode::None);
+        syncBackgroundControls();
+    });
+    auto *micaBackdropButton = makeChoice(QStringLiteral("Mica"), [&]() {
+        window.setBackdropMode(WindowEffect::BackdropMode::Mica);
+        syncBackgroundControls();
+    });
+    auto *acrylicBackdropButton = makeChoice(QStringLiteral("Acrylic"), [&]() {
+        window.setBackdropMode(WindowEffect::BackdropMode::Acrylic);
+        syncBackgroundControls();
+    });
+
+    auto *backdropGroup = new QButtonGroup(&window);
+    backdropGroup->setExclusive(true);
+    for (QPushButton *button : {autoBackdropButton, noBackdropButton,
+                                micaBackdropButton, acrylicBackdropButton}) {
+        backdropGroup->addButton(button);
+    }
+
+    switch (window.backdropMode()) {
+    case WindowEffect::BackdropMode::Auto:
+        autoBackdropButton->setChecked(true);
+        break;
+    case WindowEffect::BackdropMode::None:
+        noBackdropButton->setChecked(true);
+        break;
+    case WindowEffect::BackdropMode::Mica:
+        micaBackdropButton->setChecked(true);
+        break;
+    case WindowEffect::BackdropMode::Acrylic:
+        acrylicBackdropButton->setChecked(true);
+        break;
+    }
+
+    addRow(QStringLiteral("Backdrop"),
+           {autoBackdropButton, noBackdropButton, micaBackdropButton, acrylicBackdropButton});
+
+    // ── Application-painted background (BackdropMode::None only) ────────
+    // One exclusive group, so the active image mode is visible; Off is part of
+    // the group instead of a separate button that leaves the mode ambiguous.
+    auto *backgroundSwatch = new QPushButton;
+    backgroundSwatch->setFixedHeight(26);
+    backgroundSwatch->setMinimumWidth(96);
+    auto *backgroundThemeButton = makeButton(QStringLiteral("Theme"), [&]() {
+        window.setBackgroundColor(QColor());
+        applyColorSwatch(backgroundSwatch, window.backgroundColor(), QStringLiteral("\u2014"));
+    });
+    QObject::connect(backgroundSwatch, &QPushButton::clicked, &window,
+                     [&window, backgroundSwatch]() {
+                         const QColor color = QColorDialog::getColor(window.backgroundColor(),
+                                                                     nullptr,
+                                                                     QStringLiteral("Background color"));
+                         if (!color.isValid()) {
+                             return;
+                         }
+                         window.setBackgroundColor(color);
+                         applyColorSwatch(backgroundSwatch, window.backgroundColor(),
+                                          QStringLiteral("\u2014"));
+                     });
+    applyColorSwatch(backgroundSwatch, window.backgroundColor(), QStringLiteral("\u2014"));
+    addRow(QStringLiteral("Background"), {backgroundSwatch, backgroundThemeButton});
+    backgroundControlList << backgroundSwatch << backgroundThemeButton;
+
+    QList<QWidget *> backgroundButtons;
+    QList<QPushButton *> imageModeButtons;
+    const QList<QPair<QString, FramelessWindow::BackgroundImageMode>> backgroundModes = {
+        {QStringLiteral("Cover"), FramelessWindow::BackgroundImageMode::Cover},
+        {QStringLiteral("Fit"), FramelessWindow::BackgroundImageMode::Fit},
+        {QStringLiteral("Stretch"), FramelessWindow::BackgroundImageMode::Stretch},
+        {QStringLiteral("Tile"), FramelessWindow::BackgroundImageMode::Tile},
+        {QStringLiteral("Center"), FramelessWindow::BackgroundImageMode::Center},
+    };
+    for (const auto &entry : backgroundModes) {
+        auto *button = makeChoice(entry.first, [&window, backgroundImage, entry]() {
+            window.setBackgroundImage(backgroundImage, entry.second);
+        });
+        imageModeButtons.append(button);
+        backgroundButtons.append(button);
+    }
+    auto *noImageButton = makeChoice(QStringLiteral("Off"), [&window]() {
+        window.clearBackgroundImage();
+    });
+    imageModeButtons.append(noImageButton);
+    backgroundButtons.append(noImageButton);
+
+    auto *imageGroup = new QButtonGroup(&window);
+    imageGroup->setExclusive(true);
+    for (QPushButton *button : imageModeButtons) {
+        imageGroup->addButton(button);
+    }
+
+    if (window.backgroundImage().isNull()) {
+        noImageButton->setChecked(true);
+    } else {
+        for (int i = 0; i < backgroundModes.size(); ++i) {
+            if (backgroundModes.at(i).second == window.backgroundImageMode()) {
+                imageModeButtons.at(i)->setChecked(true);
+                break;
+            }
+        }
+    }
+
+    addRow(QStringLiteral("Image"), backgroundButtons);
+    backgroundControlList.append(backgroundButtons);
+
+
+    backgroundControlList.append(addSliderRow(QStringLiteral("Image opacity"), 0, 100,
+                                              qRound(window.backgroundOpacity() * 100),
+                                              QStringLiteral("%"), [&window](int value) {
+                                                  window.setBackgroundOpacity(value / 100.0);
+                                              }));
+
+    syncBackgroundControls = [&window, backgroundControlList]() {
+        // Ask the window, not the requested mode: Auto may resolve to an opaque
+        // surface on a machine without materials.
+        const bool appOwned = !window.isBackdropActive();
+        for (QWidget *widget : backgroundControlList) {
+            widget->setEnabled(appOwned);
+        }
+    };
+    syncBackgroundControls();
+
     auto *borderSwatch = new QPushButton;
     borderSwatch->setFixedHeight(26);
     borderSwatch->setMinimumWidth(96);
@@ -256,80 +404,6 @@ int main(int argc, char *argv[])
     borderDefaultButton->setEnabled(window.borderColor().isValid());
     addRow(QStringLiteral("Border"), {borderSwatch, borderDefaultButton});
 
-    // Backdrop: Auto resolves to Mica -> Acrylic -> None on the running OS.
-    // None also drops the translucent surface, so the window looks exactly like
-    // the background-image build.
-    auto *autoBackdropButton = makeChoice(QStringLiteral("Auto"), [&window]() {
-        window.setBackdropMode(WindowEffect::BackdropMode::Auto);
-    });
-    auto *noBackdropButton = makeChoice(QStringLiteral("None"), [&window]() {
-        window.setBackdropMode(WindowEffect::BackdropMode::None);
-    });
-    auto *micaBackdropButton = makeChoice(QStringLiteral("Mica"), [&window]() {
-        window.setBackdropMode(WindowEffect::BackdropMode::Mica);
-    });
-    auto *acrylicBackdropButton = makeChoice(QStringLiteral("Acrylic"), [&window]() {
-        window.setBackdropMode(WindowEffect::BackdropMode::Acrylic);
-    });
-
-    auto *backdropGroup = new QButtonGroup(&window);
-    backdropGroup->setExclusive(true);
-    for (QPushButton *button : {autoBackdropButton, noBackdropButton,
-                                micaBackdropButton, acrylicBackdropButton}) {
-        backdropGroup->addButton(button);
-    }
-
-    switch (window.backdropMode()) {
-    case WindowEffect::BackdropMode::Auto:
-        autoBackdropButton->setChecked(true);
-        break;
-    case WindowEffect::BackdropMode::None:
-        noBackdropButton->setChecked(true);
-        break;
-    case WindowEffect::BackdropMode::Mica:
-        micaBackdropButton->setChecked(true);
-        break;
-    case WindowEffect::BackdropMode::Acrylic:
-        acrylicBackdropButton->setChecked(true);
-        break;
-    }
-
-    addRow(QStringLiteral("Backdrop"),
-           {autoBackdropButton, noBackdropButton, micaBackdropButton, acrylicBackdropButton});
-
-    // ── Background image (commented out while testing the backdrop) ─────
-    // A background image and a backdrop write to the same surface (#10), so the
-    // library gives the image precedence: setting one switches the surface to
-    // opaque and drops the backdrop. Uncomment this block to go back to the
-    // image demo.
-    //
-    // const QPixmap backgroundImage(QStringLiteral(":/images/bg.jpg"));
-    // window.setBackgroundImage(backgroundImage);
-    // window.setBackgroundOpacity(0.35);
-    //
-    // addRow(QStringLiteral("Background"),
-    //        {makeButton(QStringLiteral("Cover"), [&window, backgroundImage]() {
-    //             window.setBackgroundImage(backgroundImage, FramelessWindow::BackgroundImageMode::Cover);
-    //         }),
-    //         makeButton(QStringLiteral("Fit"), [&window, backgroundImage]() {
-    //             window.setBackgroundImage(backgroundImage, FramelessWindow::BackgroundImageMode::Fit);
-    //         }),
-    //         makeButton(QStringLiteral("Stretch"), [&window, backgroundImage]() {
-    //             window.setBackgroundImage(backgroundImage, FramelessWindow::BackgroundImageMode::Stretch);
-    //         }),
-    //         makeButton(QStringLiteral("Tile"), [&window, backgroundImage]() {
-    //             window.setBackgroundImage(backgroundImage, FramelessWindow::BackgroundImageMode::Tile);
-    //         }),
-    //         makeButton(QStringLiteral("Center"), [&window, backgroundImage]() {
-    //             window.setBackgroundImage(backgroundImage, FramelessWindow::BackgroundImageMode::Center);
-    //         }),
-    //         makeButton(QStringLiteral("Off"), [&window]() {
-    //             window.clearBackgroundImage();
-    //         })});
-    // addSliderRow(QStringLiteral("Image opacity"), 0, 100,
-    //              qRound(window.backgroundOpacity() * 100), QStringLiteral("%"),
-    //              [&window](int value) { window.setBackgroundOpacity(value / 100.0); });
-
     // Window opacity is skipped as well: stacking QWidget::setWindowOpacity() on
     // top of a translucent backdrop makes the backdrop itself impossible to judge.
     // addSliderRow(QStringLiteral("Window opacity"), 0, 100,
@@ -351,18 +425,16 @@ int main(int argc, char *argv[])
             makeSwitch(QStringLiteral("Close"), window.isCloseButtonVisible(),
                        [&window](bool visible) { window.setCloseButtonVisible(visible); })});
 
-    // DWM visual effects and diagnostics. The shadow switch is left out on
-    // purpose: the window surface is translucent by default (Mica), and DWM
-    // draws no frame shadow for a layered window, so the toggle would look
-    // broken. setShadowEnabled() still works for opaque surfaces.
-    addRow(QStringLiteral("Effects"),
-           {makeSwitch(QStringLiteral("Rounded corners"), window.isRoundedCornersEnabled(),
-                       [&window](bool enabled) { window.setRoundedCornersEnabled(enabled); })});
-    addRow(QStringLiteral("Extras"),
-           {makeSwitch(QStringLiteral("Snap Layout"), window.isSnapLayoutEnabled(),
-                       [&window](bool enabled) { window.setSnapLayoutEnabled(enabled); }),
-            makeSwitch(QStringLiteral("Diagnostics"), window.isDiagnosticsEnabled(),
-                       [&window](bool enabled) { window.setDiagnosticsEnabled(enabled); })});
+    // Not exposed in the panel:
+    // - Snap Layout is on by default; setSnapLayoutEnabled() is for apps that
+    //   draw their own maximize button and want to opt out.
+    // - Diagnostics is a debugging aid, not a feature: off by default, switched
+    //   on with setDiagnosticsEnabled(true) when a DWM effect misbehaves (see
+    //   the README).
+    // - The DWM shadow needs an opaque surface and a material is layered, so a
+    //   toggle would look broken (setShadowEnabled() still works on None).
+    // - The rounded corner preference is not cosmetic: DWM uses it for the whole
+    //   frame it draws (border colour, shadow shape). It stays on.
 
     layout->addStretch();
     auto *hint = new QLabel(QStringLiteral("Drag the titlebar to move · double-click to "

@@ -34,6 +34,9 @@ public:
     void setRoundedCornersEnabled(bool enabled);
     // BackdropMode::None is the "off" switch; there is no separate enabled flag.
     void setBackdropMode(WindowEffect::BackdropMode mode);
+    // True while a material (Mica/Acrylic) owns the surface. The application
+    // background (colour/image/opacity) is only painted when this is false.
+    bool isBackdropActive() const;
     void setSnapLayoutEnabled(bool enabled);
     void setThemeMode(ThemeManager::ThemeMode mode, bool persist = true, bool animated = true);
     ThemeManager::ThemeMode themeMode() const;
@@ -64,6 +67,11 @@ public:
         Center
     };
 
+    // Background colour / image / opacity describe the application-painted
+    // surface, i.e. BackdropMode::None. A material (Mica/Acrylic) owns its own
+    // background and these have no effect while one is active.
+    void setBackgroundColor(const QColor &color);
+    QColor backgroundColor() const;
     void setBackgroundImage(const QPixmap &image, BackgroundImageMode mode = BackgroundImageMode::Cover);
     void clearBackgroundImage();
     QPixmap backgroundImage() const;
@@ -155,6 +163,7 @@ private:
     WindowEffect::BackdropMode m_backdropMode;
     bool m_roundedCornersEnabled;
     bool m_snapLayoutEnabled;
+    QColor m_backgroundColor;
     QPixmap m_backgroundImage;
     BackgroundImageMode m_backgroundImageMode = BackgroundImageMode::Cover;
     qreal m_backgroundOpacity = 1.0;
@@ -168,6 +177,7 @@ private:
     bool m_loggedNullWinId;
     bool m_loggedTranslucentShadow;
     bool m_resizing = false;
+    WindowVisualState::SurfaceKind m_lastAppliedSurfaceKind = WindowVisualState::SurfaceKind::Opaque;
     QPropertyAnimation *m_windowTransition = nullptr;
     bool m_windowTransitionMaximizes = false;
     bool m_animatingWindowTransition = false;

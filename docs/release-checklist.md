@@ -64,7 +64,8 @@ the real `windows` platform plugin, so keep `QT_QPA_PLATFORM=windows` on Windows
 - [ ] Mica: applied at startup, survives maximize → restore
 - [ ] Acrylic: applied at startup, survives maximize → restore, tint follows the theme
 - [ ] `setBackdropMode(None)` clears the backdrop and drops the translucent surface
-- [ ] Setting a background image while a backdrop is active switches the surface to opaque
+- [ ] Background controls (colour / image / opacity) are disabled while Mica or Acrylic is active and re-enable on `None`
+- [ ] An image set on `None` disappears when switching to Mica and returns when switching back
 - [ ] Dark theme + Mica: window is dark, never flat grey (backdrop dark variant follows the theme)
 - [ ] `setBorderColor()` shows the border on Windows 11
 - [ ] Shadow: visible with `BackdropMode::None`, absent with Mica/Acrylic (DWM drops it for layered windows)
