@@ -360,23 +360,13 @@ int main(int argc, char *argv[])
                                                   window.setBackgroundOpacity(value / 100.0);
                                               }));
 
-    auto *backgroundHint = new QLabel;
-    backgroundHint->setObjectName(QStringLiteral("ContentLabel"));
-    backgroundHint->setStyleSheet(QStringLiteral("font-size: 11px;"));
-    backgroundHint->setWordWrap(true);
-    layout->addWidget(backgroundHint);
-
-    syncBackgroundControls = [&window, backgroundControlList, backgroundHint]() {
+    syncBackgroundControls = [&window, backgroundControlList]() {
         // Ask the window, not the requested mode: Auto may resolve to an opaque
         // surface on a machine without materials.
         const bool appOwned = !window.isBackdropActive();
         for (QWidget *widget : backgroundControlList) {
             widget->setEnabled(appOwned);
         }
-        backgroundHint->setText(appOwned
-                                    ? QStringLiteral("Background is painted by the application.")
-                                    : QStringLiteral("Background is owned by the material "
-                                                     "\u2014 select Backdrop None to edit it."));
     };
     syncBackgroundControls();
 
