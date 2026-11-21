@@ -1025,6 +1025,9 @@ void FramelessWindow::toggleMaximizeRestore()
             return;
         }
     } else if (const QScreen *targetScreen = screen()) {
+        // The rectangle to come back to, captured before the animation walks
+        // the geometry up to the work area.
+        m_restoreGeometry = geometry();
         startWindowTransition(targetScreen->availableGeometry(), true);
         return;
     }
@@ -1122,6 +1125,16 @@ void FramelessWindow::rememberRestoreGeometry()
     if (m_animatingWindowTransition || isMaximized() || isMinimized() || isFullScreen()) {
         return;
     }
+
+#ifdef Q_OS_WIN
+    // Qt learns the maximized state from WM_SIZE asynchronously, so during a
+    // native maximize a move/resize event can arrive while isMaximized() is
+    // still false although the geometry already is the work area. Ask the
+    // window itself instead of relying on the event order.
+    if (WindowFrame::isMaximized(reinterpret_cast<void *>(winId()))) {
+        return;
+    }
+#endif
 
     m_restoreGeometry = geometry();
 }

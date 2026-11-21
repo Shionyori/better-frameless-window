@@ -41,6 +41,17 @@ void forceDwmRefresh(void *hwnd)
 #endif
 }
 
+bool isMaximized(void *hwnd)
+{
+#ifdef Q_OS_WIN
+    const HWND win = static_cast<HWND>(hwnd);
+    return win != nullptr && IsZoomed(win) != FALSE;
+#else
+    Q_UNUSED(hwnd)
+    return false;
+#endif
+}
+
 QRect restoreGeometry(void *hwnd)
 {
 #ifdef Q_OS_WIN
