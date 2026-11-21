@@ -428,17 +428,16 @@ int main(int argc, char *argv[])
             makeSwitch(QStringLiteral("Close"), window.isCloseButtonVisible(),
                        [&window](bool visible) { window.setCloseButtonVisible(visible); })});
 
-    // Frame-level effects stay out of the panel on purpose:
-    // - the DWM shadow needs an opaque surface, and a material is layered, so
-    //   the toggle would look broken (setShadowEnabled() still works on None);
-    // - the rounded corner preference is not a cosmetic switch: DWM uses it for
-    //   the whole frame it draws (border colour, shadow shape), so turning it
-    //   off changes more than the corners. It stays on by default.
-    addRow(QStringLiteral("Extras"),
-           {makeSwitch(QStringLiteral("Snap Layout"), window.isSnapLayoutEnabled(),
-                       [&window](bool enabled) { window.setSnapLayoutEnabled(enabled); }),
-            makeSwitch(QStringLiteral("Diagnostics"), window.isDiagnosticsEnabled(),
-                       [&window](bool enabled) { window.setDiagnosticsEnabled(enabled); })});
+    // Not exposed in the panel:
+    // - Snap Layout is on by default; setSnapLayoutEnabled() is for apps that
+    //   draw their own maximize button and want to opt out.
+    // - Diagnostics is a debugging aid, not a feature: off by default, switched
+    //   on with setDiagnosticsEnabled(true) when a DWM effect misbehaves (see
+    //   the README).
+    // - The DWM shadow needs an opaque surface and a material is layered, so a
+    //   toggle would look broken (setShadowEnabled() still works on None).
+    // - The rounded corner preference is not cosmetic: DWM uses it for the whole
+    //   frame it draws (border colour, shadow shape). It stays on.
 
     layout->addStretch();
     auto *hint = new QLabel(QStringLiteral("Drag the titlebar to move · double-click to "
