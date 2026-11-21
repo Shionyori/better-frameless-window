@@ -70,10 +70,10 @@ int main(int argc, char *argv[])
     window.setWindowIcon(QIcon(QStringLiteral(":/images/icon.png")));
     window.setWindowSizeLimits(QSize(640, 520));
 
-    // System backdrop is the focus here: Auto lets the library pick the best
-    // mode this machine supports, the buttons below force a specific one.
-    window.setSystemBackdropEnabled(true);
-    window.setSystemBackdropPreference(WindowEffect::SystemBackdropPreference::Auto);
+    // BackdropMode::Auto lets the library pick the best backdrop this machine
+    // supports; BackdropMode::None is the "off" switch. The buttons in the
+    // panel force a specific mode.
+    window.setBackdropMode(WindowEffect::BackdropMode::Auto);
 
     window.restoreWindowGeometry(); // saved automatically on close
 
@@ -161,27 +161,28 @@ int main(int argc, char *argv[])
                 window.setBorderColor(QColor());
             })});
 
-    // System backdrop: Auto -> Mica -> Acrylic -> None fallback chain. "None"
-    // also drops the translucent surface, so the window looks exactly like the
-    // background-image build.
+    // Backdrop: Auto resolves to Mica -> Acrylic -> None on the running OS.
+    // None also drops the translucent surface, so the window looks exactly like
+    // the background-image build.
     addRow(QStringLiteral("Backdrop"),
            {makeButton(QStringLiteral("Auto"), [&window]() {
-                window.setSystemBackdropPreference(WindowEffect::SystemBackdropPreference::Auto);
+                window.setBackdropMode(WindowEffect::BackdropMode::Auto);
             }),
             makeButton(QStringLiteral("None"), [&window]() {
-                window.setSystemBackdropPreference(WindowEffect::SystemBackdropPreference::None);
+                window.setBackdropMode(WindowEffect::BackdropMode::None);
             }),
             makeButton(QStringLiteral("Mica"), [&window]() {
-                window.setSystemBackdropPreference(WindowEffect::SystemBackdropPreference::Mica);
+                window.setBackdropMode(WindowEffect::BackdropMode::Mica);
             }),
             makeButton(QStringLiteral("Acrylic"), [&window]() {
-                window.setSystemBackdropPreference(WindowEffect::SystemBackdropPreference::Acrylic);
+                window.setBackdropMode(WindowEffect::BackdropMode::Acrylic);
             })});
 
     // ── Background image (commented out while testing the backdrop) ─────
-    // A background image and a system backdrop write to the same surface (#10),
-    // so only one of them can be live at a time. To go back to the image demo:
-    // comment out the two setSystemBackdrop*() calls above.
+    // A background image and a backdrop write to the same surface (#10), so the
+    // library gives the image precedence: setting one switches the surface to
+    // opaque and drops the backdrop. Uncomment this block to go back to the
+    // image demo.
     //
     // const QPixmap backgroundImage(QStringLiteral(":/images/bg.jpg"));
     // window.setBackgroundImage(backgroundImage);
@@ -234,7 +235,7 @@ int main(int argc, char *argv[])
     // DWM visual effects and diagnostics.
     addRow(QStringLiteral("Effects"),
            {makeSwitch(QStringLiteral("Shadow"), window.isShadowEnabled(),
-                       [&window](bool enabled) { window.setSystemShadowEnabled(enabled); }),
+                       [&window](bool enabled) { window.setShadowEnabled(enabled); }),
             makeSwitch(QStringLiteral("Rounded corners"), window.isRoundedCornersEnabled(),
                        [&window](bool enabled) { window.setRoundedCornersEnabled(enabled); })});
     addRow(QStringLiteral("Extras"),

@@ -138,13 +138,8 @@ void WindowEffect::applyVisualEffects(void *hwnd, const VisualEffectOptions &opt
 #ifdef Q_OS_WIN
     applyShadow(hwnd, options.shadowEnabled, options.maximized, options.minimized);
     applyRoundedCorners(hwnd, options.roundedCornersEnabled, options.maximized, options.minimized);
-    applySystemDarkMode(hwnd, options.useDarkMode);
-    applySystemBackdropEffects(hwnd,
-                         options.systemBackdropEnabled,
-                         options.useDarkMode,
-                         options.maximized,
-                         options.minimized,
-                         options.systemBackdropPreference);
+    applyDarkModeHint(hwnd, options.darkMode);
+    applyBackdrop(hwnd, options.backdrop, options.darkMode);
     applyBorderColor(hwnd, options.borderColor);
 #else
     (void) hwnd;
@@ -230,12 +225,12 @@ void WindowEffect::applyRoundedCorners(void *hwnd, bool enabled, bool maximized,
 #endif
 }
 
-void WindowEffect::applySystemDarkMode(void *hwnd, bool useDarkMode) const
+void WindowEffect::applyDarkModeHint(void *hwnd, bool darkMode) const
 {
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
     if (win == nullptr) {
-        Diagnostics::logWarning(QStringLiteral("applySystemDarkMode: null HWND"));
+        Diagnostics::logWarning(QStringLiteral("applyDarkModeHint: null HWND"));
         return;
     }
 
@@ -243,11 +238,11 @@ void WindowEffect::applySystemDarkMode(void *hwnd, bool useDarkMode) const
         return;
     }
 
-    // DWM uses this attribute both for its own dark chrome and as the selector
-    // for the dark variant of Mica, so it has to follow the app theme; leaving
-    // it at light while the theme is dark paints the dark wash over light Mica
-    // and the window turns flat grey.
-    const BOOL darkEnabled = useDarkMode ? TRUE : FALSE;
+    // DWM reads this attribute both for its own dark chrome and as the light /
+    // dark selector of Mica, so it has to follow the app theme. Leaving it at
+    // light while the theme is dark paints the dark wash over light Mica, which
+    // turns the window flat grey.
+    const BOOL darkEnabled = darkMode ? TRUE : FALSE;
     if (m_darkMode20Valid) {
         const HRESULT result = DwmSetWindowAttribute(win,
                                                      DWMWA_USE_SYSTEM_DARK_MODE,
@@ -258,7 +253,7 @@ void WindowEffect::applySystemDarkMode(void *hwnd, bool useDarkMode) const
         }
 
         m_darkMode20Valid = false;
-        Diagnostics::logWarning(QStringLiteral("applySystemDarkMode: DWMWA_USE_SYSTEM_DARK_MODE failed (hr=0x%1), fallback to legacy attribute")
+        Diagnostics::logWarning(QStringLiteral("applyDarkModeHint: DWMWA_USE_SYSTEM_DARK_MODE failed (hr=0x%1), fallback to legacy attribute")
                                     .arg(QString::number(static_cast<qulonglong>(result), 16)));
     }
 
@@ -269,95 +264,40 @@ void WindowEffect::applySystemDarkMode(void *hwnd, bool useDarkMode) const
                                                             sizeof(darkEnabled));
         if (FAILED(legacyResult)) {
             m_darkMode19Valid = false;
-            Diagnostics::logWarning(QStringLiteral("applySystemDarkMode: legacy dark mode attribute failed (hr=0x%1), disable subsequent calls")
+            Diagnostics::logWarning(QStringLiteral("applyDarkModeHint: legacy dark mode attribute failed (hr=0x%1), disable subsequent calls")
                                         .arg(QString::number(static_cast<qulonglong>(legacyResult), 16)));
         }
     }
 #else
     (void) hwnd;
-    (void) enabled;
-    (void) useDarkMode;
+    (void) darkMode;
 #endif
 }
 
-WindowEffect::SystemBackdropMode WindowEffect::selectSystemBackdropMode(bool enabled,
-                                                                  bool minimized,
-                                                                  SystemBackdropPreference systemBackdropPreference) const
-{
-#ifdef Q_OS_WIN
-    if (!enabled || minimized) {
-        return SystemBackdropMode::None;
-    }
-
-    const Utils::WindowsCapabilities caps = Utils::detectWindowsCapabilities();
-    const bool allowAcrylic = true;
-    if (systemBackdropPreference != SystemBackdropPreference::Auto) {
-        switch (systemBackdropPreference) {
-        case SystemBackdropPreference::None:
-            return SystemBackdropMode::None;
-        case SystemBackdropPreference::Mica:
-            if (caps.supportsSystemSystemBackdrop) {
-                return SystemBackdropMode::Mica;
-            }
-            Diagnostics::logWarning(QStringLiteral("selectSystemBackdropMode: requested Mica not supported, fallback to Auto chain"));
-            break;
-        case SystemBackdropPreference::Acrylic:
-            if (allowAcrylic && caps.supportsAcrylic && getSetWindowCompositionAttribute() != nullptr) {
-                return SystemBackdropMode::Acrylic;
-            }
-            Diagnostics::logWarning(QStringLiteral("selectSystemBackdropMode: requested Acrylic not supported now, fallback to Mica/Auto chain"));
-            break;
-        case SystemBackdropPreference::Auto:
-            break;
-        }
-    }
-
-    if (caps.supportsSystemSystemBackdrop) {
-        return SystemBackdropMode::Mica;
-    }
-
-    if (allowAcrylic && caps.supportsAcrylic && getSetWindowCompositionAttribute() != nullptr) {
-        return SystemBackdropMode::Acrylic;
-    }
-#else
-    (void) enabled;
-    (void) minimized;
-    (void) systemBackdropPreference;
-#endif
-
-    return SystemBackdropMode::None;
-}
-
-void WindowEffect::applySystemBackdropEffects(void *hwnd,
-                                           bool enabled,
-                                           bool useDarkMode,
-                                           bool maximized,
-                                           bool minimized,
-                                           SystemBackdropPreference systemBackdropPreference,
-                                           bool forceRebind) const
+void WindowEffect::applyBackdrop(void *hwnd,
+                                 BackdropKind kind,
+                                 bool darkMode,
+                                 bool forceRebind) const
 {
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
     if (win == nullptr) {
-        Diagnostics::logWarning(QStringLiteral("applySystemBackdropEffects: null HWND"));
+        Diagnostics::logWarning(QStringLiteral("applyBackdrop: null HWND"));
         return;
     }
-
-    const Utils::WindowsCapabilities caps = Utils::detectWindowsCapabilities();
-    SystemBackdropMode mode = selectSystemBackdropMode(enabled, minimized, systemBackdropPreference);
 
     // Per-instance caching: skip redundant DWM calls during frequent visual
     // refreshes (window move, focus change) when nothing actually changed.
     if (!forceRebind
-        && WindowVisualState::isBackdropApplyRedundant(mode,
-                                                      useDarkMode,
-                                                      m_lastAppliedMode,
-                                                      m_lastAppliedUseDarkMode,
+        && WindowVisualState::isBackdropApplyRedundant(kind,
+                                                      darkMode,
+                                                      m_lastAppliedKind,
+                                                      m_lastAppliedDarkMode,
                                                       m_lastAppliedSuccessfully)) {
         return;
     }
 
-    auto setSystemBackdropType = [&](DWORD type, const QString &reason) -> HRESULT {
+    auto setBackdropType = [&](DWORD type, const QString &reason) -> HRESULT {
         if (!m_systemBackdropAttributeSupported) {
             return E_NOTIMPL;
         }
@@ -368,62 +308,63 @@ void WindowEffect::applySystemBackdropEffects(void *hwnd,
                                                  sizeof(type));
         if (hr == E_INVALIDARG) {
             m_systemBackdropAttributeSupported = false;
-            Diagnostics::logWarning(QStringLiteral("applySystemBackdropEffects: DWMWA_SYSTEMBACKDROP_TYPE unsupported (hr=0x%1, reason=%2)")
+            Diagnostics::logWarning(QStringLiteral("applyBackdrop: DWMWA_SYSTEMBACKDROP_TYPE unsupported (hr=0x%1, reason=%2)")
                                         .arg(QString::number(static_cast<qulonglong>(hr), 16), reason));
         } else if (FAILED(hr)) {
-            Diagnostics::logWarning(QStringLiteral("applySystemBackdropEffects: DWMWA_SYSTEMBACKDROP_TYPE failed (hr=0x%1, reason=%2)")
+            Diagnostics::logWarning(QStringLiteral("applyBackdrop: DWMWA_SYSTEMBACKDROP_TYPE failed (hr=0x%1, reason=%2)")
                                         .arg(QString::number(static_cast<qulonglong>(hr), 16), reason));
         }
         return hr;
     };
 
-    // Phase 1: reset the previously applied effect when DWM stores it as a
-    // window attribute (Mica), so that re-applying the same type is recognized
+    // Phase 1: reset the previously applied backdrop when DWM stores it as a
+    // window attribute (Mica), so that re-applying the same kind is recognized
     // as a genuine state change. Acrylic lives in the accent policy instead and
     // is idempotent, so it is re-applied in place: clearing it first drops the
     // blur for a frame, which is the flicker seen after a maximize/restore
     // transition.
-    if (WindowVisualState::shouldClearBackdropBeforeApply(m_lastAppliedMode, mode)) {
-        if (m_lastAppliedMode == SystemBackdropMode::Mica) {
-            setSystemBackdropType(DWMSBT_NONE, QStringLiteral("clear-mica"));
-        } else if (m_lastAppliedMode == SystemBackdropMode::Acrylic) {
-            applyAcrylicAccent(win, false, useDarkMode);
+    if (WindowVisualState::shouldClearBackdropBeforeApply(m_lastAppliedKind, kind)) {
+        if (m_lastAppliedKind == BackdropKind::Mica) {
+            setBackdropType(DWMSBT_NONE, QStringLiteral("clear-mica"));
+        } else if (m_lastAppliedKind == BackdropKind::Acrylic) {
+            applyAcrylicAccent(win, false, darkMode);
         }
     }
 
-    m_lastAppliedMode = SystemBackdropMode::None;
+    m_lastAppliedKind = BackdropKind::None;
     m_lastAppliedSuccessfully = false;
 
-    // Phase 2: If no backdrop is desired, done after clearing.
-    if (mode == SystemBackdropMode::None) {
+    if (kind == BackdropKind::None) {
         m_lastAppliedSuccessfully = true;
-        m_lastAppliedUseDarkMode = useDarkMode;
+        m_lastAppliedDarkMode = darkMode;
         return;
     }
 
-    // Phase 3: Apply the selected mode with linear fallback.
-    bool applied = false;
+    const Utils::WindowsCapabilities caps = Utils::detectWindowsCapabilities();
 
-    if (mode == SystemBackdropMode::Mica) {
-        const HRESULT hr = setSystemBackdropType(DWMSBT_MAINWINDOW, QStringLiteral("apply-mica"));
+    // Phase 2: apply the resolved kind, falling back to Acrylic when Mica is
+    // rejected by the running OS.
+    bool applied = false;
+    if (kind == BackdropKind::Mica) {
+        const HRESULT hr = setBackdropType(DWMSBT_MAINWINDOW, QStringLiteral("apply-mica"));
         if (SUCCEEDED(hr)) {
             applied = true;
         } else if (caps.supportsAcrylic && getSetWindowCompositionAttribute() != nullptr) {
-            mode = SystemBackdropMode::Acrylic;
+            kind = BackdropKind::Acrylic;
         }
     }
 
-    if (!applied && mode == SystemBackdropMode::Acrylic) {
-        applyAcrylicAccent(win, true, useDarkMode);
+    if (!applied && kind == BackdropKind::Acrylic) {
+        applyAcrylicAccent(win, true, darkMode);
         applied = true;
     }
 
     if (applied) {
-        m_lastAppliedMode = mode;
+        m_lastAppliedKind = kind;
         m_lastAppliedSuccessfully = true;
-        m_lastAppliedUseDarkMode = useDarkMode;
+        m_lastAppliedDarkMode = darkMode;
 
-        if (mode != SystemBackdropMode::Acrylic) {
+        if (kind != BackdropKind::Acrylic) {
             SetWindowPos(win,
                          nullptr,
                          0,
@@ -440,10 +381,9 @@ void WindowEffect::applySystemBackdropEffects(void *hwnd,
 
 #else
     (void) hwnd;
-    (void) useDarkMode;
-    (void) maximized;
-    (void) minimized;
-    (void) systemBackdropPreference;
+    (void) kind;
+    (void) darkMode;
+    (void) forceRebind;
 #endif
 }
 

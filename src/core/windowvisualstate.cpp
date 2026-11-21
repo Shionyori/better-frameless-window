@@ -4,93 +4,125 @@
 
 namespace WindowVisualState {
 
+namespace {
+
+WindowEffect::BackdropKind bestSupportedBackdrop(const BackdropCapabilities &capabilities)
+{
+    if (capabilities.mica) {
+        return WindowEffect::BackdropKind::Mica;
+    }
+    if (capabilities.acrylic) {
+        return WindowEffect::BackdropKind::Acrylic;
+    }
+    return WindowEffect::BackdropKind::None;
+}
+
+} // namespace
+
+SurfacePolicy resolveSurfacePolicy(WindowEffect::BackdropMode requested,
+                                   bool minimized,
+                                   bool hasBackgroundImage,
+                                   const BackdropCapabilities &capabilities)
+{
+    SurfacePolicy policy;
+
+    // States where the theme must own the surface: a minimized window keeps no
+    // backdrop, and a background image is painted by the theme itself.
+    if (minimized || hasBackgroundImage || requested == WindowEffect::BackdropMode::None) {
+        return policy;
+    }
+
+    WindowEffect::BackdropKind backdrop = WindowEffect::BackdropKind::None;
+    switch (requested) {
+    case WindowEffect::BackdropMode::Auto:
+    case WindowEffect::BackdropMode::Mica:
+        backdrop = bestSupportedBackdrop(capabilities);
+        break;
+    case WindowEffect::BackdropMode::Acrylic:
+        backdrop = capabilities.acrylic ? WindowEffect::BackdropKind::Acrylic
+                                        : bestSupportedBackdrop(capabilities);
+        break;
+    case WindowEffect::BackdropMode::None:
+        break;
+    }
+
+    if (backdrop == WindowEffect::BackdropKind::None) {
+        return policy;
+    }
+
+    policy.kind = SurfaceKind::Translucent;
+    policy.backdrop = backdrop;
+    return policy;
+}
+
+SurfacePolicy resolveSurfacePolicy(WindowEffect::BackdropMode requested,
+                                   bool minimized,
+                                   bool hasBackgroundImage)
+{
+    const Utils::WindowsCapabilities caps = Utils::detectWindowsCapabilities();
+    BackdropCapabilities capabilities;
+    capabilities.mica = caps.supportsMica;
+    capabilities.acrylic = caps.supportsAcrylic;
+    return resolveSurfacePolicy(requested, minimized, hasBackgroundImage, capabilities);
+}
+
+bool usesTranslucentSurface(const SurfacePolicy &policy)
+{
+    return policy.kind == SurfaceKind::Translucent;
+}
+
 bool shouldUseDarkMode(ThemeManager::ThemeMode themeMode)
 {
     return themeMode == ThemeManager::ThemeMode::Dark;
 }
 
-bool shouldClearBackdropBeforeApply(WindowEffect::SystemBackdropMode appliedMode,
-                                    WindowEffect::SystemBackdropMode requestedMode)
+bool shouldClearBackdropBeforeApply(WindowEffect::BackdropKind appliedKind,
+                                    WindowEffect::BackdropKind requestedKind)
 {
-    switch (appliedMode) {
-    case WindowEffect::SystemBackdropMode::Mica:
+    switch (appliedKind) {
+    case WindowEffect::BackdropKind::Mica:
         return true;
-    case WindowEffect::SystemBackdropMode::Acrylic:
-        return requestedMode != WindowEffect::SystemBackdropMode::Acrylic;
-    case WindowEffect::SystemBackdropMode::None:
+    case WindowEffect::BackdropKind::Acrylic:
+        return requestedKind != WindowEffect::BackdropKind::Acrylic;
+    case WindowEffect::BackdropKind::None:
         return false;
     }
 
     return false;
 }
 
-bool isBackdropApplyRedundant(WindowEffect::SystemBackdropMode requestedMode,
-                              bool requestedUseDarkMode,
-                              WindowEffect::SystemBackdropMode appliedMode,
-                              bool appliedUseDarkMode,
+bool isBackdropApplyRedundant(WindowEffect::BackdropKind requestedKind,
+                              bool requestedDarkMode,
+                              WindowEffect::BackdropKind appliedKind,
+                              bool appliedDarkMode,
                               bool appliedSuccessfully)
 {
-    if (!appliedSuccessfully || requestedMode != appliedMode) {
+    if (!appliedSuccessfully || requestedKind != appliedKind) {
         return false;
     }
 
-    if (requestedMode == WindowEffect::SystemBackdropMode::Acrylic) {
-        return requestedUseDarkMode == appliedUseDarkMode;
+    if (requestedKind == WindowEffect::BackdropKind::Acrylic) {
+        return requestedDarkMode == appliedDarkMode;
     }
 
     return true;
 }
 
-bool shouldUseTranslucentBackground(bool systemBackdropEnabled,
-                                    bool minimized,
-                                    WindowEffect::SystemBackdropPreference systemBackdropPreference)
-{
-#ifdef Q_OS_WIN
-    if (!systemBackdropEnabled || minimized) {
-        return false;
-    }
-
-    const Utils::WindowsCapabilities caps = Utils::detectWindowsCapabilities();
-    const bool autoChainAvailable = caps.supportsSystemSystemBackdrop
-                                    || caps.supportsAcrylic;
-
-    switch (systemBackdropPreference) {
-    case WindowEffect::SystemBackdropPreference::Auto:
-        return autoChainAvailable;
-    case WindowEffect::SystemBackdropPreference::None:
-        return false;
-    case WindowEffect::SystemBackdropPreference::Mica:
-        return caps.supportsSystemSystemBackdrop ? true : autoChainAvailable;
-    case WindowEffect::SystemBackdropPreference::Acrylic:
-        return caps.supportsAcrylic ? true : autoChainAvailable;
-    }
-
-    return false;
-#else
-    Q_UNUSED(systemBackdropEnabled)
-    Q_UNUSED(minimized)
-    Q_UNUSED(systemBackdropPreference)
-    return false;
-#endif
-}
-
 WindowEffect::VisualEffectOptions buildVisualEffectOptions(bool shadowEnabled,
-                                                              bool systemBackdropEnabled,
-                                                              WindowEffect::SystemBackdropPreference systemBackdropPreference,
-                                                              bool roundedCornersEnabled,
-                                                              ThemeManager::ThemeMode themeMode,
-                                                              bool maximized,
-                                                              bool minimized,
-                                                              const QColor &borderColor)
+                                                           bool roundedCornersEnabled,
+                                                           ThemeManager::ThemeMode themeMode,
+                                                           bool maximized,
+                                                           bool minimized,
+                                                           const SurfacePolicy &surface,
+                                                           const QColor &borderColor)
 {
     WindowEffect::VisualEffectOptions options;
     options.shadowEnabled = shadowEnabled;
-    options.systemBackdropEnabled = systemBackdropEnabled;
-    options.systemBackdropPreference = systemBackdropPreference;
     options.roundedCornersEnabled = roundedCornersEnabled;
-    options.useDarkMode = shouldUseDarkMode(themeMode);
+    options.darkMode = shouldUseDarkMode(themeMode);
     options.maximized = maximized;
     options.minimized = minimized;
+    options.backdrop = surface.backdrop;
     options.borderColor = borderColor;
     return options;
 }
@@ -100,11 +132,10 @@ quint64 buildVisualStateToken(bool visible,
                               bool minimized,
                               bool active,
                               bool shadowEnabled,
-                              bool systemBackdropEnabled,
                               bool roundedCornersEnabled,
-                              WindowEffect::SystemBackdropPreference systemBackdropPreference,
+                              WindowEffect::BackdropKind backdrop,
                               ThemeManager::ThemeMode themeMode,
-                              bool translucentBackground)
+                              bool translucentSurface)
 {
     quint64 token = 0;
     token |= static_cast<quint64>(visible) << 0;
@@ -112,12 +143,11 @@ quint64 buildVisualStateToken(bool visible,
     token |= static_cast<quint64>(minimized) << 2;
     token |= static_cast<quint64>(active) << 3;
     token |= static_cast<quint64>(shadowEnabled) << 4;
-    token |= static_cast<quint64>(systemBackdropEnabled) << 5;
-    token |= static_cast<quint64>(roundedCornersEnabled) << 6;
-    token |= static_cast<quint64>(shouldUseDarkMode(themeMode)) << 8;
-    token |= static_cast<quint64>(translucentBackground) << 9;
-    token |= static_cast<quint64>(static_cast<int>(systemBackdropPreference) & 0xF) << 10;
-    token |= static_cast<quint64>(static_cast<int>(themeMode) & 0x3) << 14;
+    token |= static_cast<quint64>(roundedCornersEnabled) << 5;
+    token |= static_cast<quint64>(shouldUseDarkMode(themeMode)) << 6;
+    token |= static_cast<quint64>(translucentSurface) << 7;
+    token |= static_cast<quint64>(static_cast<int>(backdrop) & 0x3) << 8;
+    token |= static_cast<quint64>(static_cast<int>(themeMode) & 0x3) << 10;
     return token;
 }
 

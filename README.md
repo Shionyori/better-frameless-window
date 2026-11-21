@@ -92,8 +92,6 @@ int main(int argc, char *argv[])
 | `minimumWindowSize()` / `maximumWindowSize()` | Get current size limits |
 | `setCentralWidget(widget)` | Set the main content widget |
 | `centralWidget()` / `takeCentralWidget()` | Get / remove the content widget |
-| `setWindowOpacity(qreal)` | Set window-level opacity (0.0–1.0) |
-| `windowOpacity()` | Get current window opacity |
 | `saveWindowGeometry()` / `restoreWindowGeometry()` | Persist / restore window position and size |
 
 ### Titlebar
@@ -132,18 +130,46 @@ int main(int argc, char *argv[])
 
 | Method | Description |
 |---|---|
-| `setSystemShadowEnabled(bool)` | Enable / disable system window shadow |
+| `setShadowEnabled(bool)` | Enable / disable the DWM window shadow |
 | `isShadowEnabled()` | Check shadow state |
-| `setSystemBackdropEnabled(bool)` | Enable / disable system backdrop effects |
-| `setSystemBackdropPreference(pref)` | Set backdrop mode |
-| `systemBackdropPreference()` | Get current backdrop mode |
-| `isSystemBackdropEnabled()` | Check backdrop state |
+| `setBackdropMode(mode)` | Request a backdrop; `None` switches it off |
+| `backdropMode()` | Get the requested backdrop mode |
 | `setRoundedCornersEnabled(bool)` | Enable / disable rounded window corners |
 | `isRoundedCornersEnabled()` | Check rounded corners state |
 | `setSnapLayoutEnabled(bool)` | Enable / disable Snap Layout overlay |
 | `isSnapLayoutEnabled()` | Check Snap Layout state |
 | `setBorderColor(color)` | Set the native window border color (`DWMWA_BORDER_COLOR`, Windows 11) |
 | `borderColor()` | Get the current border color |
+
+**BackdropMode** — `Auto` (default) / `None` / `Mica` / `Acrylic`
+
+`Auto` resolves to the best backdrop the running OS supports:
+Windows 11 22H2+ → Mica → Acrylic → None.
+
+### Rendering rules
+
+The window surface is resolved once, in `WindowVisualState::resolveSurfacePolicy()`,
+and both the Qt side (translucency, theme wash) and the DWM side (backdrop kind)
+are derived from that single result. The rules, highest precedence first:
+
+| Rule | Result |
+|---|---|
+| Window is minimized | DWM drops the backdrop; the Qt surface stays translucent across the transition, because flipping that attribute mid-restore delays composition recovery |
+| A background image is set | opaque, no backdrop (the image owns the surface) |
+| `BackdropMode::None` | opaque, no backdrop |
+| Backdrop requested and supported | translucent surface + that backdrop |
+| Backdrop requested, nothing supported | opaque, no backdrop |
+
+Consequences:
+
+- A translucent surface always has a backdrop behind it, so the window can never
+  show the desktop through an unbacked wash.
+- Background image and backdrop never compete: setting an image drops the
+  backdrop, so the two features can be used one after the other, not at once.
+- The dark variant of the backdrop is not a switch. DWM reads it from
+  `DWMWA_USE_IMMERSIVE_DARK_MODE`, which the library always keeps in sync with
+  `themeMode()`; toggling it independently would paint the dark wash over light
+  Mica and turn the window flat grey.
 
 ### Theme
 
@@ -161,16 +187,6 @@ int main(int argc, char *argv[])
 ### Theme Enums
 
 **ThemeMode** — `Light` / `Dark`
-
-**SystemBackdropPreference** — `Auto` / `None` / `Mica` / `Acrylic`
-
-The dark variant of the backdrop is not a separate switch: DWM selects it from
-`DWMWA_USE_IMMERSIVE_DARK_MODE`, which the library keeps in sync with
-`themeMode()`. Toggling it independently would paint the dark theme wash over
-light Mica.
-
-The `Auto` mode selects the best available backdrop for the current OS:
-Windows 11 22H2+ → Mica → Acrylic → None
 
 ### Diagnostics
 

@@ -2,6 +2,7 @@
 
 #include "thememanager.h"
 #include "core/visualrefreshcoordinator.h"
+#include "core/windowvisualstate.h"
 #include "win32/windoweffect.h"
 
 #include <QColor>
@@ -22,17 +23,14 @@ public:
     explicit FramelessWindow(QWidget *parent = nullptr);
     ~FramelessWindow();
 
-    void setWindowOpacity(qreal opacity);
-    qreal windowOpacity() const;
-
     void setWindowSizeLimits(const QSize &minimumSize, const QSize &maximumSize = QSize());
     QSize minimumWindowSize() const;
     QSize maximumWindowSize() const;
 
-    void setSystemShadowEnabled(bool enabled);
-    void setSystemBackdropEnabled(bool enabled);
-    void setSystemBackdropPreference(WindowEffect::SystemBackdropPreference preference);
+    void setShadowEnabled(bool enabled);
     void setRoundedCornersEnabled(bool enabled);
+    // BackdropMode::None is the "off" switch; there is no separate enabled flag.
+    void setBackdropMode(WindowEffect::BackdropMode mode);
     void setSnapLayoutEnabled(bool enabled);
     void setThemeMode(ThemeManager::ThemeMode mode, bool persist = true, bool animated = true);
     ThemeManager::ThemeMode themeMode() const;
@@ -86,8 +84,7 @@ public:
 
     void setDiagnosticsEnabled(bool enabled);
     bool isShadowEnabled() const;
-    bool isSystemBackdropEnabled() const;
-    WindowEffect::SystemBackdropPreference systemBackdropPreference() const;
+    WindowEffect::BackdropMode backdropMode() const;
     bool isRoundedCornersEnabled() const;
     bool isSnapLayoutEnabled() const;
     bool isDiagnosticsEnabled() const;
@@ -125,18 +122,18 @@ protected:
     void applyVisualEffects();
     void scheduleStateVisualRefresh();
     quint64 currentVisualStateToken() const;
-    bool shouldUseTranslucentBackground() const;
+    WindowVisualState::SurfacePolicy surfacePolicy() const;
+    bool usesTranslucentSurface() const;
     bool shouldUseDarkMode() const;
     QColor preferredBorderColor() const;
     Qt::CursorShape cursorForEdges(Qt::Edges edges) const;
 
 private:
     bool shouldStartRestoreTransitionFromSizeState(bool isMaximizedState, bool isRestoredState);
-    WindowEffect::SystemBackdropPreference effectiveSystemBackdropPreference() const;
-    void beginSystemBackdropTransitionGuard();
+    void beginBackdropTransitionGuard();
     void performVisualRefreshPass();
     void requestVisualRefresh();
-    void forceSystemBackdropRebind();
+    void forceBackdropRebind();
     void attachContentEventFilters(QWidget *widget);
     void detachContentEventFilters(QWidget *widget);
     friend class NativeMessageRouter;
@@ -146,15 +143,14 @@ private:
     QWidget *m_userContentWidget;
     QVBoxLayout *m_layout;
     bool m_shadowEnabled;
-    bool m_systemBackdropEnabled;
-    WindowEffect::SystemBackdropPreference m_systemBackdropPreference;
+    WindowEffect::BackdropMode m_backdropMode;
     bool m_roundedCornersEnabled;
     bool m_snapLayoutEnabled;
     QPixmap m_backgroundImage;
     BackgroundImageMode m_backgroundImageMode = BackgroundImageMode::Cover;
     qreal m_backgroundOpacity = 1.0;
-    bool m_systemBackdropTransitionGuardActive;
-    quint64 m_systemBackdropTransitionEpoch;
+    bool m_backdropTransitionGuardActive;
+    quint64 m_backdropTransitionEpoch;
     bool m_lastNativeSizeMaximized;
     bool m_applyingTheme;
     QString m_lastAppliedStyleSheet;

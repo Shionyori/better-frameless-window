@@ -57,9 +57,9 @@ private slots:
         Q_UNUSED(caps);
     }
 
-    void isSystemDarkModeEnabledDoesNotCrash()
+    void systemPrefersDarkThemeDoesNotCrash()
     {
-        const bool enabled = Utils::isSystemDarkModeEnabled();
+        const bool enabled = Utils::systemPrefersDarkTheme();
         Q_UNUSED(enabled);
     }
 

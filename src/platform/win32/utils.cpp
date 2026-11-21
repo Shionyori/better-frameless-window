@@ -160,16 +160,16 @@ WindowsCapabilities detectWindowsCapabilities()
 #ifdef Q_OS_WIN
     caps.isWindows = true;
     caps.buildNumber = windowsBuildNumber();
-    caps.supportsSystemDarkMode = caps.buildNumber >= 17763;
+    caps.supportsDarkModeHint = caps.buildNumber >= 17763;
     caps.supportsRoundedCorners = caps.buildNumber >= 22000;
-    caps.supportsSystemSystemBackdrop = caps.buildNumber >= 22621;
+    caps.supportsMica = caps.buildNumber >= 22621;
     caps.supportsAcrylic = caps.buildNumber >= 17763;
 #endif
 
     return caps;
 }
 
-bool isSystemDarkModeEnabled()
+bool systemPrefersDarkTheme()
 {
 #ifdef Q_OS_WIN
     QSettings settings(

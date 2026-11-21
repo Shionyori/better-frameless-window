@@ -49,7 +49,9 @@ the real `windows` platform plugin, so keep `QT_QPA_PLATFORM=windows` on Windows
 - [ ] Light ↔ Dark: 300ms transition, title bar, background and backdrop tint all follow
 - [ ] Mica: applied at startup, survives maximize → restore
 - [ ] Acrylic: applied at startup, survives maximize → restore, tint follows the theme
-- [ ] `setSystemBackdropPreference(None)` clears the backdrop
+- [ ] `setBackdropMode(None)` clears the backdrop and drops the translucent surface
+- [ ] Setting a background image while a backdrop is active switches the surface to opaque
+- [ ] Dark theme + Mica: window is dark, never flat grey (backdrop dark variant follows the theme)
 - [ ] `setBorderColor()` shows the border on Windows 11
 
 ## Content

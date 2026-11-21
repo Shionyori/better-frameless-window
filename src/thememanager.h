@@ -11,11 +11,6 @@ public:
         Dark
     };
 
-    enum class BackgroundMode {
-        Solid,
-        Transparent
-    };
-
     ThemeManager() = default;
 
     void setThemeMode(ThemeMode mode);

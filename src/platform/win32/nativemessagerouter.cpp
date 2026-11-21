@@ -173,7 +173,7 @@ bool NativeMessageRouter::handle(FramelessWindow &window, void *message, qintptr
                                                                                             isRestoredSize);
         window.syncNativeWindowFrame();
         if (restoredFromMaximized) {
-            window.beginSystemBackdropTransitionGuard();
+            window.beginBackdropTransitionGuard();
             window.scheduleStateVisualRefresh();
         } else if (isMaximizedSize) {
             window.scheduleStateVisualRefresh();

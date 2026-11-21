@@ -5,6 +5,15 @@ class TestVisualState : public QObject
 {
     Q_OBJECT
 
+private:
+    static WindowVisualState::BackdropCapabilities bothBackdrops()
+    {
+        WindowVisualState::BackdropCapabilities caps;
+        caps.mica = true;
+        caps.acrylic = true;
+        return caps;
+    }
+
 private slots:
     void shouldUseDarkMode_data()
     {
@@ -24,44 +33,123 @@ private slots:
                  expected);
     }
 
-    void shouldUseTranslucentBackgroundWhenDisabled()
+    // ── Surface resolution ──────────────────────────────────────────────
+    // The Qt surface and the DWM backdrop both come from resolveSurfacePolicy(),
+    // so these cases pin down the boundaries the rest of the library relies on.
+
+    void surfaceIsOpaqueWithoutBackdrop()
     {
-        QVERIFY(!WindowVisualState::shouldUseTranslucentBackground(
-            false, false, WindowEffect::SystemBackdropPreference::Auto));
-        QVERIFY(!WindowVisualState::shouldUseTranslucentBackground(
-            false, false, WindowEffect::SystemBackdropPreference::Mica));
-        QVERIFY(!WindowVisualState::shouldUseTranslucentBackground(
-            false, false, WindowEffect::SystemBackdropPreference::Acrylic));
+        WindowVisualState::BackdropCapabilities none;
+        for (auto mode : {WindowEffect::BackdropMode::Auto,
+                          WindowEffect::BackdropMode::Mica,
+                          WindowEffect::BackdropMode::Acrylic}) {
+            const auto policy = WindowVisualState::resolveSurfacePolicy(mode, false, false, none);
+            QCOMPARE(policy.kind, WindowVisualState::SurfaceKind::Opaque);
+            QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::None);
+        }
     }
 
-    void shouldUseTranslucentBackgroundWhenMinimized()
+    void surfaceStaysOpaqueForRequestedNone()
     {
-        QVERIFY(!WindowVisualState::shouldUseTranslucentBackground(
-            true, true, WindowEffect::SystemBackdropPreference::Auto));
+        const auto policy = WindowVisualState::resolveSurfacePolicy(
+            WindowEffect::BackdropMode::None, false, false, bothBackdrops());
+        QCOMPARE(policy.kind, WindowVisualState::SurfaceKind::Opaque);
+        QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::None);
     }
 
-    void shouldUseTranslucentBackgroundPreferenceNone()
+    void surfaceDropsBackdropWhileMinimized()
     {
-        QVERIFY(!WindowVisualState::shouldUseTranslucentBackground(
-            true, false, WindowEffect::SystemBackdropPreference::None));
+        const auto policy = WindowVisualState::resolveSurfacePolicy(
+            WindowEffect::BackdropMode::Auto, true, false, bothBackdrops());
+        QCOMPARE(policy.kind, WindowVisualState::SurfaceKind::Opaque);
+        QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::None);
+    }
+
+    void backgroundImageWinsOverBackdrop()
+    {
+        for (auto mode : {WindowEffect::BackdropMode::Auto,
+                          WindowEffect::BackdropMode::Mica,
+                          WindowEffect::BackdropMode::Acrylic}) {
+            const auto policy = WindowVisualState::resolveSurfacePolicy(mode, false, true,
+                                                                       bothBackdrops());
+            QCOMPARE(policy.kind, WindowVisualState::SurfaceKind::Opaque);
+            QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::None);
+        }
+    }
+
+    void autoPrefersMica()
+    {
+        const auto policy = WindowVisualState::resolveSurfacePolicy(
+            WindowEffect::BackdropMode::Auto, false, false, bothBackdrops());
+        QCOMPARE(policy.kind, WindowVisualState::SurfaceKind::Translucent);
+        QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::Mica);
+    }
+
+    void autoFallsBackToAcrylic()
+    {
+        WindowVisualState::BackdropCapabilities acrylicOnly;
+        acrylicOnly.acrylic = true;
+        const auto policy = WindowVisualState::resolveSurfacePolicy(
+            WindowEffect::BackdropMode::Auto, false, false, acrylicOnly);
+        QCOMPARE(policy.kind, WindowVisualState::SurfaceKind::Translucent);
+        QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::Acrylic);
+    }
+
+    void requestedMicaFallsBackToAcrylic()
+    {
+        WindowVisualState::BackdropCapabilities acrylicOnly;
+        acrylicOnly.acrylic = true;
+        const auto policy = WindowVisualState::resolveSurfacePolicy(
+            WindowEffect::BackdropMode::Mica, false, false, acrylicOnly);
+        QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::Acrylic);
+    }
+
+    void requestedAcrylicFallsBackToMica()
+    {
+        WindowVisualState::BackdropCapabilities micaOnly;
+        micaOnly.mica = true;
+        const auto policy = WindowVisualState::resolveSurfacePolicy(
+            WindowEffect::BackdropMode::Acrylic, false, false, micaOnly);
+        QCOMPARE(policy.backdrop, WindowEffect::BackdropKind::Mica);
+    }
+
+    // A translucent surface always has a backdrop behind it; otherwise the
+    // window would expose the desktop instead of blending with anything.
+    void translucentImpliesBackdrop()
+    {
+        for (auto mode : {WindowEffect::BackdropMode::Auto,
+                          WindowEffect::BackdropMode::None,
+                          WindowEffect::BackdropMode::Mica,
+                          WindowEffect::BackdropMode::Acrylic}) {
+            for (bool minimized : {false, true}) {
+                for (bool hasImage : {false, true}) {
+                    const auto policy = WindowVisualState::resolveSurfacePolicy(
+                        mode, minimized, hasImage, bothBackdrops());
+                    const bool translucent = WindowVisualState::usesTranslucentSurface(policy);
+                    QCOMPARE(translucent,
+                             policy.backdrop != WindowEffect::BackdropKind::None);
+                }
+            }
+        }
     }
 
     void buildVisualEffectOptionsPropagatesFields()
     {
+        WindowVisualState::SurfacePolicy surface;
+        surface.kind = WindowVisualState::SurfaceKind::Translucent;
+        surface.backdrop = WindowEffect::BackdropKind::Mica;
+
         const auto options = WindowVisualState::buildVisualEffectOptions(
-            true, false,
-            WindowEffect::SystemBackdropPreference::Mica,
-            true,
+            true, true,
             ThemeManager::ThemeMode::Dark,
             false, false,
+            surface,
             QColor(255, 0, 0));
 
         QVERIFY(options.shadowEnabled);
-        QVERIFY(!options.systemBackdropEnabled);
-        QCOMPARE(options.systemBackdropPreference,
-                 WindowEffect::SystemBackdropPreference::Mica);
         QVERIFY(options.roundedCornersEnabled);
-        QVERIFY(options.useDarkMode);
+        QVERIFY(options.darkMode);
+        QCOMPARE(options.backdrop, WindowEffect::BackdropKind::Mica);
         QVERIFY(!options.maximized);
         QVERIFY(!options.minimized);
         QCOMPARE(options.borderColor, QColor(255, 0, 0));
@@ -70,102 +158,108 @@ private slots:
     void buildVisualStateTokenIsDeterministic()
     {
         const quint64 a = WindowVisualState::buildVisualStateToken(
-            true, false, false, true, true, false, true,
-            WindowEffect::SystemBackdropPreference::Auto,
-            ThemeManager::ThemeMode::Light, false);
+            true, false, false, true, true, false,
+            WindowEffect::BackdropKind::Mica,
+            ThemeManager::ThemeMode::Light, true);
         const quint64 b = WindowVisualState::buildVisualStateToken(
-            true, false, false, true, true, false, true,
-            WindowEffect::SystemBackdropPreference::Auto,
-            ThemeManager::ThemeMode::Light, false);
+            true, false, false, true, true, false,
+            WindowEffect::BackdropKind::Mica,
+            ThemeManager::ThemeMode::Light, true);
         QCOMPARE(a, b);
     }
 
     void buildVisualStateTokenChangesWithInput()
     {
         const quint64 tokenLight = WindowVisualState::buildVisualStateToken(
-            false, false, false, false, false, false, false,
-            WindowEffect::SystemBackdropPreference::Auto,
+            false, false, false, false, false, false,
+            WindowEffect::BackdropKind::None,
             ThemeManager::ThemeMode::Light, false);
         const quint64 tokenDark = WindowVisualState::buildVisualStateToken(
-            false, false, false, false, false, false, false,
-            WindowEffect::SystemBackdropPreference::Auto,
+            false, false, false, false, false, false,
+            WindowEffect::BackdropKind::None,
             ThemeManager::ThemeMode::Dark, false);
         QVERIFY(tokenLight != tokenDark);
+
+        const quint64 tokenMica = WindowVisualState::buildVisualStateToken(
+            false, false, false, false, false, false,
+            WindowEffect::BackdropKind::Mica,
+            ThemeManager::ThemeMode::Light, true);
+        QVERIFY(tokenLight != tokenMica);
     }
 
     void shouldClearBackdropBeforeApply_data()
     {
-        QTest::addColumn<int>("appliedMode");
-        QTest::addColumn<int>("requestedMode");
+        QTest::addColumn<int>("appliedKind");
+        QTest::addColumn<int>("requestedKind");
         QTest::addColumn<bool>("expected");
 
         QTest::newRow("none -> none")
-            << static_cast<int>(WindowEffect::SystemBackdropMode::None)
-            << static_cast<int>(WindowEffect::SystemBackdropMode::None) << false;
+            << static_cast<int>(WindowEffect::BackdropKind::None)
+            << static_cast<int>(WindowEffect::BackdropKind::None) << false;
         QTest::newRow("none -> mica")
-            << static_cast<int>(WindowEffect::SystemBackdropMode::None)
-            << static_cast<int>(WindowEffect::SystemBackdropMode::Mica) << false;
+            << static_cast<int>(WindowEffect::BackdropKind::None)
+            << static_cast<int>(WindowEffect::BackdropKind::Mica) << false;
         QTest::newRow("none -> acrylic")
-            << static_cast<int>(WindowEffect::SystemBackdropMode::None)
-            << static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic) << false;
+            << static_cast<int>(WindowEffect::BackdropKind::None)
+            << static_cast<int>(WindowEffect::BackdropKind::Acrylic) << false;
 
         // Stored DWM attributes (Mica) can only be replaced by resetting them.
         QTest::newRow("mica -> mica")
-            << static_cast<int>(WindowEffect::SystemBackdropMode::Mica)
-            << static_cast<int>(WindowEffect::SystemBackdropMode::Mica) << true;
+            << static_cast<int>(WindowEffect::BackdropKind::Mica)
+            << static_cast<int>(WindowEffect::BackdropKind::Mica) << true;
         QTest::newRow("mica -> acrylic")
-            << static_cast<int>(WindowEffect::SystemBackdropMode::Mica)
-            << static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic) << true;
+            << static_cast<int>(WindowEffect::BackdropKind::Mica)
+            << static_cast<int>(WindowEffect::BackdropKind::Acrylic) << true;
 
         // Acrylic lives in the accent policy: re-applying it is idempotent, so
         // clearing first would drop the blur for a frame.
         QTest::newRow("acrylic -> acrylic")
-            << static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic)
-            << static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic) << false;
+            << static_cast<int>(WindowEffect::BackdropKind::Acrylic)
+            << static_cast<int>(WindowEffect::BackdropKind::Acrylic) << false;
         QTest::newRow("acrylic -> mica")
-            << static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic)
-            << static_cast<int>(WindowEffect::SystemBackdropMode::Mica) << true;
+            << static_cast<int>(WindowEffect::BackdropKind::Acrylic)
+            << static_cast<int>(WindowEffect::BackdropKind::Mica) << true;
         QTest::newRow("acrylic -> none")
-            << static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic)
-            << static_cast<int>(WindowEffect::SystemBackdropMode::None) << true;
+            << static_cast<int>(WindowEffect::BackdropKind::Acrylic)
+            << static_cast<int>(WindowEffect::BackdropKind::None) << true;
     }
 
     void shouldClearBackdropBeforeApply()
     {
-        QFETCH(int, appliedMode);
-        QFETCH(int, requestedMode);
+        QFETCH(int, appliedKind);
+        QFETCH(int, requestedKind);
         QFETCH(bool, expected);
 
         QCOMPARE(WindowVisualState::shouldClearBackdropBeforeApply(
-                     static_cast<WindowEffect::SystemBackdropMode>(appliedMode),
-                     static_cast<WindowEffect::SystemBackdropMode>(requestedMode)),
+                     static_cast<WindowEffect::BackdropKind>(appliedKind),
+                     static_cast<WindowEffect::BackdropKind>(requestedKind)),
                  expected);
     }
 
     void isBackdropApplyRedundant_data()
     {
-        QTest::addColumn<int>("requestedMode");
-        QTest::addColumn<bool>("requestedUseDarkMode");
-        QTest::addColumn<int>("appliedMode");
-        QTest::addColumn<bool>("appliedUseDarkMode");
+        QTest::addColumn<int>("requestedKind");
+        QTest::addColumn<bool>("requestedDarkMode");
+        QTest::addColumn<int>("appliedKind");
+        QTest::addColumn<bool>("appliedDarkMode");
         QTest::addColumn<bool>("appliedSuccessfully");
         QTest::addColumn<bool>("expected");
 
-        const int acrylic = static_cast<int>(WindowEffect::SystemBackdropMode::Acrylic);
-        const int mica = static_cast<int>(WindowEffect::SystemBackdropMode::Mica);
-        const int none = static_cast<int>(WindowEffect::SystemBackdropMode::None);
+        const int acrylic = static_cast<int>(WindowEffect::BackdropKind::Acrylic);
+        const int mica = static_cast<int>(WindowEffect::BackdropKind::Mica);
+        const int none = static_cast<int>(WindowEffect::BackdropKind::None);
 
         QTest::newRow("same everything")
             << acrylic << true << acrylic << true << true << true;
         QTest::newRow("previous apply failed")
             << acrylic << true << acrylic << true << false << false;
-        QTest::newRow("mode changed")
+        QTest::newRow("kind changed")
             << mica << true << acrylic << true << true << false;
         QTest::newRow("nothing applied yet")
             << none << false << none << false << true << true;
 
         // Acrylic tint is baked into the accent gradient, so a theme switch must
-        // re-apply it even though the backdrop mode itself did not change.
+        // re-apply it even though the backdrop kind itself did not change.
         QTest::newRow("acrylic theme switch")
             << acrylic << false << acrylic << true << true << false;
 
@@ -177,18 +271,18 @@ private slots:
 
     void isBackdropApplyRedundant()
     {
-        QFETCH(int, requestedMode);
-        QFETCH(bool, requestedUseDarkMode);
-        QFETCH(int, appliedMode);
-        QFETCH(bool, appliedUseDarkMode);
+        QFETCH(int, requestedKind);
+        QFETCH(bool, requestedDarkMode);
+        QFETCH(int, appliedKind);
+        QFETCH(bool, appliedDarkMode);
         QFETCH(bool, appliedSuccessfully);
         QFETCH(bool, expected);
 
         QCOMPARE(WindowVisualState::isBackdropApplyRedundant(
-                     static_cast<WindowEffect::SystemBackdropMode>(requestedMode),
-                     requestedUseDarkMode,
-                     static_cast<WindowEffect::SystemBackdropMode>(appliedMode),
-                     appliedUseDarkMode,
+                     static_cast<WindowEffect::BackdropKind>(requestedKind),
+                     requestedDarkMode,
+                     static_cast<WindowEffect::BackdropKind>(appliedKind),
+                     appliedDarkMode,
                      appliedSuccessfully),
                  expected);
     }
