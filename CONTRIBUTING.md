@@ -193,8 +193,13 @@ Closes #<issue>
 
 ### PR review rules
 
-- **Don't merge your own PR** (unless an urgent fix with explicit authorization)
 - Wait for CI to be green before merging
+- While the repository has collaborators: **don't merge your own PR**; wait for an approval.
+  The `main` ruleset enforces this with `required_approving_review_count = 1`.
+- While it is maintained by a single person: merging your own PR is the intended flow.
+  The ruleset then runs with `required_approving_review_count = 0`, and keeps the parts that
+  still protect `main`: no force-push, no deletion, review threads must be resolved,
+  merge/squash only. Restore the review requirement when a second maintainer joins.
 - Merge method depends on the number of commits in the PR:
 
 | Commits in PR | Merge method | Rationale |
