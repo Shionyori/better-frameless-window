@@ -233,34 +233,6 @@ int main(int argc, char *argv[])
     });
     addRow(QStringLiteral("Accent"), {accentSwatch});
 
-    auto *borderSwatch = new QPushButton;
-    borderSwatch->setFixedHeight(26);
-    borderSwatch->setMinimumWidth(96);
-    auto *borderDefaultButton = new QPushButton(QStringLiteral("Default"));
-    borderDefaultButton->setFixedHeight(26);
-    QObject::connect(borderDefaultButton, &QPushButton::clicked, &window,
-                     [&window, borderSwatch, borderDefaultButton]() {
-                         window.setBorderColor(QColor());
-                         applyColorSwatch(borderSwatch, window.borderColor(),
-                                          QStringLiteral("\u2014"));
-                         borderDefaultButton->setEnabled(false);
-                     });
-
-    QObject::connect(borderSwatch, &QPushButton::clicked, &window,
-                     [&window, borderSwatch, borderDefaultButton]() {
-                         const QColor color = QColorDialog::getColor(window.borderColor(), nullptr,
-                                                                     QStringLiteral("Border color"));
-                         if (!color.isValid()) {
-                             return;
-                         }
-                         window.setBorderColor(color);
-                         applyColorSwatch(borderSwatch, window.borderColor(), QStringLiteral("\u2014"));
-                         borderDefaultButton->setEnabled(true);
-                     });
-
-    applyColorSwatch(borderSwatch, window.borderColor(), QStringLiteral("\u2014"));
-    borderDefaultButton->setEnabled(window.borderColor().isValid());
-    addRow(QStringLiteral("Border"), {borderSwatch, borderDefaultButton});
 
     // Three surface families, kept apart on purpose:
     //   None    - the application paints the background (colour / image / opacity)
@@ -316,6 +288,29 @@ int main(int argc, char *argv[])
     // ── Application-painted background (BackdropMode::None only) ────────
     // One exclusive group, so the active image mode is visible; Off is part of
     // the group instead of a separate button that leaves the mode ambiguous.
+    auto *backgroundSwatch = new QPushButton;
+    backgroundSwatch->setFixedHeight(26);
+    backgroundSwatch->setMinimumWidth(96);
+    auto *backgroundThemeButton = makeButton(QStringLiteral("Theme"), [&]() {
+        window.setBackgroundColor(QColor());
+        applyColorSwatch(backgroundSwatch, window.backgroundColor(), QStringLiteral("\u2014"));
+    });
+    QObject::connect(backgroundSwatch, &QPushButton::clicked, &window,
+                     [&window, backgroundSwatch]() {
+                         const QColor color = QColorDialog::getColor(window.backgroundColor(),
+                                                                     nullptr,
+                                                                     QStringLiteral("Background color"));
+                         if (!color.isValid()) {
+                             return;
+                         }
+                         window.setBackgroundColor(color);
+                         applyColorSwatch(backgroundSwatch, window.backgroundColor(),
+                                          QStringLiteral("\u2014"));
+                     });
+    applyColorSwatch(backgroundSwatch, window.backgroundColor(), QStringLiteral("\u2014"));
+    addRow(QStringLiteral("Background"), {backgroundSwatch, backgroundThemeButton});
+    backgroundControlList << backgroundSwatch << backgroundThemeButton;
+
     QList<QWidget *> backgroundButtons;
     QList<QPushButton *> imageModeButtons;
     const QList<QPair<QString, FramelessWindow::BackgroundImageMode>> backgroundModes = {
@@ -358,28 +353,6 @@ int main(int argc, char *argv[])
     addRow(QStringLiteral("Image"), backgroundButtons);
     backgroundControlList.append(backgroundButtons);
 
-    auto *backgroundSwatch = new QPushButton;
-    backgroundSwatch->setFixedHeight(26);
-    backgroundSwatch->setMinimumWidth(96);
-    auto *backgroundThemeButton = makeButton(QStringLiteral("Theme"), [&]() {
-        window.setBackgroundColor(QColor());
-        applyColorSwatch(backgroundSwatch, window.backgroundColor(), QStringLiteral("\u2014"));
-    });
-    QObject::connect(backgroundSwatch, &QPushButton::clicked, &window,
-                     [&window, backgroundSwatch]() {
-                         const QColor color = QColorDialog::getColor(window.backgroundColor(),
-                                                                     nullptr,
-                                                                     QStringLiteral("Background color"));
-                         if (!color.isValid()) {
-                             return;
-                         }
-                         window.setBackgroundColor(color);
-                         applyColorSwatch(backgroundSwatch, window.backgroundColor(),
-                                          QStringLiteral("\u2014"));
-                     });
-    applyColorSwatch(backgroundSwatch, window.backgroundColor(), QStringLiteral("\u2014"));
-    addRow(QStringLiteral("Color"), {backgroundSwatch, backgroundThemeButton});
-    backgroundControlList << backgroundSwatch << backgroundThemeButton;
 
     backgroundControlList.append(addSliderRow(QStringLiteral("Image opacity"), 0, 100,
                                               qRound(window.backgroundOpacity() * 100),
@@ -406,6 +379,35 @@ int main(int argc, char *argv[])
                                                      "\u2014 select Backdrop None to edit it."));
     };
     syncBackgroundControls();
+
+    auto *borderSwatch = new QPushButton;
+    borderSwatch->setFixedHeight(26);
+    borderSwatch->setMinimumWidth(96);
+    auto *borderDefaultButton = new QPushButton(QStringLiteral("Default"));
+    borderDefaultButton->setFixedHeight(26);
+    QObject::connect(borderDefaultButton, &QPushButton::clicked, &window,
+                     [&window, borderSwatch, borderDefaultButton]() {
+                         window.setBorderColor(QColor());
+                         applyColorSwatch(borderSwatch, window.borderColor(),
+                                          QStringLiteral("\u2014"));
+                         borderDefaultButton->setEnabled(false);
+                     });
+
+    QObject::connect(borderSwatch, &QPushButton::clicked, &window,
+                     [&window, borderSwatch, borderDefaultButton]() {
+                         const QColor color = QColorDialog::getColor(window.borderColor(), nullptr,
+                                                                     QStringLiteral("Border color"));
+                         if (!color.isValid()) {
+                             return;
+                         }
+                         window.setBorderColor(color);
+                         applyColorSwatch(borderSwatch, window.borderColor(), QStringLiteral("\u2014"));
+                         borderDefaultButton->setEnabled(true);
+                     });
+
+    applyColorSwatch(borderSwatch, window.borderColor(), QStringLiteral("\u2014"));
+    borderDefaultButton->setEnabled(window.borderColor().isValid());
+    addRow(QStringLiteral("Border"), {borderSwatch, borderDefaultButton});
 
     // Window opacity is skipped as well: stacking QWidget::setWindowOpacity() on
     // top of a translucent backdrop makes the backdrop itself impossible to judge.
