@@ -236,9 +236,7 @@ int main(int argc, char *argv[])
            {makeSwitch(QStringLiteral("Shadow"), window.isShadowEnabled(),
                        [&window](bool enabled) { window.setSystemShadowEnabled(enabled); }),
             makeSwitch(QStringLiteral("Rounded corners"), window.isRoundedCornersEnabled(),
-                       [&window](bool enabled) { window.setRoundedCornersEnabled(enabled); }),
-            makeSwitch(QStringLiteral("Native dark mode"), window.isSystemDarkModeEnabled(),
-                       [&window](bool enabled) { window.setSystemDarkModeEnabled(enabled); })});
+                       [&window](bool enabled) { window.setRoundedCornersEnabled(enabled); })});
     addRow(QStringLiteral("Extras"),
            {makeSwitch(QStringLiteral("Snap Layout"), window.isSnapLayoutEnabled(),
                        [&window](bool enabled) { window.setSnapLayoutEnabled(enabled); }),

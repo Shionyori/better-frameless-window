@@ -46,7 +46,6 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_systemBackdropEnabled(true)
     , m_systemBackdropPreference(WindowEffect::SystemBackdropPreference::Auto)
     , m_roundedCornersEnabled(true)
-    , m_systemDarkModeEnabled(true)
     , m_snapLayoutEnabled(true)
     , m_systemBackdropTransitionGuardActive(false)
     , m_systemBackdropTransitionEpoch(0)
@@ -157,16 +156,6 @@ void FramelessWindow::setRoundedCornersEnabled(bool enabled)
     }
 
     m_roundedCornersEnabled = enabled;
-    requestVisualRefresh();
-}
-
-void FramelessWindow::setSystemDarkModeEnabled(bool enabled)
-{
-    if (m_systemDarkModeEnabled == enabled) {
-        return;
-    }
-
-    m_systemDarkModeEnabled = enabled;
     requestVisualRefresh();
 }
 
@@ -457,11 +446,6 @@ bool FramelessWindow::isRoundedCornersEnabled() const
     return m_roundedCornersEnabled;
 }
 
-bool FramelessWindow::isSystemDarkModeEnabled() const
-{
-    return m_systemDarkModeEnabled;
-}
-
 bool FramelessWindow::isSnapLayoutEnabled() const
 {
     return m_snapLayoutEnabled;
@@ -735,7 +719,6 @@ quint64 FramelessWindow::currentVisualStateToken() const
                                                     m_shadowEnabled,
                                                     m_systemBackdropEnabled,
                                                     m_roundedCornersEnabled,
-                                                    m_systemDarkModeEnabled,
                                                     effectiveSystemBackdropPreference(),
                                                     m_themeManager.themeMode(),
                                                     shouldUseTranslucentBackground());
@@ -1148,7 +1131,6 @@ void FramelessWindow::applyVisualEffects()
         m_systemBackdropEnabled,
         effectiveSystemBackdropPreference(),
         m_roundedCornersEnabled,
-        m_systemDarkModeEnabled,
         m_themeManager.themeMode(),
         isMaximized(),
         isMinimized(),

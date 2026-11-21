@@ -78,7 +78,6 @@ WindowEffect::VisualEffectOptions buildVisualEffectOptions(bool shadowEnabled,
                                                               bool systemBackdropEnabled,
                                                               WindowEffect::SystemBackdropPreference systemBackdropPreference,
                                                               bool roundedCornersEnabled,
-                                                              bool systemDarkModeEnabled,
                                                               ThemeManager::ThemeMode themeMode,
                                                               bool maximized,
                                                               bool minimized,
@@ -89,7 +88,6 @@ WindowEffect::VisualEffectOptions buildVisualEffectOptions(bool shadowEnabled,
     options.systemBackdropEnabled = systemBackdropEnabled;
     options.systemBackdropPreference = systemBackdropPreference;
     options.roundedCornersEnabled = roundedCornersEnabled;
-    options.systemDarkModeEnabled = systemDarkModeEnabled;
     options.useDarkMode = shouldUseDarkMode(themeMode);
     options.maximized = maximized;
     options.minimized = minimized;
@@ -104,7 +102,6 @@ quint64 buildVisualStateToken(bool visible,
                               bool shadowEnabled,
                               bool systemBackdropEnabled,
                               bool roundedCornersEnabled,
-                              bool systemDarkModeEnabled,
                               WindowEffect::SystemBackdropPreference systemBackdropPreference,
                               ThemeManager::ThemeMode themeMode,
                               bool translucentBackground)
@@ -117,7 +114,6 @@ quint64 buildVisualStateToken(bool visible,
     token |= static_cast<quint64>(shadowEnabled) << 4;
     token |= static_cast<quint64>(systemBackdropEnabled) << 5;
     token |= static_cast<quint64>(roundedCornersEnabled) << 6;
-    token |= static_cast<quint64>(systemDarkModeEnabled) << 7;
     token |= static_cast<quint64>(shouldUseDarkMode(themeMode)) << 8;
     token |= static_cast<quint64>(translucentBackground) << 9;
     token |= static_cast<quint64>(static_cast<int>(systemBackdropPreference) & 0xF) << 10;

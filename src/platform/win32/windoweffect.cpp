@@ -138,7 +138,7 @@ void WindowEffect::applyVisualEffects(void *hwnd, const VisualEffectOptions &opt
 #ifdef Q_OS_WIN
     applyShadow(hwnd, options.shadowEnabled, options.maximized, options.minimized);
     applyRoundedCorners(hwnd, options.roundedCornersEnabled, options.maximized, options.minimized);
-    applySystemDarkMode(hwnd, options.systemDarkModeEnabled, options.useDarkMode);
+    applySystemDarkMode(hwnd, options.useDarkMode);
     applySystemBackdropEffects(hwnd,
                          options.systemBackdropEnabled,
                          options.useDarkMode,
@@ -230,7 +230,7 @@ void WindowEffect::applyRoundedCorners(void *hwnd, bool enabled, bool maximized,
 #endif
 }
 
-void WindowEffect::applySystemDarkMode(void *hwnd, bool enabled, bool useDarkMode) const
+void WindowEffect::applySystemDarkMode(void *hwnd, bool useDarkMode) const
 {
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
@@ -243,7 +243,11 @@ void WindowEffect::applySystemDarkMode(void *hwnd, bool enabled, bool useDarkMod
         return;
     }
 
-    const BOOL darkEnabled = (enabled && useDarkMode) ? TRUE : FALSE;
+    // DWM uses this attribute both for its own dark chrome and as the selector
+    // for the dark variant of Mica, so it has to follow the app theme; leaving
+    // it at light while the theme is dark paints the dark wash over light Mica
+    // and the window turns flat grey.
+    const BOOL darkEnabled = useDarkMode ? TRUE : FALSE;
     if (m_darkMode20Valid) {
         const HRESULT result = DwmSetWindowAttribute(win,
                                                      DWMWA_USE_SYSTEM_DARK_MODE,

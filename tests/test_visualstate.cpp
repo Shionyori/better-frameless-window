@@ -51,7 +51,7 @@ private slots:
         const auto options = WindowVisualState::buildVisualEffectOptions(
             true, false,
             WindowEffect::SystemBackdropPreference::Mica,
-            true, true,
+            true,
             ThemeManager::ThemeMode::Dark,
             false, false,
             QColor(255, 0, 0));
@@ -61,7 +61,6 @@ private slots:
         QCOMPARE(options.systemBackdropPreference,
                  WindowEffect::SystemBackdropPreference::Mica);
         QVERIFY(options.roundedCornersEnabled);
-        QVERIFY(options.systemDarkModeEnabled);
         QVERIFY(options.useDarkMode);
         QVERIFY(!options.maximized);
         QVERIFY(!options.minimized);
@@ -71,11 +70,11 @@ private slots:
     void buildVisualStateTokenIsDeterministic()
     {
         const quint64 a = WindowVisualState::buildVisualStateToken(
-            true, false, false, true, true, false, true, true,
+            true, false, false, true, true, false, true,
             WindowEffect::SystemBackdropPreference::Auto,
             ThemeManager::ThemeMode::Light, false);
         const quint64 b = WindowVisualState::buildVisualStateToken(
-            true, false, false, true, true, false, true, true,
+            true, false, false, true, true, false, true,
             WindowEffect::SystemBackdropPreference::Auto,
             ThemeManager::ThemeMode::Light, false);
         QCOMPARE(a, b);
@@ -84,11 +83,11 @@ private slots:
     void buildVisualStateTokenChangesWithInput()
     {
         const quint64 tokenLight = WindowVisualState::buildVisualStateToken(
-            false, false, false, false, false, false, false, false,
+            false, false, false, false, false, false, false,
             WindowEffect::SystemBackdropPreference::Auto,
             ThemeManager::ThemeMode::Light, false);
         const quint64 tokenDark = WindowVisualState::buildVisualStateToken(
-            false, false, false, false, false, false, false, false,
+            false, false, false, false, false, false, false,
             WindowEffect::SystemBackdropPreference::Auto,
             ThemeManager::ThemeMode::Dark, false);
         QVERIFY(tokenLight != tokenDark);

@@ -33,7 +33,6 @@ public:
     void setSystemBackdropEnabled(bool enabled);
     void setSystemBackdropPreference(WindowEffect::SystemBackdropPreference preference);
     void setRoundedCornersEnabled(bool enabled);
-    void setSystemDarkModeEnabled(bool enabled);
     void setSnapLayoutEnabled(bool enabled);
     void setThemeMode(ThemeManager::ThemeMode mode, bool persist = true, bool animated = true);
     ThemeManager::ThemeMode themeMode() const;
@@ -90,7 +89,6 @@ public:
     bool isSystemBackdropEnabled() const;
     WindowEffect::SystemBackdropPreference systemBackdropPreference() const;
     bool isRoundedCornersEnabled() const;
-    bool isSystemDarkModeEnabled() const;
     bool isSnapLayoutEnabled() const;
     bool isDiagnosticsEnabled() const;
 
@@ -151,7 +149,6 @@ private:
     bool m_systemBackdropEnabled;
     WindowEffect::SystemBackdropPreference m_systemBackdropPreference;
     bool m_roundedCornersEnabled;
-    bool m_systemDarkModeEnabled;
     bool m_snapLayoutEnabled;
     QPixmap m_backgroundImage;
     BackgroundImageMode m_backgroundImageMode = BackgroundImageMode::Cover;

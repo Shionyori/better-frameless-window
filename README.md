@@ -31,7 +31,7 @@
 - **Frameless window** — custom titlebar with icon, drag-to-move, double-click maximize/restore, right-click system menu, Alt+Space shortcut
 - **8-direction resize** — HiDPI-aware hit testing with corner detection
 - **Background image** — Cover / Fit / Stretch / Tile / Center modes with independent opacity control
-- **DWM visual effects** — shadow, rounded corners, system dark mode, Mica / Acrylic backdrop with auto fallback chain
+- **DWM visual effects** — shadow, rounded corners, Mica / Acrylic backdrop with auto fallback chain
 - **Snap Layout** — native DWM hit-test forwarding, toggleable via `setSnapLayoutEnabled()`
 - **Theme manager** — Light / Dark with 300ms animated transitions, persistence, and system theme following
 - **Titlebar customization** — visibility toggle, adjustable height, widget extension slot
@@ -140,8 +140,6 @@ int main(int argc, char *argv[])
 | `isSystemBackdropEnabled()` | Check backdrop state |
 | `setRoundedCornersEnabled(bool)` | Enable / disable rounded window corners |
 | `isRoundedCornersEnabled()` | Check rounded corners state |
-| `setSystemDarkModeEnabled(bool)` | Enable / disable system dark mode titlebar |
-| `isSystemDarkModeEnabled()` | Check dark mode state |
 | `setSnapLayoutEnabled(bool)` | Enable / disable Snap Layout overlay |
 | `isSnapLayoutEnabled()` | Check Snap Layout state |
 | `setBorderColor(color)` | Set the native window border color (`DWMWA_BORDER_COLOR`, Windows 11) |
@@ -165,6 +163,11 @@ int main(int argc, char *argv[])
 **ThemeMode** — `Light` / `Dark`
 
 **SystemBackdropPreference** — `Auto` / `None` / `Mica` / `Acrylic`
+
+The dark variant of the backdrop is not a separate switch: DWM selects it from
+`DWMWA_USE_IMMERSIVE_DARK_MODE`, which the library keeps in sync with
+`themeMode()`. Toggling it independently would paint the dark theme wash over
+light Mica.
 
 The `Auto` mode selects the best available backdrop for the current OS:
 Windows 11 22H2+ → Mica → Acrylic → None

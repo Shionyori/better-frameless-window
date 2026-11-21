@@ -22,7 +22,6 @@ public:
         bool shadowEnabled = true;
         bool systemBackdropEnabled = true;
         bool roundedCornersEnabled = true;
-        bool systemDarkModeEnabled = true;
         SystemBackdropPreference systemBackdropPreference = SystemBackdropPreference::Auto;
         bool useDarkMode = false;
         bool maximized = false;
@@ -35,7 +34,7 @@ public:
     void applyVisualEffects(void *hwnd, const VisualEffectOptions &options) const;
     void applyShadow(void *hwnd, bool enabled, bool maximized, bool minimized) const;
     void applyRoundedCorners(void *hwnd, bool enabled, bool maximized, bool minimized) const;
-    void applySystemDarkMode(void *hwnd, bool enabled, bool useDarkMode) const;
+    void applySystemDarkMode(void *hwnd, bool useDarkMode) const;
     void applySystemBackdropEffects(void *hwnd,
                               bool enabled,
                               bool useDarkMode,
