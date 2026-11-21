@@ -107,6 +107,12 @@ int main(int argc, char *argv[])
     // panel force a specific mode.
     window.setBackdropMode(WindowEffect::BackdropMode::Auto);
 
+    // The application-painted surface: a photo blended 30% over the theme
+    // colour. Dormant while a material owns the surface, painted on None.
+    const QPixmap backgroundImage(QStringLiteral(":/images/bg.jpg"));
+    window.setBackgroundImage(backgroundImage, FramelessWindow::BackgroundImageMode::Cover);
+    window.setBackgroundOpacity(0.30);
+
     window.restoreWindowGeometry(); // saved automatically on close
 
     // ── Titlebar extension slot ─────────────────────────────────────────
@@ -262,8 +268,6 @@ int main(int argc, char *argv[])
     //   Acrylic - a translucent frosted surface
     // The material owns the surface, so the background controls are disabled
     // while one is active instead of silently doing nothing.
-    const QPixmap backgroundImage(QStringLiteral(":/images/bg.jpg"));
-
     QList<QWidget *> backgroundControlList;
     std::function<void()> syncBackgroundControls;
 
@@ -310,7 +314,10 @@ int main(int argc, char *argv[])
            {autoBackdropButton, noBackdropButton, micaBackdropButton, acrylicBackdropButton});
 
     // ── Application-painted background (BackdropMode::None only) ────────
+    // One exclusive group, so the active image mode is visible; Off is part of
+    // the group instead of a separate button that leaves the mode ambiguous.
     QList<QWidget *> backgroundButtons;
+    QList<QPushButton *> imageModeButtons;
     const QList<QPair<QString, FramelessWindow::BackgroundImageMode>> backgroundModes = {
         {QStringLiteral("Cover"), FramelessWindow::BackgroundImageMode::Cover},
         {QStringLiteral("Fit"), FramelessWindow::BackgroundImageMode::Fit},
@@ -319,13 +326,35 @@ int main(int argc, char *argv[])
         {QStringLiteral("Center"), FramelessWindow::BackgroundImageMode::Center},
     };
     for (const auto &entry : backgroundModes) {
-        backgroundButtons.append(makeButton(entry.first, [&window, backgroundImage, entry]() {
+        auto *button = makeChoice(entry.first, [&window, backgroundImage, entry]() {
             window.setBackgroundImage(backgroundImage, entry.second);
-        }));
+        });
+        imageModeButtons.append(button);
+        backgroundButtons.append(button);
     }
-    backgroundButtons.append(makeButton(QStringLiteral("Off"), [&window]() {
+    auto *noImageButton = makeChoice(QStringLiteral("Off"), [&window]() {
         window.clearBackgroundImage();
-    }));
+    });
+    imageModeButtons.append(noImageButton);
+    backgroundButtons.append(noImageButton);
+
+    auto *imageGroup = new QButtonGroup(&window);
+    imageGroup->setExclusive(true);
+    for (QPushButton *button : imageModeButtons) {
+        imageGroup->addButton(button);
+    }
+
+    if (window.backgroundImage().isNull()) {
+        noImageButton->setChecked(true);
+    } else {
+        for (int i = 0; i < backgroundModes.size(); ++i) {
+            if (backgroundModes.at(i).second == window.backgroundImageMode()) {
+                imageModeButtons.at(i)->setChecked(true);
+                break;
+            }
+        }
+    }
+
     addRow(QStringLiteral("Image"), backgroundButtons);
     backgroundControlList.append(backgroundButtons);
 
@@ -334,7 +363,7 @@ int main(int argc, char *argv[])
     backgroundSwatch->setMinimumWidth(96);
     auto *backgroundThemeButton = makeButton(QStringLiteral("Theme"), [&]() {
         window.setBackgroundColor(QColor());
-        applyColorSwatch(backgroundSwatch, window.backgroundColor(), QStringLiteral("Theme"));
+        applyColorSwatch(backgroundSwatch, window.backgroundColor(), QStringLiteral("\u2014"));
     });
     QObject::connect(backgroundSwatch, &QPushButton::clicked, &window,
                      [&window, backgroundSwatch]() {
@@ -346,9 +375,9 @@ int main(int argc, char *argv[])
                          }
                          window.setBackgroundColor(color);
                          applyColorSwatch(backgroundSwatch, window.backgroundColor(),
-                                          QStringLiteral("Theme"));
+                                          QStringLiteral("\u2014"));
                      });
-    applyColorSwatch(backgroundSwatch, window.backgroundColor(), QStringLiteral("Theme"));
+    applyColorSwatch(backgroundSwatch, window.backgroundColor(), QStringLiteral("\u2014"));
     addRow(QStringLiteral("Color"), {backgroundSwatch, backgroundThemeButton});
     backgroundControlList << backgroundSwatch << backgroundThemeButton;
 
