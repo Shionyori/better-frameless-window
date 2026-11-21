@@ -46,9 +46,13 @@ the real `windows` platform plugin, so keep `QT_QPA_PLATFORM=windows` on Windows
 
 ## Window chrome
 
-- [ ] Caption buttons sit flush with the right edge and span the full titlebar height
+- [ ] Caption buttons sit flush with the top-right corner (46x32, native size)
 - [ ] Close button hover fill reaches the window corner (no rounded gap)
+- [ ] The titlebar strip below the buttons still drags the window
+- [ ] The outer resize border works on top of the caption buttons (top/right edge)
+- [ ] Hovering a caption button and leaving the window through its border clears the hover
 - [ ] Maximize: geometry animates to the work area (~170ms), then the button glyph flips
+- [ ] Double-clicking the caption uses the same animated transition as the button
 - [ ] Restore: geometry animates back to the previous size, no jump or flash
 - [ ] A second click during the animation completes it instead of stacking
 - [ ] Dragging the caption or an edge during the animation takes over cleanly

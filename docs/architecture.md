@@ -160,6 +160,20 @@ through a callback, so the native side knows exactly where
 `HTCAPTION`/`HTMINBUTTON`/`HTMAXBUTTON`/`HTCLOSE` are. Snap Layout depends on
 the `HTMAXBUTTON` answer; the click itself is intercepted so it maximizes once.
 
+Two rules keep the caption usable:
+
+- The **resize border wins over the caption buttons**. The buttons are pinned
+  to the top-right corner, so without this the outer border over them would
+  stop resizing (and stop being draggable at all).
+- The buttons keep their **native size** (46x32) instead of stretching over a
+  taller titlebar; a titlebar taller than that keeps a draggable strip below
+  them.
+
+Double-click on the caption is intercepted (`WM_NCLBUTTONDBLCLK` with
+`HTCAPTION`) and routed through the same animated transition as the button.
+DefWindowProc would otherwise maximize instantly and skip the restore
+rectangle capture.
+
 ---
 
 ## 5. Theme pipeline
