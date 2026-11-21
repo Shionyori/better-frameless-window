@@ -95,6 +95,14 @@ Derived artefacts (all from the same call):
 | `currentVisualStateToken()` | one bitfield that decides whether a refresh pass runs |
 | `forceBackdropRebind()` | re-applies the material after restore / theme change |
 
+Surface switches are ordered so the window content never disagrees with the
+composited backdrop: switching to the opaque surface repaints *before* the
+material is dropped (otherwise the old translucent wash is composited over the
+desktop for a frame, which reads as a flash), while switching to a material
+applies it first and repaints after. The native surface keeps its alpha
+capability for the whole lifetime — toggling `WA_TranslucentBackground` makes Qt
+rebuild the window.
+
 `VisualRefreshCoordinator` coalesces refresh requests and skips the pass when
 the token is unchanged, which is what keeps window moves and focus changes from
 spamming DWM.

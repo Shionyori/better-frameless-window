@@ -177,6 +177,7 @@ private:
     bool m_loggedNullWinId;
     bool m_loggedTranslucentShadow;
     bool m_resizing = false;
+    WindowVisualState::SurfaceKind m_lastAppliedSurfaceKind = WindowVisualState::SurfaceKind::Opaque;
     QPropertyAnimation *m_windowTransition = nullptr;
     bool m_windowTransitionMaximizes = false;
     bool m_animatingWindowTransition = false;
