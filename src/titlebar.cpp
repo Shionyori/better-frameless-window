@@ -12,6 +12,7 @@
 #include <QGraphicsOpacityEffect>
 #include <QPropertyAnimation>
 #include <QStyle>
+#include <QTimer>
 
 namespace {
 // Windows caption buttons are 46x32. The titlebar can be taller, in which case
@@ -35,6 +36,7 @@ TitleBar::TitleBar(QWidget *parent)
     , m_leftPressed(false)
     , m_dragInitiated(false)
     , m_visualMaximized(false)
+    , m_hoverWatch(nullptr)
 {
     setFixedHeight(44);
     setMouseTracking(true);
@@ -68,6 +70,10 @@ TitleBar::TitleBar(QWidget *parent)
     titleFont.setPixelSize(14);
     titleFont.setWeight(QFont::DemiBold);
     m_titleLabel->setFont(titleFont);
+
+    m_hoverWatch = new QTimer(this);
+    m_hoverWatch->setInterval(120);
+    connect(m_hoverWatch, &QTimer::timeout, this, &TitleBar::syncButtonVisualStatesFromCursor);
 
     initControlButton(m_minimizeButton, "min");
     initControlButton(m_maximizeButton, "max");
@@ -366,6 +372,33 @@ void TitleBar::syncButtonVisualStatesFromCursor()
         }
 
         updateButtonVisualState(button, targetState);
+    }
+
+    updateHoverWatch();
+}
+
+void TitleBar::updateHoverWatch()
+{
+    if (m_hoverWatch == nullptr) {
+        return;
+    }
+
+    // A highlighted button means the cursor is (or was) over it; poll until the
+    // pointer is elsewhere, whatever path it took out of the window.
+    const QList<QPushButton *> buttons = {m_minimizeButton, m_maximizeButton, m_closeButton};
+    bool anyHighlighted = false;
+    for (const QPushButton *button : buttons) {
+        if (button != nullptr && button->isVisible()
+            && button->property("btnState").toString() != QLatin1String("normal")) {
+            anyHighlighted = true;
+            break;
+        }
+    }
+
+    if (anyHighlighted && !m_hoverWatch->isActive()) {
+        m_hoverWatch->start();
+    } else if (!anyHighlighted && m_hoverWatch->isActive()) {
+        m_hoverWatch->stop();
     }
 }
 

@@ -50,7 +50,7 @@ the real `windows` platform plugin, so keep `QT_QPA_PLATFORM=windows` on Windows
 - [ ] Close button hover fill reaches the window corner (no rounded gap)
 - [ ] The titlebar strip below the buttons still drags the window
 - [ ] The outer resize border works on top of the caption buttons (top/right edge)
-- [ ] Hovering a caption button and leaving the window through its border clears the hover
+- [ ] Hovering a caption button then leaving the window (through the top edge, the right edge, or straight off the desktop) clears the hover
 - [ ] Maximize: geometry animates to the work area (~170ms), then the button glyph flips
 - [ ] Double-clicking the caption uses the same animated transition as the button
 - [ ] Restore: geometry animates back to the previous size, no jump or flash

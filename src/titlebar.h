@@ -10,6 +10,7 @@ class QMouseEvent;
 class QHBoxLayout;
 class QGraphicsOpacityEffect;
 class QPropertyAnimation;
+class QTimer;
 
 class TitleBar : public QWidget
 {
@@ -72,6 +73,7 @@ private:
     void updateButtonVisualState(QPushButton *button, const char *state);
     void resetButtonVisualStates();
     void syncButtonVisualStatesFromCursor();
+    void updateHoverWatch();
     void animateButtonOpacity(QPushButton *button, const QString &state);
 
     QHBoxLayout *m_layout;
@@ -88,5 +90,9 @@ private:
     bool m_dragInitiated;
     QPoint m_pressPos;
     bool m_visualMaximized;
+    // Re-derives the hover state from the cursor while a button is highlighted.
+    // Nothing else reports that the pointer left through the caption or the
+    // window edge, so the highlight would otherwise survive the exit.
+    QTimer *m_hoverWatch;
     QHash<QPushButton *, ButtonVisualFx> m_buttonFx;
 };
