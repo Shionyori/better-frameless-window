@@ -234,6 +234,9 @@ dark hint → backdrop → border) stay inside the class.
 
 ## 8. Failure policy
 
+- `setShadowEnabled()` only has a visible effect on an opaque surface: DWM does
+  not paint the frame shadow for a layered window, and a translucent surface is
+  layered. The library logs that once per state change under diagnostics.
 - Every DWM attribute has a per-window validity flag: after the first failure
   it is not retried for that window (`m_darkMode20Valid`, …). This keeps
   unsupported attributes from spamming the log every refresh.

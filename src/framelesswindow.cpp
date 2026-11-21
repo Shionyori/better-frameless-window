@@ -65,6 +65,7 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_loggedNullWindowHandle(false)
     , m_borderColor()
     , m_loggedNullWinId(false)
+    , m_loggedTranslucentShadow(false)
     , m_visualRefreshCoordinator(this)
     , m_followSystemTheme(false)
 {
@@ -1265,6 +1266,17 @@ void FramelessWindow::applyVisualEffects()
     WindowVisualState::SurfacePolicy effectSurface = policy;
     if (isMinimized()) {
         effectSurface.backdrop = WindowEffect::BackdropKind::None;
+    }
+
+    if (m_shadowEnabled && shouldBeTranslucent && !m_loggedTranslucentShadow) {
+        // DWM only paints its frame shadow for windows without per-pixel alpha.
+        // A translucent surface is layered, so this flag has no visible effect
+        // until the window switches to an opaque surface (BackdropMode::None).
+        Diagnostics::logWarning(QStringLiteral("applyShadow: DWM draws no shadow for a translucent surface, "
+                                               "shadow takes effect only when the window is opaque"));
+        m_loggedTranslucentShadow = true;
+    } else if (!m_shadowEnabled || !shouldBeTranslucent) {
+        m_loggedTranslucentShadow = false;
     }
 
     const WindowEffect::VisualEffectOptions options = WindowVisualState::buildVisualEffectOptions(

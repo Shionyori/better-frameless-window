@@ -67,6 +67,7 @@ the real `windows` platform plugin, so keep `QT_QPA_PLATFORM=windows` on Windows
 - [ ] Setting a background image while a backdrop is active switches the surface to opaque
 - [ ] Dark theme + Mica: window is dark, never flat grey (backdrop dark variant follows the theme)
 - [ ] `setBorderColor()` shows the border on Windows 11
+- [ ] Shadow: visible with `BackdropMode::None`, absent with Mica/Acrylic (DWM drops it for layered windows)
 
 ## Content
 
