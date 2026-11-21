@@ -166,6 +166,7 @@ private:
     QColor m_borderColor;
     bool m_loggedNullWindowHandle;
     bool m_loggedNullWinId;
+    bool m_loggedTranslucentShadow;
     bool m_resizing = false;
     QPropertyAnimation *m_windowTransition = nullptr;
     bool m_windowTransitionMaximizes = false;
