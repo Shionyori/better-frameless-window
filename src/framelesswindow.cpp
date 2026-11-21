@@ -198,7 +198,10 @@ void FramelessWindow::setTitleBarVisible(bool visible)
 
 bool FramelessWindow::isTitleBarVisible() const
 {
-    return m_titleBar != nullptr && m_titleBar->isVisible();
+    // isHidden() rather than isVisible(): a titlebar of a window that has not
+    // been shown yet is not "visible", but it is not hidden either, and callers
+    // asking before show() expect the intended state.
+    return m_titleBar != nullptr && !m_titleBar->isHidden();
 }
 
 void FramelessWindow::setTitleBarHeight(int height)

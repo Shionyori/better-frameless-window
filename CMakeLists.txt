@@ -224,6 +224,7 @@ function(add_bfw_test name)
 endfunction()
 
 add_bfw_test(version)
+add_bfw_test(framelesswindow)
 add_bfw_test(titlebar)
 add_bfw_test(thememanager)
 add_bfw_test(visualstate)
