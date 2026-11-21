@@ -11,10 +11,9 @@ namespace Utils {
 struct WindowsCapabilities {
 	bool isWindows = false;
 	uint32_t buildNumber = 0;
-	bool supportsSystemDarkMode = false;
+	bool supportsDarkModeHint = false;
 	bool supportsRoundedCorners = false;
-	bool supportsSystemSystemBackdrop = false;
-	bool supportsLegacyMica = false;
+	bool supportsMica = false;
 	bool supportsAcrylic = false;
 };
 
@@ -23,6 +22,6 @@ int hitFromEdges(Qt::Edges edges);
 void syncNativeWindowStyles(void *hwnd, bool includeExStyle);
 uint32_t windowsBuildNumber();
 WindowsCapabilities detectWindowsCapabilities();
-bool isSystemDarkModeEnabled();
+bool systemPrefersDarkTheme();
 
 } // namespace Utils

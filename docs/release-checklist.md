@@ -44,12 +44,28 @@ the real `windows` platform plugin, so keep `QT_QPA_PLATFORM=windows` on Windows
 - [ ] Move the window to a second monitor, close, relaunch with that monitor disconnected: window comes back inside the primary work area
 - [ ] Taskbar is never covered by a maximized window
 
+## Window chrome
+
+- [ ] Caption buttons sit flush with the top-right corner (46x32, native size)
+- [ ] Close button hover fill reaches the window corner (no rounded gap)
+- [ ] The titlebar strip below the buttons still drags the window
+- [ ] The outer resize border works on top of the caption buttons (top/right edge)
+- [ ] Hovering a caption button then leaving the window (through the top edge, the right edge, or straight off the desktop) clears the hover
+- [ ] Maximize: geometry animates to the work area (~170ms), then the button glyph flips
+- [ ] Double-clicking the caption uses the same animated transition as the button
+- [ ] Restore: geometry animates back to the previous size, no jump or flash
+- [ ] A second click during the animation completes it instead of stacking
+- [ ] Dragging the caption or an edge during the animation takes over cleanly
+- [ ] Closing while maximized, then relaunching: maximized, and restore returns the pre-maximize size
+
 ## Theme and backdrop
 
 - [ ] Light ↔ Dark: 300ms transition, title bar, background and backdrop tint all follow
 - [ ] Mica: applied at startup, survives maximize → restore
 - [ ] Acrylic: applied at startup, survives maximize → restore, tint follows the theme
-- [ ] `setSystemBackdropPreference(None)` clears the backdrop
+- [ ] `setBackdropMode(None)` clears the backdrop and drops the translucent surface
+- [ ] Setting a background image while a backdrop is active switches the surface to opaque
+- [ ] Dark theme + Mica: window is dark, never flat grey (backdrop dark variant follows the theme)
 - [ ] `setBorderColor()` shows the border on Windows 11
 
 ## Content

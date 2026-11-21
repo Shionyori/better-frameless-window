@@ -142,6 +142,23 @@ int nonClientHitTest(const Context &context, const QPoint &globalPos)
         ? context.titleRegionResolver(localPos)
         : TitleRegion::None;
 
+    const bool onTitleBarCaptionArea = titleRegion == TitleRegion::Caption;
+
+    // The resize border wins over everything that lives inside it, caption
+    // buttons included: the caption buttons reach the window edge now, and
+    // without this the top/right border below them would stop resizing (and
+    // therefore stop being draggable at all).
+    if (!context.maximized) {
+        const Qt::Edges edges = edgesAtLocalPos(localPos,
+                                                QSize(logicalWidth, logicalHeight),
+                                                resizeBorderThickness(context.hwnd),
+                                                false,
+                                                false);
+        if (edges != Qt::Edges()) {
+            return Utils::hitFromEdges(edges);
+        }
+    }
+
     if (titleRegion == TitleRegion::MaximizeButton) {
         if (GetKeyState(VK_LBUTTON) < 0) {
             return HTCLIENT;
@@ -158,18 +175,8 @@ int nonClientHitTest(const Context &context, const QPoint &globalPos)
         return HTCLIENT;
     }
 
-    const bool onTitleBarCaptionArea = titleRegion == TitleRegion::Caption;
     if (context.maximized) {
         return onTitleBarCaptionArea ? HTCAPTION : HTCLIENT;
-    }
-
-    const Qt::Edges edges = edgesAtLocalPos(localPos,
-                                            QSize(logicalWidth, logicalHeight),
-                                            resizeBorderThickness(context.hwnd),
-                                            false,
-                                            false);
-    if (edges != Qt::Edges()) {
-        return Utils::hitFromEdges(edges);
     }
 
     if (onTitleBarCaptionArea) {

@@ -8,7 +8,7 @@
 
 namespace WindowCommand {
 
-bool toggleMaximizeRestore(void *hwnd, bool currentlyMaximized)
+bool setMaximized(void *hwnd, bool maximized)
 {
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
@@ -16,12 +16,14 @@ bool toggleMaximizeRestore(void *hwnd, bool currentlyMaximized)
         return false;
     }
 
-    const WPARAM command = currentlyMaximized ? SC_RESTORE : SC_MAXIMIZE;
-    SendMessage(win, WM_SYSCOMMAND, command, 0);
-    return true;
+    ShowWindow(win, maximized ? SW_MAXIMIZE : SW_RESTORE);
+
+    // ShowWindow only reports the *previous* visibility; the window state is
+    // what matters here, so ask for it.
+    return IsZoomed(win) == (maximized ? TRUE : FALSE);
 #else
     Q_UNUSED(hwnd)
-    Q_UNUSED(currentlyMaximized)
+    Q_UNUSED(maximized)
     return false;
 #endif
 }

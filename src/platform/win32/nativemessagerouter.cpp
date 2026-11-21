@@ -149,8 +149,19 @@ bool NativeMessageRouter::handle(FramelessWindow &window, void *message, qintptr
     case WM_NCACTIVATE:
         *result = TRUE;
         return true;
-    case WM_NCLBUTTONDOWN:
     case WM_NCLBUTTONDBLCLK:
+        if (msg->wParam == HTCAPTION) {
+            // DefWindowProc would maximize on its own here: instant, and it
+            // would bypass both the transition and the restore rectangle.
+            window.toggleMaximizeRestore();
+            *result = 0;
+            return true;
+        }
+        return NativeMessageRouter::handleNcButtonMessage(window,
+                                     msg->message,
+                                     static_cast<quintptr>(msg->wParam),
+                                     result);
+    case WM_NCLBUTTONDOWN:
     case WM_NCLBUTTONUP:
         return NativeMessageRouter::handleNcButtonMessage(window,
                                      msg->message,
@@ -158,6 +169,12 @@ bool NativeMessageRouter::handle(FramelessWindow &window, void *message, qintptr
                                      result);
     case WM_NCMOUSELEAVE:
     case WM_MOUSELEAVE:
+        // Leaving through the resize border or the caption never reaches the
+        // widget, so Qt never sends it a Leave event and a hovered caption
+        // button would keep its highlight. Re-derive the state from the cursor.
+        if (window.m_titleBar != nullptr) {
+            window.m_titleBar->syncButtonVisualStatesFromCursor();
+        }
         return false;
     case WM_CAPTURECHANGED:
     case WM_KILLFOCUS:
@@ -173,7 +190,7 @@ bool NativeMessageRouter::handle(FramelessWindow &window, void *message, qintptr
                                                                                             isRestoredSize);
         window.syncNativeWindowFrame();
         if (restoredFromMaximized) {
-            window.beginSystemBackdropTransitionGuard();
+            window.beginBackdropTransitionGuard();
             window.scheduleStateVisualRefresh();
         } else if (isMaximizedSize) {
             window.scheduleStateVisualRefresh();

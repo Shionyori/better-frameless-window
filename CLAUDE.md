@@ -126,9 +126,12 @@ gh pr create --base main --title "<type>: <描述>" --body "..."
 
 ### 审查规则
 
-- 不自行合并自己的 PR
 - 等 CI 全绿
 - 1~2 个 commit → Squash merge，3 个及以上 → Merge commit
+- **协作期**（有第二个人参与）：不要合并自己的 PR，等协作者 approve
+- **单人维护期**：CI 全绿后自行合并即可。`main` 的 ruleset 因此只要求
+  「禁强推 / 禁删除 / 评论解决 / 允许 merge+squash」，不设 review 数量门禁；
+  有协作者时再把 `required_approving_review_count` 调回 1
 
 ### PR 合并后
 

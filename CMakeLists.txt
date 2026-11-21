@@ -46,6 +46,8 @@ set(LIB_SOURCES
     src/diagnostics.h
     src/platform/win32/utils.cpp
     src/platform/win32/utils.h
+    src/platform/win32/windowcommand.cpp
+    src/platform/win32/windowcommand.h
 )
 
 set(WIN32_SOURCES
@@ -53,8 +55,6 @@ set(WIN32_SOURCES
     src/platform/win32/nativemessagerouter.h
     src/platform/win32/systemmenu.cpp
     src/platform/win32/systemmenu.h
-    src/platform/win32/windowcommand.cpp
-    src/platform/win32/windowcommand.h
     src/platform/win32/windowframe.cpp
     src/platform/win32/windowframe.h
     src/platform/win32/windowhittest.cpp

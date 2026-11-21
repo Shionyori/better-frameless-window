@@ -7,12 +7,20 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
-#include <QSpacerItem>
 #include <QEvent>
 #include <QFont>
 #include <QGraphicsOpacityEffect>
 #include <QPropertyAnimation>
 #include <QStyle>
+#include <QTimer>
+
+namespace {
+// Windows caption buttons are 46x32. The titlebar can be taller, in which case
+// the buttons stay at this size and the strip below them keeps dragging the
+// window.
+constexpr int kCaptionButtonWidth = 46;
+constexpr int kCaptionButtonHeight = 32;
+} // namespace
 
 TitleBar::TitleBar(QWidget *parent)
     : QWidget(parent)
@@ -28,11 +36,14 @@ TitleBar::TitleBar(QWidget *parent)
     , m_leftPressed(false)
     , m_dragInitiated(false)
     , m_visualMaximized(false)
+    , m_hoverWatch(nullptr)
 {
     setFixedHeight(44);
     setMouseTracking(true);
 
-    m_layout->setContentsMargins(14, 0, 12, 0);
+    // Caption buttons own the right edge, as in native Windows: the layout
+    // keeps a left margin for the icon/title but no right or vertical one.
+    m_layout->setContentsMargins(14, 0, 0, 0);
     m_layout->setSpacing(0);
 
     m_centerContainer->setObjectName("TitleBarCenterContainer");
@@ -60,6 +71,10 @@ TitleBar::TitleBar(QWidget *parent)
     titleFont.setWeight(QFont::DemiBold);
     m_titleLabel->setFont(titleFont);
 
+    m_hoverWatch = new QTimer(this);
+    m_hoverWatch->setInterval(120);
+    connect(m_hoverWatch, &QTimer::timeout, this, &TitleBar::syncButtonVisualStatesFromCursor);
+
     initControlButton(m_minimizeButton, "min");
     initControlButton(m_maximizeButton, "max");
     initControlButton(m_closeButton, "close");
@@ -69,17 +84,13 @@ TitleBar::TitleBar(QWidget *parent)
     m_layout->addWidget(m_iconContainer);
     m_layout->addWidget(m_titleLabel);
     m_layout->addWidget(m_centerContainer, 0);
-    m_minimizeSpacer = new QSpacerItem(4, 0, QSizePolicy::Fixed, QSizePolicy::Minimum);
-    m_maximizeSpacer = new QSpacerItem(4, 0, QSizePolicy::Fixed, QSizePolicy::Minimum);
-    m_closeSpacer = new QSpacerItem(4, 0, QSizePolicy::Fixed, QSizePolicy::Minimum);
 
     m_layout->addStretch();
-    m_layout->addSpacerItem(m_minimizeSpacer);
-    m_layout->addWidget(m_minimizeButton);
-    m_layout->addSpacerItem(m_maximizeSpacer);
-    m_layout->addWidget(m_maximizeButton);
-    m_layout->addSpacerItem(m_closeSpacer);
-    m_layout->addWidget(m_closeButton);
+    // Top-aligned: the buttons hug the window's top-right corner (native
+    // height) and leave the caption below them draggable.
+    m_layout->addWidget(m_minimizeButton, 0, Qt::AlignTop);
+    m_layout->addWidget(m_maximizeButton, 0, Qt::AlignTop);
+    m_layout->addWidget(m_closeButton, 0, Qt::AlignTop);
 
     connect(m_minimizeButton, &QPushButton::clicked, this, &TitleBar::minimizeRequested);
     connect(m_maximizeButton, &QPushButton::clicked, this, &TitleBar::maximizeRestoreRequested);
@@ -92,7 +103,10 @@ void TitleBar::initControlButton(QPushButton *button, const char *role)
         return;
     }
 
-    button->setFixedSize(46, 30);
+    // Native caption proportion: a fixed 46x32 button attached to the window
+    // edge. Stretching them over a taller custom titlebar would swallow the
+    // whole strip next to them, dragging included.
+    button->setFixedSize(kCaptionButtonWidth, kCaptionButtonHeight);
     button->setFlat(true);
     button->setAutoDefault(false);
     button->setDefault(false);
@@ -132,6 +146,12 @@ void TitleBar::updateControlButtonGlyphs()
 void TitleBar::setHeight(int height)
 {
     setFixedHeight(height);
+
+    // Never let the buttons outgrow the bar they sit in.
+    const int buttonHeight = qMin(height, kCaptionButtonHeight);
+    for (QPushButton *button : {m_minimizeButton, m_maximizeButton, m_closeButton}) {
+        button->setFixedSize(kCaptionButtonWidth, buttonHeight);
+    }
 }
 
 void TitleBar::setTitle(const QString &title)
@@ -353,6 +373,33 @@ void TitleBar::syncButtonVisualStatesFromCursor()
 
         updateButtonVisualState(button, targetState);
     }
+
+    updateHoverWatch();
+}
+
+void TitleBar::updateHoverWatch()
+{
+    if (m_hoverWatch == nullptr) {
+        return;
+    }
+
+    // A highlighted button means the cursor is (or was) over it; poll until the
+    // pointer is elsewhere, whatever path it took out of the window.
+    const QList<QPushButton *> buttons = {m_minimizeButton, m_maximizeButton, m_closeButton};
+    bool anyHighlighted = false;
+    for (const QPushButton *button : buttons) {
+        if (button != nullptr && button->isVisible()
+            && button->property("btnState").toString() != QLatin1String("normal")) {
+            anyHighlighted = true;
+            break;
+        }
+    }
+
+    if (anyHighlighted && !m_hoverWatch->isActive()) {
+        m_hoverWatch->start();
+    } else if (!anyHighlighted && m_hoverWatch->isActive()) {
+        m_hoverWatch->stop();
+    }
 }
 
 void TitleBar::setMaximized(bool maximized)
@@ -459,10 +506,6 @@ void TitleBar::leaveEvent(QEvent *event)
 void TitleBar::setMinimizeButtonVisible(bool visible)
 {
     m_minimizeButton->setVisible(visible);
-    m_minimizeSpacer->changeSize(
-        visible ? 4 : 0, 0,
-        QSizePolicy::Fixed,
-        visible ? QSizePolicy::Minimum : QSizePolicy::Fixed);
     m_layout->invalidate();
 }
 
@@ -474,10 +517,6 @@ bool TitleBar::isMinimizeButtonVisible() const
 void TitleBar::setMaximizeButtonVisible(bool visible)
 {
     m_maximizeButton->setVisible(visible);
-    m_maximizeSpacer->changeSize(
-        visible ? 4 : 0, 0,
-        QSizePolicy::Fixed,
-        visible ? QSizePolicy::Minimum : QSizePolicy::Fixed);
     m_layout->invalidate();
 }
 
@@ -489,10 +528,6 @@ bool TitleBar::isMaximizeButtonVisible() const
 void TitleBar::setCloseButtonVisible(bool visible)
 {
     m_closeButton->setVisible(visible);
-    m_closeSpacer->changeSize(
-        visible ? 4 : 0, 0,
-        QSizePolicy::Fixed,
-        visible ? QSizePolicy::Minimum : QSizePolicy::Fixed);
     m_layout->invalidate();
 }
 

@@ -3,9 +3,10 @@
 #include "diagnostics.h"
 #include "core/windowgeometry.h"
 #include "core/windowvisualstate.h"
+// Platform-neutral: reports failure instead of doing anything off Windows.
+#include "win32/windowcommand.h"
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
-#include "win32/windowcommand.h"
 #include "win32/systemmenu.h"
 #include "win32/windowhittest.h"
 #include "win32/windowframe.h"
@@ -16,6 +17,8 @@
 
 #include <QEvent>
 #include <QLayout>
+#include <QMoveEvent>
+#include <QResizeEvent>
 #include <QMouseEvent>
 #include <QShortcut>
 #include <QPropertyAnimation>
@@ -36,6 +39,14 @@
 #include <QWindow>
 #include <QtGlobal>
 
+namespace {
+
+// Windows' own maximize/restore transition is roughly 200ms; 170ms reads as the
+// same gesture without the window lingering in an in-between state.
+constexpr int kWindowTransitionDurationMs = 170;
+
+} // namespace
+
 FramelessWindow::FramelessWindow(QWidget *parent)
     : QWidget(parent)
     , m_titleBar(nullptr)
@@ -43,13 +54,11 @@ FramelessWindow::FramelessWindow(QWidget *parent)
     , m_userContentWidget(nullptr)
     , m_layout(nullptr)
     , m_shadowEnabled(true)
-    , m_systemBackdropEnabled(true)
-    , m_systemBackdropPreference(WindowEffect::SystemBackdropPreference::Auto)
+    , m_backdropMode(WindowEffect::BackdropMode::Auto)
     , m_roundedCornersEnabled(true)
-    , m_systemDarkModeEnabled(true)
     , m_snapLayoutEnabled(true)
-    , m_systemBackdropTransitionGuardActive(false)
-    , m_systemBackdropTransitionEpoch(0)
+    , m_backdropTransitionGuardActive(false)
+    , m_backdropTransitionEpoch(0)
     , m_lastNativeSizeMaximized(false)
     , m_applyingTheme(false)
     , m_lastAppliedStyleSheet()
@@ -84,21 +93,6 @@ FramelessWindow::FramelessWindow(QWidget *parent)
 
 FramelessWindow::~FramelessWindow() = default;
 
-void FramelessWindow::setWindowOpacity(qreal opacity)
-{
-    const qreal normalizedOpacity = qBound<qreal>(0.0, opacity, 1.0);
-    if (qFuzzyCompare(QWidget::windowOpacity(), normalizedOpacity)) {
-        return;
-    }
-
-    QWidget::setWindowOpacity(normalizedOpacity);
-}
-
-qreal FramelessWindow::windowOpacity() const
-{
-    return QWidget::windowOpacity();
-}
-
 void FramelessWindow::setWindowSizeLimits(const QSize &minimumSize, const QSize &maximumSize)
 {
     if (minimumSize.isValid() && minimumSize != QWidget::minimumSize()) {
@@ -120,7 +114,7 @@ QSize FramelessWindow::maximumWindowSize() const
     return QWidget::maximumSize();
 }
 
-void FramelessWindow::setSystemShadowEnabled(bool enabled)
+void FramelessWindow::setShadowEnabled(bool enabled)
 {
     if (m_shadowEnabled == enabled) {
         return;
@@ -130,23 +124,13 @@ void FramelessWindow::setSystemShadowEnabled(bool enabled)
     requestVisualRefresh();
 }
 
-void FramelessWindow::setSystemBackdropEnabled(bool enabled)
+void FramelessWindow::setBackdropMode(WindowEffect::BackdropMode mode)
 {
-    if (m_systemBackdropEnabled == enabled) {
+    if (m_backdropMode == mode) {
         return;
     }
 
-    m_systemBackdropEnabled = enabled;
-    requestVisualRefresh();
-}
-
-void FramelessWindow::setSystemBackdropPreference(WindowEffect::SystemBackdropPreference preference)
-{
-    if (m_systemBackdropPreference == preference) {
-        return;
-    }
-
-    m_systemBackdropPreference = preference;
+    m_backdropMode = mode;
     requestVisualRefresh();
 }
 
@@ -160,16 +144,6 @@ void FramelessWindow::setRoundedCornersEnabled(bool enabled)
     requestVisualRefresh();
 }
 
-void FramelessWindow::setSystemDarkModeEnabled(bool enabled)
-{
-    if (m_systemDarkModeEnabled == enabled) {
-        return;
-    }
-
-    m_systemDarkModeEnabled = enabled;
-    requestVisualRefresh();
-}
-
 void FramelessWindow::setSnapLayoutEnabled(bool enabled)
 {
     m_snapLayoutEnabled = enabled;
@@ -179,13 +153,18 @@ void FramelessWindow::setBackgroundImage(const QPixmap &image, BackgroundImageMo
 {
     m_backgroundImage = image;
     m_backgroundImageMode = mode;
-    update();
+
+    // The presence of an image changes the resolved surface: an image needs an
+    // opaque window, so a live backdrop has to be dropped. The refresh below
+    // recomputes the theme style sheet and the DWM effects from that policy.
+    requestVisualRefresh();
 }
 
 void FramelessWindow::clearBackgroundImage()
 {
     m_backgroundImage = QPixmap();
-    update();
+    // Dropping the image lets the requested backdrop take the surface again.
+    requestVisualRefresh();
 }
 
 QPixmap FramelessWindow::backgroundImage() const
@@ -293,7 +272,7 @@ void FramelessWindow::setThemeMode(ThemeManager::ThemeMode mode, bool persist, b
         anim->start(QAbstractAnimation::DeleteWhenStopped);
 
         QTimer::singleShot(350, this, [this]() {
-            forceSystemBackdropRebind();
+            forceBackdropRebind();
         });
     } else {
         m_themeManager.setThemeMode(mode);
@@ -301,7 +280,7 @@ void FramelessWindow::setThemeMode(ThemeManager::ThemeMode mode, bool persist, b
         requestVisualRefresh();
 
         QTimer::singleShot(50, this, [this]() {
-            forceSystemBackdropRebind();
+            forceBackdropRebind();
         });
     }
 }
@@ -343,10 +322,11 @@ void FramelessWindow::performVisualRefreshPass()
     applyTheme();
 
     // Suppress native frame sync and DWM visual effects during an active
-    // system resize (WM_ENTERSIZEMOVE → WM_EXITSIZEMOVE). Calling
-    // SetWindowPos(SWP_FRAMECHANGED) or DwmSetWindowAttribute mid-resize
-    // fights the system's own resize handling and causes visible jitter.
-    if (!m_resizing) {
+    // system resize (WM_ENTERSIZEMOVE → WM_EXITSIZEMOVE) and while the
+    // maximize/restore transition animates the geometry. Calling
+    // SetWindowPos(SWP_FRAMECHANGED) or DwmSetWindowAttribute mid-transition
+    // fights the moving frame and causes visible jitter.
+    if (!m_resizing && !m_animatingWindowTransition) {
         syncNativeWindowFrame();
         applyVisualEffects();
     }
@@ -442,24 +422,14 @@ bool FramelessWindow::isShadowEnabled() const
     return m_shadowEnabled;
 }
 
-bool FramelessWindow::isSystemBackdropEnabled() const
+WindowEffect::BackdropMode FramelessWindow::backdropMode() const
 {
-    return m_systemBackdropEnabled;
-}
-
-WindowEffect::SystemBackdropPreference FramelessWindow::systemBackdropPreference() const
-{
-    return m_systemBackdropPreference;
+    return m_backdropMode;
 }
 
 bool FramelessWindow::isRoundedCornersEnabled() const
 {
     return m_roundedCornersEnabled;
-}
-
-bool FramelessWindow::isSystemDarkModeEnabled() const
-{
-    return m_systemDarkModeEnabled;
 }
 
 bool FramelessWindow::isSnapLayoutEnabled() const
@@ -487,7 +457,7 @@ void FramelessWindow::setFollowSystemTheme(bool enabled)
 
 #ifdef Q_OS_WIN
     if (enabled) {
-        const bool systemDark = Utils::isSystemDarkModeEnabled();
+        const bool systemDark = Utils::systemPrefersDarkTheme();
         setThemeMode(systemDark ? ThemeManager::ThemeMode::Dark
                                 : ThemeManager::ThemeMode::Light,
                      /*persist=*/false,
@@ -508,7 +478,7 @@ void FramelessWindow::syncThemeWithSystemIfFollowing()
         return;
     }
 
-    const bool systemDark = Utils::isSystemDarkModeEnabled();
+    const bool systemDark = Utils::systemPrefersDarkTheme();
     const ThemeManager::ThemeMode systemMode = systemDark
         ? ThemeManager::ThemeMode::Dark
         : ThemeManager::ThemeMode::Light;
@@ -733,12 +703,10 @@ quint64 FramelessWindow::currentVisualStateToken() const
                                                     isMinimized(),
                                                     isActiveWindow(),
                                                     m_shadowEnabled,
-                                                    m_systemBackdropEnabled,
                                                     m_roundedCornersEnabled,
-                                                    m_systemDarkModeEnabled,
-                                                    effectiveSystemBackdropPreference(),
+                                                    surfacePolicy().backdrop,
                                                     m_themeManager.themeMode(),
-                                                    shouldUseTranslucentBackground());
+                                                    usesTranslucentSurface());
 }
 
 bool FramelessWindow::eventFilter(QObject *watched, QEvent *event)
@@ -794,7 +762,7 @@ void FramelessWindow::applyTheme()
     }
 
     QScopedValueRollback<bool> applyingGuard(m_applyingTheme, true);
-    const bool useTranslucentBackground = shouldUseTranslucentBackground();
+    const bool useTranslucentBackground = usesTranslucentSurface();
     setAttribute(Qt::WA_TranslucentBackground, useTranslucentBackground);
 
     const QString styleSheet = m_themeManager.buildStyleSheet(useTranslucentBackground);
@@ -838,14 +806,20 @@ void FramelessWindow::saveWindowGeometry()
     QSettings settings(QStringLiteral("better-frameless-window"), QStringLiteral("settings"));
     settings.setValue(QStringLiteral("geometry/maximized"), maximized);
 
-    // Persist the restore size even while maximized: otherwise closing a
+    // Persist the restore rectangle even while maximized: otherwise closing a
     // maximized window would keep whatever was saved the last time the window
-    // happened to be restored, which can be arbitrarily stale. The window
-    // manager owns that rectangle, so ask it instead of tracking it here --
-    // Qt updates its own maximized state after the resize event, so an
-    // event-based copy ends up holding the maximized geometry.
+    // happened to be restored, which can be arbitrarily stale.
+    //
+    // The tracked rectangle is preferred over the window manager's idea of it:
+    // the maximize transition animates the geometry up to the work area before
+    // the state flips, so GetWindowPlacement() would report the maximized
+    // rectangle as the "normal" one.
     QRect rect = geometry();
     if (maximized) {
+        rect = m_restoreGeometry;
+    }
+
+    if (!rect.isValid()) {
 #ifdef Q_OS_WIN
         const QRect nativeRestore = WindowFrame::restoreGeometry(reinterpret_cast<void *>(winId()));
         if (!nativeRestore.isValid()) {
@@ -860,8 +834,8 @@ void FramelessWindow::saveWindowGeometry()
                            qRound(nativeRestore.height() / dpr))
                    : nativeRestore;
 #else
-        // No window-manager source for the restore rectangle on this platform:
-        // keep whatever was persisted rather than writing the maximized size.
+        // No source for the restore rectangle on this platform: keep whatever
+        // was persisted rather than writing the maximized size.
         return;
 #endif
     }
@@ -914,6 +888,9 @@ void FramelessWindow::forceNativeDwmRefresh()
 
 void FramelessWindow::mousePressEvent(QMouseEvent *event)
 {
+    // A press takes over from a running maximize/restore transition.
+    finishWindowTransition();
+
     if (event->button() == Qt::LeftButton) {
         const bool started = tryStartSystemResizeAtLocalPos(event->pos());
         if (started) {
@@ -929,6 +906,18 @@ void FramelessWindow::mouseMoveEvent(QMouseEvent *event)
 {
     updateCursorForPosition(event->pos());
     QWidget::mouseMoveEvent(event);
+}
+
+void FramelessWindow::moveEvent(QMoveEvent *event)
+{
+    QWidget::moveEvent(event);
+    rememberRestoreGeometry();
+}
+
+void FramelessWindow::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    rememberRestoreGeometry();
 }
 
 void FramelessWindow::leaveEvent(QEvent *event)
@@ -1016,15 +1005,38 @@ Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
 void FramelessWindow::toggleMaximizeRestore()
 {
 #ifdef Q_OS_WIN
-    // Let DWM run its own maximize/restore animation: the window state changes
-    // immediately and the content is never hidden. The previous version faded
-    // the content out for 60ms, toggled, then faded back in 200ms later, which
-    // read as a flash and made the button behave differently from double-click
-    // or Win+Up (both go through the native path). It also relied on a
-    // QGraphicsOpacityEffect on the content panel, which forces the whole
-    // content widget through an off-screen render pass.
-    if (!WindowCommand::toggleMaximizeRestore(reinterpret_cast<void *>(winId()), isMaximized())) {
-        Diagnostics::logWarning(QStringLiteral("toggleMaximizeRestore: null HWND, fallback"));
+    // Windows never animates this window: the native transition belongs to the
+    // frame, and the frame is ours (WS_CAPTION is cleared to keep Snap Layout
+    // working), so SC_MAXIMIZE/SC_RESTORE land instantly. Animate the geometry
+    // ourselves and only flip the window state once the rectangle arrives.
+    if (m_windowTransition != nullptr) {
+        // A second click while the transition runs must not stack animations.
+        finishWindowTransition();
+        return;
+    }
+
+    if (isMaximized()) {
+        QRect target = m_restoreGeometry;
+        if (!target.isValid()) {
+            target = normalGeometry();
+        }
+        if (target.isValid()) {
+            startWindowTransition(target, false);
+            return;
+        }
+    } else if (const QScreen *targetScreen = screen()) {
+        // The rectangle to come back to, captured before the animation walks
+        // the geometry up to the work area.
+        m_restoreGeometry = geometry();
+        startWindowTransition(targetScreen->availableGeometry(), true);
+        return;
+    }
+
+    // No usable target (for example a window that was maximized before it was
+    // ever shown): fall back to an instant state change, which is abrupt but
+    // always correct.
+    if (!WindowCommand::setMaximized(reinterpret_cast<void *>(winId()), !isMaximized())) {
+        Diagnostics::logWarning(QStringLiteral("toggleMaximizeRestore: native state change failed, fallback"));
         if (isMaximized()) {
             showNormal();
         } else {
@@ -1040,8 +1052,98 @@ void FramelessWindow::toggleMaximizeRestore()
 #endif
 }
 
+void FramelessWindow::startWindowTransition(const QRect &target, bool maximizeAtEnd)
+{
+    const QRect from = geometry();
+    m_windowTransitionMaximizes = maximizeAtEnd;
+    m_animatingWindowTransition = true;
+
+    if (!maximizeAtEnd) {
+        // A maximized window cannot be moved or resized by the platform, so drop
+        // the state first and animate back out of the old rectangle. This goes
+        // through the platform rather than QWidget::showNormal(): the window
+        // state then comes back from WM_SIZE, which keeps Qt's idea of the state
+        // and the OS's in sync.
+        WindowCommand::setMaximized(reinterpret_cast<void *>(winId()), false);
+    }
+
+    auto *animation = new QPropertyAnimation(this, "geometry", this);
+    animation->setDuration(kWindowTransitionDurationMs);
+    animation->setEasingCurve(QEasingCurve::InOutCubic);
+    animation->setStartValue(from);
+    animation->setEndValue(target);
+
+    m_windowTransition = animation;
+    connect(animation, &QPropertyAnimation::finished, this, [this]() {
+        m_windowTransition = nullptr;
+        completeWindowTransition();
+    });
+
+    // Maximize feedback is immediate in Windows: flip the glyph now and keep
+    // updateMaximizeButtonState() from reverting it mid-transition.
+    if (m_titleBar != nullptr) {
+        m_titleBar->setMaximized(maximizeAtEnd);
+    }
+
+    animation->start(QAbstractAnimation::DeleteWhenStopped);
+}
+
+void FramelessWindow::finishWindowTransition()
+{
+    if (m_windowTransition == nullptr) {
+        return;
+    }
+
+    // stop() does not emit finished(), so the end state is applied here.
+    m_windowTransition->stop();
+    m_windowTransition = nullptr;
+    completeWindowTransition();
+}
+
+void FramelessWindow::completeWindowTransition()
+{
+    m_animatingWindowTransition = false;
+
+    if (m_windowTransitionMaximizes) {
+        m_windowTransitionMaximizes = false;
+        // The rectangle already is the maximized one, so this only sets
+        // WS_MAXIMIZE and lets WM_SIZE tell Qt about it.
+        WindowCommand::setMaximized(reinterpret_cast<void *>(winId()), true);
+    }
+
+    // DWM dropped the backdrop while the geometry was moving; re-apply it now
+    // that the rectangle has settled.
+    beginBackdropTransitionGuard();
+    scheduleStateVisualRefresh();
+}
+
+void FramelessWindow::rememberRestoreGeometry()
+{
+    // The geometry the window returns to. Tracked continuously so a maximize
+    // that did not come from this class (Win+Up, snap) still animates, and
+    // skipped while the transition animates through intermediate sizes.
+    if (m_animatingWindowTransition || isMaximized() || isMinimized() || isFullScreen()) {
+        return;
+    }
+
+#ifdef Q_OS_WIN
+    // Qt learns the maximized state from WM_SIZE asynchronously, so during a
+    // native maximize a move/resize event can arrive while isMaximized() is
+    // still false although the geometry already is the work area. Ask the
+    // window itself instead of relying on the event order.
+    if (WindowFrame::isMaximized(reinterpret_cast<void *>(winId()))) {
+        return;
+    }
+#endif
+
+    m_restoreGeometry = geometry();
+}
+
 void FramelessWindow::startSystemMove()
 {
+    // Dragging the caption during a transition would fight the animation.
+    finishWindowTransition();
+
     if (windowHandle() != nullptr && !isMaximized()) {
         windowHandle()->startSystemMove();
     }
@@ -1065,6 +1167,12 @@ void FramelessWindow::updateMaximizeButtonState()
         return;
     }
 
+    // While the transition runs the window state does not match what the user
+    // just asked for; startWindowTransition() already set the glyph.
+    if (m_animatingWindowTransition) {
+        return;
+    }
+
     m_titleBar->setMaximized(isMaximized());
 }
 
@@ -1083,6 +1191,8 @@ bool FramelessWindow::tryStartSystemResizeAtLocalPos(const QPoint &localPos)
     if (windowHandle() == nullptr || isMaximized()) {
         return false;
     }
+
+    finishWindowTransition();
 
     const Qt::Edges edges = edgesForLocalPos(localPos);
     if (edges == Qt::Edges()) {
@@ -1110,6 +1220,10 @@ void FramelessWindow::ensureNativeResizeStyle()
 void FramelessWindow::syncNativeWindowFrame()
 {
 #ifdef Q_OS_WIN
+    if (m_animatingWindowTransition) {
+        return;
+    }
+
     WindowFrame::syncWindowFrame(reinterpret_cast<void *>(winId()));
 #else
     Q_UNUSED(0)
@@ -1136,22 +1250,30 @@ void FramelessWindow::applyVisualEffects()
     m_loggedNullWindowHandle = false;
     m_loggedNullWinId = false;
 
-    // Sync WA_TranslucentBackground with expected state before applying native effects.
-    // Guards against direct applyVisualEffects() calls that bypass applyTheme().
-    const bool shouldBeTranslucent = shouldUseTranslucentBackground();
+    // Sync WA_TranslucentBackground with the resolved surface before applying
+    // native effects. Guards against direct applyVisualEffects() calls that
+    // bypass applyTheme().
+    const WindowVisualState::SurfacePolicy policy = surfacePolicy();
+    const bool shouldBeTranslucent = WindowVisualState::usesTranslucentSurface(policy);
     if (shouldBeTranslucent != testAttribute(Qt::WA_TranslucentBackground)) {
         setAttribute(Qt::WA_TranslucentBackground, shouldBeTranslucent);
     }
 
+    // DWM tears the backdrop down on minimize. Telling WindowEffect about it
+    // keeps its cache honest, so the restore transition re-applies the backdrop
+    // instead of being skipped as redundant.
+    WindowVisualState::SurfacePolicy effectSurface = policy;
+    if (isMinimized()) {
+        effectSurface.backdrop = WindowEffect::BackdropKind::None;
+    }
+
     const WindowEffect::VisualEffectOptions options = WindowVisualState::buildVisualEffectOptions(
         m_shadowEnabled,
-        m_systemBackdropEnabled,
-        effectiveSystemBackdropPreference(),
         m_roundedCornersEnabled,
-        m_systemDarkModeEnabled,
         m_themeManager.themeMode(),
         isMaximized(),
         isMinimized(),
+        effectSurface,
         preferredBorderColor());
 
     void *hwnd = reinterpret_cast<void *>(winId());
@@ -1175,10 +1297,11 @@ void FramelessWindow::applyVisualEffects()
 #endif
 }
 
-void FramelessWindow::forceSystemBackdropRebind()
+void FramelessWindow::forceBackdropRebind()
 {
 #ifdef Q_OS_WIN
-    if (!m_systemBackdropEnabled || windowHandle() == nullptr) {
+    const WindowEffect::BackdropKind backdrop = surfacePolicy().backdrop;
+    if (backdrop == WindowEffect::BackdropKind::None || isMinimized() || windowHandle() == nullptr) {
         return;
     }
 
@@ -1187,22 +1310,12 @@ void FramelessWindow::forceSystemBackdropRebind()
         return;
     }
 
-    const bool useDarkMode = shouldUseDarkMode();
-    const bool maximized = isMaximized();
-    const bool minimized = isMinimized();
-
     // Ask DWM to re-evaluate the backdrop after a maximize/restore or theme
     // transition. WindowEffect decides whether the previously applied effect
     // has to be reset first: Mica is a stored attribute and needs the reset,
     // while Acrylic is re-applied in place because clearing the accent policy
     // drops the blur for a frame.
-    m_windowEffect.applySystemBackdropEffects(hwnd,
-                                        true,
-                                        useDarkMode,
-                                        maximized,
-                                        minimized,
-                                        m_systemBackdropPreference,
-                                        true);
+    m_windowEffect.applyBackdrop(hwnd, backdrop, shouldUseDarkMode(), true);
 #else
     Q_UNUSED(0)
 #endif
@@ -1224,31 +1337,32 @@ bool FramelessWindow::shouldStartRestoreTransitionFromSizeState(bool isMaximized
     return false;
 }
 
-WindowEffect::SystemBackdropPreference FramelessWindow::effectiveSystemBackdropPreference() const
+void FramelessWindow::beginBackdropTransitionGuard()
 {
-    return m_systemBackdropPreference;
-}
-
-void FramelessWindow::beginSystemBackdropTransitionGuard()
-{
-    if (!m_systemBackdropEnabled) {
-        m_systemBackdropTransitionGuardActive = false;
+    if (m_animatingWindowTransition) {
+        // completeWindowTransition() arms the guard once the geometry settles.
+        m_backdropTransitionGuardActive = false;
         return;
     }
 
-    m_systemBackdropTransitionGuardActive = true;
-    const quint64 epoch = ++m_systemBackdropTransitionEpoch;
+    if (surfacePolicy().backdrop == WindowEffect::BackdropKind::None) {
+        m_backdropTransitionGuardActive = false;
+        return;
+    }
 
-    // The new applySystemBackdropEffects always clears effects before applying,
-    // so a single recovery pass reliably restores the backdrop after restore.
+    m_backdropTransitionGuardActive = true;
+    const quint64 epoch = ++m_backdropTransitionEpoch;
+
+    // applyBackdrop() always clears the previous backdrop before applying, so a
+    // single recovery pass reliably restores it after a restore transition.
     QTimer::singleShot(160, this, [this, epoch]() {
-        if (epoch != m_systemBackdropTransitionEpoch) {
+        if (epoch != m_backdropTransitionEpoch) {
             return;
         }
 
-        m_systemBackdropTransitionGuardActive = false;
+        m_backdropTransitionGuardActive = false;
         requestVisualRefresh();
-        forceSystemBackdropRebind();
+        forceBackdropRebind();
         forceNativeDwmRefresh();
     });
 }
@@ -1258,15 +1372,20 @@ bool FramelessWindow::shouldUseDarkMode() const
     return WindowVisualState::shouldUseDarkMode(m_themeManager.themeMode());
 }
 
-bool FramelessWindow::shouldUseTranslucentBackground() const
+WindowVisualState::SurfacePolicy FramelessWindow::surfacePolicy() const
 {
-    // Keep Qt translucent-surface policy stable across maximize/restore guard.
-    // Native systemBackdrop can be temporarily forced to None, but coupling that
-    // transient state to QWidget translucency may cause delayed composition
-    // recovery on Windows after restore.
-    return WindowVisualState::shouldUseTranslucentBackground(m_systemBackdropEnabled,
-                                                              false,
-                                                              m_systemBackdropPreference);
+    // The minimized flag is deliberately not part of the surface: Qt keeps the
+    // translucent attribute stable across minimize/restore, because flipping it
+    // mid-transition delays composition recovery on Windows. DWM drops the
+    // backdrop on its own while the window is minimized.
+    return WindowVisualState::resolveSurfacePolicy(m_backdropMode,
+                                                   false,
+                                                   !m_backgroundImage.isNull());
+}
+
+bool FramelessWindow::usesTranslucentSurface() const
+{
+    return WindowVisualState::usesTranslucentSurface(surfacePolicy());
 }
 
 QColor FramelessWindow::preferredBorderColor() const

@@ -31,10 +31,11 @@
 - **Frameless window** — custom titlebar with icon, drag-to-move, double-click maximize/restore, right-click system menu, Alt+Space shortcut
 - **8-direction resize** — HiDPI-aware hit testing with corner detection
 - **Background image** — Cover / Fit / Stretch / Tile / Center modes with independent opacity control
-- **DWM visual effects** — shadow, rounded corners, system dark mode, Mica / Acrylic backdrop with auto fallback chain
+- **DWM visual effects** — shadow, rounded corners, Mica / Acrylic backdrop with auto fallback chain
 - **Snap Layout** — native DWM hit-test forwarding, toggleable via `setSnapLayoutEnabled()`
 - **Theme manager** — Light / Dark with 300ms animated transitions, persistence, and system theme following
-- **Titlebar customization** — visibility toggle, adjustable height, widget extension slot
+- **Titlebar customization** — visibility toggle, adjustable height, widget extension slot, caption buttons flush with the window edge
+- **Smooth maximize / restore** — the geometry is animated (170ms, InOutCubic) before the window state flips
 - **Fullscreen support** — auto-hides titlebar, disables resize edges
 - **Window geometry persistence** — automatic save/restore with multi-monitor validation
 
@@ -92,8 +93,6 @@ int main(int argc, char *argv[])
 | `minimumWindowSize()` / `maximumWindowSize()` | Get current size limits |
 | `setCentralWidget(widget)` | Set the main content widget |
 | `centralWidget()` / `takeCentralWidget()` | Get / remove the content widget |
-| `setWindowOpacity(qreal)` | Set window-level opacity (0.0–1.0) |
-| `windowOpacity()` | Get current window opacity |
 | `saveWindowGeometry()` / `restoreWindowGeometry()` | Persist / restore window position and size |
 
 ### Titlebar
@@ -132,20 +131,46 @@ int main(int argc, char *argv[])
 
 | Method | Description |
 |---|---|
-| `setSystemShadowEnabled(bool)` | Enable / disable system window shadow |
+| `setShadowEnabled(bool)` | Enable / disable the DWM window shadow |
 | `isShadowEnabled()` | Check shadow state |
-| `setSystemBackdropEnabled(bool)` | Enable / disable system backdrop effects |
-| `setSystemBackdropPreference(pref)` | Set backdrop mode |
-| `systemBackdropPreference()` | Get current backdrop mode |
-| `isSystemBackdropEnabled()` | Check backdrop state |
+| `setBackdropMode(mode)` | Request a backdrop; `None` switches it off |
+| `backdropMode()` | Get the requested backdrop mode |
 | `setRoundedCornersEnabled(bool)` | Enable / disable rounded window corners |
 | `isRoundedCornersEnabled()` | Check rounded corners state |
-| `setSystemDarkModeEnabled(bool)` | Enable / disable system dark mode titlebar |
-| `isSystemDarkModeEnabled()` | Check dark mode state |
 | `setSnapLayoutEnabled(bool)` | Enable / disable Snap Layout overlay |
 | `isSnapLayoutEnabled()` | Check Snap Layout state |
 | `setBorderColor(color)` | Set the native window border color (`DWMWA_BORDER_COLOR`, Windows 11) |
 | `borderColor()` | Get the current border color |
+
+**BackdropMode** — `Auto` (default) / `None` / `Mica` / `Acrylic`
+
+`Auto` resolves to the best backdrop the running OS supports:
+Windows 11 22H2+ → Mica → Acrylic → None.
+
+### Rendering rules
+
+The window surface is resolved once, in `WindowVisualState::resolveSurfacePolicy()`,
+and both the Qt side (translucency, theme wash) and the DWM side (backdrop kind)
+are derived from that single result. The rules, highest precedence first:
+
+| Rule | Result |
+|---|---|
+| Window is minimized | DWM drops the backdrop; the Qt surface stays translucent across the transition, because flipping that attribute mid-restore delays composition recovery |
+| A background image is set | opaque, no backdrop (the image owns the surface) |
+| `BackdropMode::None` | opaque, no backdrop |
+| Backdrop requested and supported | translucent surface + that backdrop |
+| Backdrop requested, nothing supported | opaque, no backdrop |
+
+Consequences:
+
+- A translucent surface always has a backdrop behind it, so the window can never
+  show the desktop through an unbacked wash.
+- Background image and backdrop never compete: setting an image drops the
+  backdrop, so the two features can be used one after the other, not at once.
+- The dark variant of the backdrop is not a switch. DWM reads it from
+  `DWMWA_USE_IMMERSIVE_DARK_MODE`, which the library always keeps in sync with
+  `themeMode()`; toggling it independently would paint the dark wash over light
+  Mica and turn the window flat grey.
 
 ### Theme
 
@@ -163,11 +188,6 @@ int main(int argc, char *argv[])
 ### Theme Enums
 
 **ThemeMode** — `Light` / `Dark`
-
-**SystemBackdropPreference** — `Auto` / `None` / `Mica` / `MicaLegacy` / `Acrylic`
-
-The `Auto` mode selects the best available backdrop for the current OS:
-Windows 11 22H2+ → Mica → MicaLegacy → Acrylic → None
 
 ### Diagnostics
 
@@ -189,9 +209,15 @@ Snap Layout. Porting those is tracked in #7 (Linux) and #8 (macOS).
 |---|---|
 | Snap Layout may not appear | Depends on `HTMAXBUTTON` hit-test forwarding; toggle with `setSnapLayoutEnabled(true)` |
 | Resize jitter | Slight jitter while dragging a window edge; the native resize loop and DWM own that frame, and further suppression did not remove it without breaking resize continuity |
-| Background + backdrop conflict | Background image and Mica/Acrylic are not designed to be used together; clear the image to enable backdrop effects (#10) |
+| Mica can look like a solid background | Mica does not blur what is behind the window; it samples the desktop wallpaper, desaturates it and applies a near-neutral tint (`#f3f3f3` light, `#202020` dark). On a light, low-contrast wallpaper the light variant differs from the theme background by ~2 RGB levels, so it is invisible to the eye. Check `DWMWA_SYSTEMBACKDROP_TYPE` (2 = Mica) instead of trusting the screenshot. |
+| Acrylic is a flat tint on Windows 11 | The library falls back to `ACCENT_ENABLE_ACRYLICBLURBEHIND`, which no longer blurs on Windows 11; it renders as a solid tint. Mica is the supported material there. |
 | Accent color is not animated | Theme changes animate over 300ms, `setAccentColor()` applies immediately (#12) |
 | Window state is per library, not per app | Window geometry and theme are stored under the library's own settings key, so applications using the library share one record |
 
-See [docs/release-checklist.md](docs/release-checklist.md) for the manual
-regression pass to run before tagging a release.
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [docs/architecture.md](docs/architecture.md) | Layer map, the resolved-surface model, state machine, naming rules |
+| [docs/release-checklist.md](docs/release-checklist.md) | Manual regression pass to run before tagging a release |
+| [docs/todo.md](docs/todo.md) | Open work: materials, platform coverage, API polish |
