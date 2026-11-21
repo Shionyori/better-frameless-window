@@ -16,6 +16,8 @@
 
 #include <QEvent>
 #include <QLayout>
+#include <QMoveEvent>
+#include <QResizeEvent>
 #include <QMouseEvent>
 #include <QShortcut>
 #include <QPropertyAnimation>
@@ -35,6 +37,14 @@
 #include <QVBoxLayout>
 #include <QWindow>
 #include <QtGlobal>
+
+namespace {
+
+// Windows' own maximize/restore transition is roughly 200ms; 170ms reads as the
+// same gesture without the window lingering in an in-between state.
+constexpr int kWindowTransitionDurationMs = 170;
+
+} // namespace
 
 FramelessWindow::FramelessWindow(QWidget *parent)
     : QWidget(parent)
@@ -311,10 +321,11 @@ void FramelessWindow::performVisualRefreshPass()
     applyTheme();
 
     // Suppress native frame sync and DWM visual effects during an active
-    // system resize (WM_ENTERSIZEMOVE → WM_EXITSIZEMOVE). Calling
-    // SetWindowPos(SWP_FRAMECHANGED) or DwmSetWindowAttribute mid-resize
-    // fights the system's own resize handling and causes visible jitter.
-    if (!m_resizing) {
+    // system resize (WM_ENTERSIZEMOVE → WM_EXITSIZEMOVE) and while the
+    // maximize/restore transition animates the geometry. Calling
+    // SetWindowPos(SWP_FRAMECHANGED) or DwmSetWindowAttribute mid-transition
+    // fights the moving frame and causes visible jitter.
+    if (!m_resizing && !m_animatingWindowTransition) {
         syncNativeWindowFrame();
         applyVisualEffects();
     }
@@ -794,14 +805,20 @@ void FramelessWindow::saveWindowGeometry()
     QSettings settings(QStringLiteral("better-frameless-window"), QStringLiteral("settings"));
     settings.setValue(QStringLiteral("geometry/maximized"), maximized);
 
-    // Persist the restore size even while maximized: otherwise closing a
+    // Persist the restore rectangle even while maximized: otherwise closing a
     // maximized window would keep whatever was saved the last time the window
-    // happened to be restored, which can be arbitrarily stale. The window
-    // manager owns that rectangle, so ask it instead of tracking it here --
-    // Qt updates its own maximized state after the resize event, so an
-    // event-based copy ends up holding the maximized geometry.
+    // happened to be restored, which can be arbitrarily stale.
+    //
+    // The tracked rectangle is preferred over the window manager's idea of it:
+    // the maximize transition animates the geometry up to the work area before
+    // the state flips, so GetWindowPlacement() would report the maximized
+    // rectangle as the "normal" one.
     QRect rect = geometry();
     if (maximized) {
+        rect = m_restoreGeometry;
+    }
+
+    if (!rect.isValid()) {
 #ifdef Q_OS_WIN
         const QRect nativeRestore = WindowFrame::restoreGeometry(reinterpret_cast<void *>(winId()));
         if (!nativeRestore.isValid()) {
@@ -816,8 +833,8 @@ void FramelessWindow::saveWindowGeometry()
                            qRound(nativeRestore.height() / dpr))
                    : nativeRestore;
 #else
-        // No window-manager source for the restore rectangle on this platform:
-        // keep whatever was persisted rather than writing the maximized size.
+        // No source for the restore rectangle on this platform: keep whatever
+        // was persisted rather than writing the maximized size.
         return;
 #endif
     }
@@ -870,6 +887,9 @@ void FramelessWindow::forceNativeDwmRefresh()
 
 void FramelessWindow::mousePressEvent(QMouseEvent *event)
 {
+    // A press takes over from a running maximize/restore transition.
+    finishWindowTransition();
+
     if (event->button() == Qt::LeftButton) {
         const bool started = tryStartSystemResizeAtLocalPos(event->pos());
         if (started) {
@@ -885,6 +905,18 @@ void FramelessWindow::mouseMoveEvent(QMouseEvent *event)
 {
     updateCursorForPosition(event->pos());
     QWidget::mouseMoveEvent(event);
+}
+
+void FramelessWindow::moveEvent(QMoveEvent *event)
+{
+    QWidget::moveEvent(event);
+    rememberRestoreGeometry();
+}
+
+void FramelessWindow::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    rememberRestoreGeometry();
 }
 
 void FramelessWindow::leaveEvent(QEvent *event)
@@ -972,15 +1004,35 @@ Qt::Edges FramelessWindow::edgesForLocalPos(const QPoint &localPos) const
 void FramelessWindow::toggleMaximizeRestore()
 {
 #ifdef Q_OS_WIN
-    // Let DWM run its own maximize/restore animation: the window state changes
-    // immediately and the content is never hidden. The previous version faded
-    // the content out for 60ms, toggled, then faded back in 200ms later, which
-    // read as a flash and made the button behave differently from double-click
-    // or Win+Up (both go through the native path). It also relied on a
-    // QGraphicsOpacityEffect on the content panel, which forces the whole
-    // content widget through an off-screen render pass.
-    if (!WindowCommand::toggleMaximizeRestore(reinterpret_cast<void *>(winId()), isMaximized())) {
-        Diagnostics::logWarning(QStringLiteral("toggleMaximizeRestore: null HWND, fallback"));
+    // Windows never animates this window: the native transition belongs to the
+    // frame, and the frame is ours (WS_CAPTION is cleared to keep Snap Layout
+    // working), so SC_MAXIMIZE/SC_RESTORE land instantly. Animate the geometry
+    // ourselves and only flip the window state once the rectangle arrives.
+    if (m_windowTransition != nullptr) {
+        // A second click while the transition runs must not stack animations.
+        finishWindowTransition();
+        return;
+    }
+
+    if (isMaximized()) {
+        QRect target = m_restoreGeometry;
+        if (!target.isValid()) {
+            target = normalGeometry();
+        }
+        if (target.isValid()) {
+            startWindowTransition(target, false);
+            return;
+        }
+    } else if (const QScreen *targetScreen = screen()) {
+        startWindowTransition(targetScreen->availableGeometry(), true);
+        return;
+    }
+
+    // No usable target (for example a window that was maximized before it was
+    // ever shown): fall back to an instant state change, which is abrupt but
+    // always correct.
+    if (!WindowCommand::setMaximized(reinterpret_cast<void *>(winId()), !isMaximized())) {
+        Diagnostics::logWarning(QStringLiteral("toggleMaximizeRestore: native state change failed, fallback"));
         if (isMaximized()) {
             showNormal();
         } else {
@@ -996,8 +1048,88 @@ void FramelessWindow::toggleMaximizeRestore()
 #endif
 }
 
+void FramelessWindow::startWindowTransition(const QRect &target, bool maximizeAtEnd)
+{
+    const QRect from = geometry();
+    m_windowTransitionMaximizes = maximizeAtEnd;
+    m_animatingWindowTransition = true;
+
+    if (!maximizeAtEnd) {
+        // A maximized window cannot be moved or resized by the platform, so drop
+        // the state first and animate back out of the old rectangle. This goes
+        // through the platform rather than QWidget::showNormal(): the window
+        // state then comes back from WM_SIZE, which keeps Qt's idea of the state
+        // and the OS's in sync.
+        WindowCommand::setMaximized(reinterpret_cast<void *>(winId()), false);
+    }
+
+    auto *animation = new QPropertyAnimation(this, "geometry", this);
+    animation->setDuration(kWindowTransitionDurationMs);
+    animation->setEasingCurve(QEasingCurve::InOutCubic);
+    animation->setStartValue(from);
+    animation->setEndValue(target);
+
+    m_windowTransition = animation;
+    connect(animation, &QPropertyAnimation::finished, this, [this]() {
+        m_windowTransition = nullptr;
+        completeWindowTransition();
+    });
+
+    // Maximize feedback is immediate in Windows: flip the glyph now and keep
+    // updateMaximizeButtonState() from reverting it mid-transition.
+    if (m_titleBar != nullptr) {
+        m_titleBar->setMaximized(maximizeAtEnd);
+    }
+
+    animation->start(QAbstractAnimation::DeleteWhenStopped);
+}
+
+void FramelessWindow::finishWindowTransition()
+{
+    if (m_windowTransition == nullptr) {
+        return;
+    }
+
+    // stop() does not emit finished(), so the end state is applied here.
+    m_windowTransition->stop();
+    m_windowTransition = nullptr;
+    completeWindowTransition();
+}
+
+void FramelessWindow::completeWindowTransition()
+{
+    m_animatingWindowTransition = false;
+
+    if (m_windowTransitionMaximizes) {
+        m_windowTransitionMaximizes = false;
+        // The rectangle already is the maximized one, so this only sets
+        // WS_MAXIMIZE and lets WM_SIZE tell Qt about it.
+        WindowCommand::setMaximized(reinterpret_cast<void *>(winId()), true);
+    }
+
+    // DWM dropped the backdrop while the geometry was moving; re-apply it now
+    // that the rectangle has settled.
+    beginBackdropTransitionGuard();
+    scheduleStateVisualRefresh();
+}
+
+void FramelessWindow::rememberRestoreGeometry()
+{
+    // The geometry the window returns to. Tracked continuously so a maximize
+    // that did not come from this class (Win+Up, snap) still animates, and
+    // skipped while the transition animates through intermediate sizes.
+    if (m_animatingWindowTransition || isMaximized() || isMinimized() || isFullScreen()) {
+        return;
+    }
+
+    m_restoreGeometry = geometry();
+}
+
 void FramelessWindow::startSystemMove()
 {
+    // Dragging the caption during a transition would fight the animation.
+    finishWindowTransition();
+
     if (windowHandle() != nullptr && !isMaximized()) {
         windowHandle()->startSystemMove();
     }
@@ -1021,6 +1153,12 @@ void FramelessWindow::updateMaximizeButtonState()
         return;
     }
 
+    // While the transition runs the window state does not match what the user
+    // just asked for; startWindowTransition() already set the glyph.
+    if (m_animatingWindowTransition) {
+        return;
+    }
+
     m_titleBar->setMaximized(isMaximized());
 }
 
@@ -1039,6 +1177,8 @@ bool FramelessWindow::tryStartSystemResizeAtLocalPos(const QPoint &localPos)
     if (windowHandle() == nullptr || isMaximized()) {
         return false;
     }
+
+    finishWindowTransition();
 
     const Qt::Edges edges = edgesForLocalPos(localPos);
     if (edges == Qt::Edges()) {
@@ -1066,6 +1206,10 @@ void FramelessWindow::ensureNativeResizeStyle()
 void FramelessWindow::syncNativeWindowFrame()
 {
 #ifdef Q_OS_WIN
+    if (m_animatingWindowTransition) {
+        return;
+    }
+
     WindowFrame::syncWindowFrame(reinterpret_cast<void *>(winId()));
 #else
     Q_UNUSED(0)
@@ -1181,6 +1325,12 @@ bool FramelessWindow::shouldStartRestoreTransitionFromSizeState(bool isMaximized
 
 void FramelessWindow::beginBackdropTransitionGuard()
 {
+    if (m_animatingWindowTransition) {
+        // completeWindowTransition() arms the guard once the geometry settles.
+        m_backdropTransitionGuardActive = false;
+        return;
+    }
+
     if (surfacePolicy().backdrop == WindowEffect::BackdropKind::None) {
         m_backdropTransitionGuardActive = false;
         return;

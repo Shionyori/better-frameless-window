@@ -10,6 +10,9 @@
 #include <QSize>
 #include <QWidget>
 
+class QMoveEvent;
+class QPropertyAnimation;
+class QResizeEvent;
 class QVBoxLayout;
 class TitleBar;
 class QString;
@@ -98,6 +101,8 @@ protected:
     void closeEvent(QCloseEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
+    void moveEvent(QMoveEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
     void leaveEvent(QEvent *event) override;
 
     // Called by NativeMessageRouter on WM_ENTERSIZEMOVE / WM_EXITSIZEMOVE.
@@ -134,6 +139,10 @@ private:
     void performVisualRefreshPass();
     void requestVisualRefresh();
     void forceBackdropRebind();
+    void rememberRestoreGeometry();
+    void startWindowTransition(const QRect &target, bool maximizeAtEnd);
+    void finishWindowTransition();
+    void completeWindowTransition();
     void attachContentEventFilters(QWidget *widget);
     void detachContentEventFilters(QWidget *widget);
     friend class NativeMessageRouter;
@@ -158,6 +167,12 @@ private:
     bool m_loggedNullWindowHandle;
     bool m_loggedNullWinId;
     bool m_resizing = false;
+    QPropertyAnimation *m_windowTransition = nullptr;
+    bool m_windowTransitionMaximizes = false;
+    bool m_animatingWindowTransition = false;
+    // Geometry the window returns to on restore. Tracked while normal so a
+    // maximize that did not come from this class (Win+Up, snap) still animates.
+    QRect m_restoreGeometry;
     VisualRefreshCoordinator m_visualRefreshCoordinator;
     ThemeManager m_themeManager;
     bool m_followSystemTheme;
