@@ -13,6 +13,14 @@
 #include <QPropertyAnimation>
 #include <QStyle>
 
+namespace {
+// Windows caption buttons are 46x32. The titlebar can be taller, in which case
+// the buttons stay at this size and the strip below them keeps dragging the
+// window.
+constexpr int kCaptionButtonWidth = 46;
+constexpr int kCaptionButtonHeight = 32;
+} // namespace
+
 TitleBar::TitleBar(QWidget *parent)
     : QWidget(parent)
     , m_layout(new QHBoxLayout(this))
@@ -72,9 +80,11 @@ TitleBar::TitleBar(QWidget *parent)
     m_layout->addWidget(m_centerContainer, 0);
 
     m_layout->addStretch();
-    m_layout->addWidget(m_minimizeButton);
-    m_layout->addWidget(m_maximizeButton);
-    m_layout->addWidget(m_closeButton);
+    // Top-aligned: the buttons hug the window's top-right corner (native
+    // height) and leave the caption below them draggable.
+    m_layout->addWidget(m_minimizeButton, 0, Qt::AlignTop);
+    m_layout->addWidget(m_maximizeButton, 0, Qt::AlignTop);
+    m_layout->addWidget(m_closeButton, 0, Qt::AlignTop);
 
     connect(m_minimizeButton, &QPushButton::clicked, this, &TitleBar::minimizeRequested);
     connect(m_maximizeButton, &QPushButton::clicked, this, &TitleBar::maximizeRestoreRequested);
@@ -87,10 +97,10 @@ void TitleBar::initControlButton(QPushButton *button, const char *role)
         return;
     }
 
-    // Fixed width, full caption height: the hover fill has to reach the
-    // window edge and the top/bottom of the titlebar like a native button.
-    button->setFixedWidth(46);
-    button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    // Native caption proportion: a fixed 46x32 button attached to the window
+    // edge. Stretching them over a taller custom titlebar would swallow the
+    // whole strip next to them, dragging included.
+    button->setFixedSize(kCaptionButtonWidth, kCaptionButtonHeight);
     button->setFlat(true);
     button->setAutoDefault(false);
     button->setDefault(false);
@@ -130,6 +140,12 @@ void TitleBar::updateControlButtonGlyphs()
 void TitleBar::setHeight(int height)
 {
     setFixedHeight(height);
+
+    // Never let the buttons outgrow the bar they sit in.
+    const int buttonHeight = qMin(height, kCaptionButtonHeight);
+    for (QPushButton *button : {m_minimizeButton, m_maximizeButton, m_closeButton}) {
+        button->setFixedSize(kCaptionButtonWidth, buttonHeight);
+    }
 }
 
 void TitleBar::setTitle(const QString &title)
