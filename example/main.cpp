@@ -102,16 +102,21 @@ int main(int argc, char *argv[])
     window.setWindowIcon(QIcon(QStringLiteral(":/images/icon.png")));
     window.setWindowSizeLimits(QSize(640, 520));
 
+    // Follow the Windows theme by default; the panel can pin Light or Dark.
+    window.setFollowSystemTheme(true);
+
     // BackdropMode::Auto lets the library pick the best backdrop this machine
     // supports; BackdropMode::None is the "off" switch. The buttons in the
     // panel force a specific mode.
     window.setBackdropMode(WindowEffect::BackdropMode::Auto);
 
-    // The application-painted surface: a photo blended 30% over the theme
-    // colour. Dormant while a material owns the surface, painted on None.
+    // The application-painted surface starts empty (Image: Off); the photo is
+    // blended 30% over the theme colour once selected. Dormant while a material
+    // owns the surface, painted on None.
     const QPixmap backgroundImage(QStringLiteral(":/images/bg.jpg"));
-    window.setBackgroundImage(backgroundImage, FramelessWindow::BackgroundImageMode::Cover);
     window.setBackgroundOpacity(0.30);
+
+    window.setTitleBarHeight(40);
 
     window.restoreWindowGeometry(); // saved automatically on close
 
