@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
 | `isRoundedCornersEnabled()` | Check rounded corners state |
 | `setSnapLayoutEnabled(bool)` | Enable / disable Snap Layout overlay |
 | `isSnapLayoutEnabled()` | Check Snap Layout state |
-| `setBorderColor(color)` | Set the native window border color (`DWMWA_BORDER_COLOR`, Windows 11) |
+| `setBorderColor(color)` | Set the native window border color (`DWMWA_BORDER_COLOR`, Windows 11). Ignored while the legacy Acrylic backdrop is active; `QColor()` restores the system default |
 | `borderColor()` | Get the current border color |
 
 **BackdropMode** — `Auto` (default) / `None` / `Mica` / `Acrylic`
@@ -212,6 +212,7 @@ Snap Layout. Porting those is tracked in #7 (Linux) and #8 (macOS).
 | Resize jitter | Slight jitter while dragging a window edge; the native resize loop and DWM own that frame, and further suppression did not remove it without breaking resize continuity |
 | Mica can look like a solid background | Mica does not blur what is behind the window; it samples the desktop wallpaper, desaturates it and applies a near-neutral tint (`#f3f3f3` light, `#202020` dark). On a light, low-contrast wallpaper the light variant differs from the theme background by ~2 RGB levels, so it is invisible to the eye. Check `DWMWA_SYSTEMBACKDROP_TYPE` (2 = Mica) instead of trusting the screenshot. |
 | Shadow is not drawn on a backdrop surface | DWM only paints its frame shadow for windows without per-pixel alpha. A Mica/Acrylic surface is layered, so `setShadowEnabled()` has no visible effect there; it applies as soon as the window is opaque (`BackdropMode::None`). The library logs this through `setDiagnosticsEnabled(true)`. |
+| Border colour is ignored on Acrylic | `DWMWA_BORDER_COLOR` and the legacy accent-policy Acrylic conflict: DWM paints the (whole) frame in the border colour, so a restored window turns into a solid rectangle of that colour. The border is therefore not applied while `BackdropMode::Acrylic` is active and is reset when switching to it; Mica and `None` keep the border. Mapping Acrylic to `DWMSBT_TRANSIENTWINDOW` on Windows 11 would remove the exception. |
 | Acrylic is a flat tint on Windows 11 | The library falls back to `ACCENT_ENABLE_ACRYLICBLURBEHIND`, which no longer blurs on Windows 11; it renders as a solid tint. Mica is the supported material there. |
 | Accent color is not animated | Theme changes animate over 300ms, `setAccentColor()` applies immediately (#12) |
 | Window state is per library, not per app | Window geometry and theme are stored under the library's own settings key, so applications using the library share one record |

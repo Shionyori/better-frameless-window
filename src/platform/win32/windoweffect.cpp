@@ -18,6 +18,14 @@
 #define DWMWA_BORDER_COLOR 34
 #endif
 
+#ifndef DWMWA_COLOR_DEFAULT
+#define DWMWA_COLOR_DEFAULT 0xFFFFFFFF
+#endif
+
+#ifndef DWMWA_COLOR_NONE
+#define DWMWA_COLOR_NONE 0xFFFFFFFE
+#endif
+
 #ifndef DWMWA_USE_SYSTEM_DARK_MODE
 #define DWMWA_USE_SYSTEM_DARK_MODE 20
 #endif
@@ -139,8 +147,10 @@ void WindowEffect::applyVisualEffects(void *hwnd, const VisualEffectOptions &opt
     applyShadow(hwnd, options.shadowEnabled, options.maximized, options.minimized);
     applyRoundedCorners(hwnd, options.roundedCornersEnabled, options.maximized, options.minimized);
     applyDarkModeHint(hwnd, options.darkMode);
+    // The border is a frame attribute and has to be settled before the
+    // backdrop is applied; see applyBorderColor() for the Acrylic exception.
+    applyBorderColor(hwnd, options.backdrop, options.borderColor);
     applyBackdrop(hwnd, options.backdrop, options.darkMode);
-    applyBorderColor(hwnd, options.borderColor);
 #else
     (void) hwnd;
     (void) options;
@@ -387,11 +397,11 @@ void WindowEffect::applyBackdrop(void *hwnd,
 #endif
 }
 
-void WindowEffect::applyBorderColor(void *hwnd, const QColor &borderColor) const
+void WindowEffect::applyBorderColor(void *hwnd, BackdropKind backdrop, const QColor &borderColor) const
 {
 #ifdef Q_OS_WIN
     const HWND win = static_cast<HWND>(hwnd);
-    if (win == nullptr || !borderColor.isValid()) {
+    if (win == nullptr) {
         return;
     }
 
@@ -404,18 +414,56 @@ void WindowEffect::applyBorderColor(void *hwnd, const QColor &borderColor) const
         return;
     }
 
-    const COLORREF colorRef = RGB(borderColor.red(), borderColor.green(), borderColor.blue());
+    // The legacy accent-policy Acrylic fills the whole frame, and a border
+    // colour makes DWM paint that frame over the client area: the window turns
+    // into a solid rectangle of the border colour as soon as it is not
+    // maximized. Keep the two apart and reset the attribute instead.
+    const bool borderSupported = backdrop != BackdropKind::Acrylic;
+    const QColor color = borderSupported ? borderColor : QColor();
+
+    if (!color.isValid()) {
+        // Only touch DWM if something was applied earlier; an invalid colour
+        // means "system default", not "skip".
+        if (!m_appliedBorderColor.isValid()) {
+            return;
+        }
+
+        const DWORD reset = DWMWA_COLOR_DEFAULT;
+        const HRESULT hr = DwmSetWindowAttribute(win,
+                                                 DWMWA_BORDER_COLOR,
+                                                 &reset,
+                                                 sizeof(reset));
+        if (SUCCEEDED(hr)) {
+            m_appliedBorderColor = QColor();
+        } else {
+            Diagnostics::logWarning(QStringLiteral("applyBorderColor: resetting DWMWA_BORDER_COLOR failed (hr=0x%1)")
+                                        .arg(QString::number(static_cast<qulonglong>(hr), 16)));
+        }
+        return;
+    }
+
+    if (m_appliedBorderColor == color) {
+        return;
+    }
+
+    const COLORREF colorRef = RGB(color.red(), color.green(), color.blue());
     const HRESULT hr = DwmSetWindowAttribute(win,
                                              DWMWA_BORDER_COLOR,
                                              &colorRef,
                                              sizeof(colorRef));
-    if (FAILED(hr)) {
-        m_borderColorAttributeValid = false;
-        Diagnostics::logWarning(QStringLiteral("applyBorderColor: DWMWA_BORDER_COLOR failed (hr=0x%1), disable subsequent calls")
-                                    .arg(QString::number(static_cast<qulonglong>(hr), 16)));
+    if (SUCCEEDED(hr)) {
+        m_appliedBorderColor = color;
+        return;
     }
+
+    if (hr == E_INVALIDARG) {
+        m_borderColorAttributeValid = false;
+    }
+    Diagnostics::logWarning(QStringLiteral("applyBorderColor: DWMWA_BORDER_COLOR failed (hr=0x%1)")
+                                .arg(QString::number(static_cast<qulonglong>(hr), 16)));
 #else
     (void) hwnd;
+    (void) backdrop;
     (void) borderColor;
 #endif
 }

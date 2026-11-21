@@ -19,6 +19,10 @@ live in the commit history and in [`architecture.md`](architecture.md).
       and renders as a flat tint. `DWMSBT_TRANSIENTWINDOW` does blur what is
       behind the window. Keep the accent-policy path for Windows 10.
 
+      This also removes two workarounds: the accent policy fills the whole
+      frame, so `setBorderColor()` has to be disabled while it is active, and
+      the tint is a fixed colour instead of following the system material.
+
 - [ ] **Shadow for translucent surfaces.**
       DWM never paints its frame shadow for a layered window, and a translucent
       surface is `WS_EX_LAYERED` — so a Mica/Acrylic window has no shadow, and
