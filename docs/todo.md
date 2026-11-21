@@ -19,6 +19,16 @@ live in the commit history and in [`architecture.md`](architecture.md).
       and renders as a flat tint. `DWMSBT_TRANSIENTWINDOW` does blur what is
       behind the window. Keep the accent-policy path for Windows 10.
 
+- [ ] **Shadow for translucent surfaces.**
+      DWM never paints its frame shadow for a layered window, and a translucent
+      surface is `WS_EX_LAYERED` — so a Mica/Acrylic window has no shadow, and
+      the layered flag survives `BackdropMode::None` (Qt keeps it once the
+      window was created translucent). Either draw the shadow ourselves (a
+      second layered window behind the frame, blurred and DPI-aware) or move
+      the render backend to one that composites without `WS_EX_LAYERED`
+      (DirectComposition / Qt Quick). Until then `setShadowEnabled()` is
+      documented as opaque-surface only and the example does not expose it.
+
 - [ ] **Re-tune the translucent theme wash** (light `rgba(255,255,255,0.15)`,
       dark `rgba(0,0,0,0.35)`).
       The wash is what keeps text readable over a material, but it also

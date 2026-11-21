@@ -31,7 +31,8 @@
 - **Frameless window** — custom titlebar with icon, drag-to-move, double-click maximize/restore, right-click system menu, Alt+Space shortcut
 - **8-direction resize** — HiDPI-aware hit testing with corner detection
 - **Background image** — Cover / Fit / Stretch / Tile / Center modes with independent opacity control
-- **DWM visual effects** — shadow, rounded corners, Mica / Acrylic backdrop with auto fallback chain
+- **DWM visual effects** — rounded corners and a Mica / Acrylic backdrop with auto fallback chain
+  (the DWM frame shadow is available on opaque surfaces only, see *Known Issues*)
 - **Snap Layout** — native DWM hit-test forwarding, toggleable via `setSnapLayoutEnabled()`
 - **Theme manager** — Light / Dark with 300ms animated transitions, persistence, and system theme following
 - **Titlebar customization** — visibility toggle, adjustable height, widget extension slot, caption buttons flush with the window edge
@@ -131,7 +132,7 @@ int main(int argc, char *argv[])
 
 | Method | Description |
 |---|---|
-| `setShadowEnabled(bool)` | Enable / disable the DWM window shadow |
+| `setShadowEnabled(bool)` | Enable / disable the DWM frame shadow (visible on opaque surfaces only) |
 | `isShadowEnabled()` | Check shadow state |
 | `setBackdropMode(mode)` | Request a backdrop; `None` switches it off |
 | `backdropMode()` | Get the requested backdrop mode |
