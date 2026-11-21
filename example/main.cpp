@@ -124,8 +124,7 @@ int main(int argc, char *argv[])
     layout->setContentsMargins(28, 20, 28, 20);
     layout->setSpacing(10);
 
-    auto addRow = [&layout](const QString &title,
-                            const std::initializer_list<QWidget *> &widgets) {
+    auto addRow = [&layout](const QString &title, const QList<QWidget *> &widgets) {
         auto *row = new QHBoxLayout;
         row->setSpacing(8);
         row->addWidget(makeLabel(title));
@@ -138,7 +137,7 @@ int main(int argc, char *argv[])
 
     auto addSliderRow = [&addRow](const QString &title, int minimum, int maximum, int value,
                                   const QString &suffix,
-                                  const std::function<void(int)> &onChange) {
+                                  const std::function<void(int)> &onChange) -> QList<QWidget *> {
         auto *valueLabel = new QLabel(QString::number(value) + suffix);
         valueLabel->setObjectName(QStringLiteral("ContentLabel"));
         valueLabel->setStyleSheet(QStringLiteral("font-size: 12px;"));
@@ -155,6 +154,7 @@ int main(int argc, char *argv[])
         QObject::connect(slider, &QSlider::valueChanged, onChange);
 
         addRow(title, {slider, valueLabel});
+        return {slider, valueLabel};
     };
 
     // Theme: exactly one of System / Light / Dark is active, so they are one
@@ -256,20 +256,32 @@ int main(int argc, char *argv[])
     borderDefaultButton->setEnabled(window.borderColor().isValid());
     addRow(QStringLiteral("Border"), {borderSwatch, borderDefaultButton});
 
-    // Backdrop: Auto resolves to Mica -> Acrylic -> None on the running OS.
-    // None also drops the translucent surface, so the window looks exactly like
-    // the background-image build.
-    auto *autoBackdropButton = makeChoice(QStringLiteral("Auto"), [&window]() {
+    // Three surface families, kept apart on purpose:
+    //   None    - the application paints the background (colour / image / opacity)
+    //   Mica    - the system derives a near-solid colour from the wallpaper
+    //   Acrylic - a translucent frosted surface
+    // The material owns the surface, so the background controls are disabled
+    // while one is active instead of silently doing nothing.
+    const QPixmap backgroundImage(QStringLiteral(":/images/bg.jpg"));
+
+    QList<QWidget *> backgroundControlList;
+    std::function<void()> syncBackgroundControls;
+
+    auto *autoBackdropButton = makeChoice(QStringLiteral("Auto"), [&]() {
         window.setBackdropMode(WindowEffect::BackdropMode::Auto);
+        syncBackgroundControls();
     });
-    auto *noBackdropButton = makeChoice(QStringLiteral("None"), [&window]() {
+    auto *noBackdropButton = makeChoice(QStringLiteral("None"), [&]() {
         window.setBackdropMode(WindowEffect::BackdropMode::None);
+        syncBackgroundControls();
     });
-    auto *micaBackdropButton = makeChoice(QStringLiteral("Mica"), [&window]() {
+    auto *micaBackdropButton = makeChoice(QStringLiteral("Mica"), [&]() {
         window.setBackdropMode(WindowEffect::BackdropMode::Mica);
+        syncBackgroundControls();
     });
-    auto *acrylicBackdropButton = makeChoice(QStringLiteral("Acrylic"), [&window]() {
+    auto *acrylicBackdropButton = makeChoice(QStringLiteral("Acrylic"), [&]() {
         window.setBackdropMode(WindowEffect::BackdropMode::Acrylic);
+        syncBackgroundControls();
     });
 
     auto *backdropGroup = new QButtonGroup(&window);
@@ -297,38 +309,74 @@ int main(int argc, char *argv[])
     addRow(QStringLiteral("Backdrop"),
            {autoBackdropButton, noBackdropButton, micaBackdropButton, acrylicBackdropButton});
 
-    // ── Background image (commented out while testing the backdrop) ─────
-    // A background image and a backdrop write to the same surface (#10), so the
-    // library gives the image precedence: setting one switches the surface to
-    // opaque and drops the backdrop. Uncomment this block to go back to the
-    // image demo.
-    //
-    // const QPixmap backgroundImage(QStringLiteral(":/images/bg.jpg"));
-    // window.setBackgroundImage(backgroundImage);
-    // window.setBackgroundOpacity(0.35);
-    //
-    // addRow(QStringLiteral("Background"),
-    //        {makeButton(QStringLiteral("Cover"), [&window, backgroundImage]() {
-    //             window.setBackgroundImage(backgroundImage, FramelessWindow::BackgroundImageMode::Cover);
-    //         }),
-    //         makeButton(QStringLiteral("Fit"), [&window, backgroundImage]() {
-    //             window.setBackgroundImage(backgroundImage, FramelessWindow::BackgroundImageMode::Fit);
-    //         }),
-    //         makeButton(QStringLiteral("Stretch"), [&window, backgroundImage]() {
-    //             window.setBackgroundImage(backgroundImage, FramelessWindow::BackgroundImageMode::Stretch);
-    //         }),
-    //         makeButton(QStringLiteral("Tile"), [&window, backgroundImage]() {
-    //             window.setBackgroundImage(backgroundImage, FramelessWindow::BackgroundImageMode::Tile);
-    //         }),
-    //         makeButton(QStringLiteral("Center"), [&window, backgroundImage]() {
-    //             window.setBackgroundImage(backgroundImage, FramelessWindow::BackgroundImageMode::Center);
-    //         }),
-    //         makeButton(QStringLiteral("Off"), [&window]() {
-    //             window.clearBackgroundImage();
-    //         })});
-    // addSliderRow(QStringLiteral("Image opacity"), 0, 100,
-    //              qRound(window.backgroundOpacity() * 100), QStringLiteral("%"),
-    //              [&window](int value) { window.setBackgroundOpacity(value / 100.0); });
+    // ── Application-painted background (BackdropMode::None only) ────────
+    QList<QWidget *> backgroundButtons;
+    const QList<QPair<QString, FramelessWindow::BackgroundImageMode>> backgroundModes = {
+        {QStringLiteral("Cover"), FramelessWindow::BackgroundImageMode::Cover},
+        {QStringLiteral("Fit"), FramelessWindow::BackgroundImageMode::Fit},
+        {QStringLiteral("Stretch"), FramelessWindow::BackgroundImageMode::Stretch},
+        {QStringLiteral("Tile"), FramelessWindow::BackgroundImageMode::Tile},
+        {QStringLiteral("Center"), FramelessWindow::BackgroundImageMode::Center},
+    };
+    for (const auto &entry : backgroundModes) {
+        backgroundButtons.append(makeButton(entry.first, [&window, backgroundImage, entry]() {
+            window.setBackgroundImage(backgroundImage, entry.second);
+        }));
+    }
+    backgroundButtons.append(makeButton(QStringLiteral("Off"), [&window]() {
+        window.clearBackgroundImage();
+    }));
+    addRow(QStringLiteral("Image"), backgroundButtons);
+    backgroundControlList.append(backgroundButtons);
+
+    auto *backgroundSwatch = new QPushButton;
+    backgroundSwatch->setFixedHeight(26);
+    backgroundSwatch->setMinimumWidth(96);
+    auto *backgroundThemeButton = makeButton(QStringLiteral("Theme"), [&]() {
+        window.setBackgroundColor(QColor());
+        applyColorSwatch(backgroundSwatch, window.backgroundColor(), QStringLiteral("Theme"));
+    });
+    QObject::connect(backgroundSwatch, &QPushButton::clicked, &window,
+                     [&window, backgroundSwatch]() {
+                         const QColor color = QColorDialog::getColor(window.backgroundColor(),
+                                                                     nullptr,
+                                                                     QStringLiteral("Background color"));
+                         if (!color.isValid()) {
+                             return;
+                         }
+                         window.setBackgroundColor(color);
+                         applyColorSwatch(backgroundSwatch, window.backgroundColor(),
+                                          QStringLiteral("Theme"));
+                     });
+    applyColorSwatch(backgroundSwatch, window.backgroundColor(), QStringLiteral("Theme"));
+    addRow(QStringLiteral("Color"), {backgroundSwatch, backgroundThemeButton});
+    backgroundControlList << backgroundSwatch << backgroundThemeButton;
+
+    backgroundControlList.append(addSliderRow(QStringLiteral("Image opacity"), 0, 100,
+                                              qRound(window.backgroundOpacity() * 100),
+                                              QStringLiteral("%"), [&window](int value) {
+                                                  window.setBackgroundOpacity(value / 100.0);
+                                              }));
+
+    auto *backgroundHint = new QLabel;
+    backgroundHint->setObjectName(QStringLiteral("ContentLabel"));
+    backgroundHint->setStyleSheet(QStringLiteral("font-size: 11px;"));
+    backgroundHint->setWordWrap(true);
+    layout->addWidget(backgroundHint);
+
+    syncBackgroundControls = [&window, backgroundControlList, backgroundHint]() {
+        // Ask the window, not the requested mode: Auto may resolve to an opaque
+        // surface on a machine without materials.
+        const bool appOwned = !window.isBackdropActive();
+        for (QWidget *widget : backgroundControlList) {
+            widget->setEnabled(appOwned);
+        }
+        backgroundHint->setText(appOwned
+                                    ? QStringLiteral("Background is painted by the application.")
+                                    : QStringLiteral("Background is owned by the material "
+                                                     "\u2014 select Backdrop None to edit it."));
+    };
+    syncBackgroundControls();
 
     // Window opacity is skipped as well: stacking QWidget::setWindowOpacity() on
     // top of a translucent backdrop makes the backdrop itself impossible to judge.

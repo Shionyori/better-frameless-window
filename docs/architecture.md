@@ -64,17 +64,23 @@ Resolution order (highest precedence first):
 | Condition | Surface | Backdrop |
 |---|---|---|
 | minimized | translucent kept stable | none (DWM owns the transition) |
-| background image set | opaque | none — the image owns the pixels |
-| `BackdropMode::None` | opaque | none |
-| requested backdrop supported | translucent | Mica / Acrylic |
+| `BackdropMode::None` | opaque | none — the application paints the background |
+| requested backdrop supported | translucent | Mica / Acrylic — the material owns the surface |
 | requested backdrop unsupported | opaque | none |
+
+Three surface families, each owning its background completely: `None` is the
+application-painted surface (background colour, image, image opacity), Mica is
+the system's wallpaper-derived material, Acrylic the frosted one. The requested
+mode has the last word: setting an image no longer forces an opaque surface, the
+image simply is not painted while a material is active, and comes back with
+`None`. `isBackdropActive()` exposes that state so a UI can disable controls.
 
 Consequences, all covered by `tests/test_visualstate.cpp`:
 
 - `Translucent ⇒ backdrop != None`. A see-through wash with nothing behind it
   can never be produced.
-- A background image and a backdrop cannot compete: `setBackgroundImage()`
-  drops the backdrop, `clearBackgroundImage()` lets it come back.
+- A material and the application background cannot compete: the image, colour
+  and opacity are only painted on the opaque (`None`) surface.
 - The dark variant of the material is **not** a switch. DWM reads it from
   `DWMWA_USE_IMMERSIVE_DARK_MODE`, which is always written from `themeMode()`.
   Exposing it separately made the dark theme paint its wash over light Mica
