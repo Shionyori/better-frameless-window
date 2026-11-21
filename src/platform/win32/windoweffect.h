@@ -45,11 +45,14 @@ public:
                        bool darkMode,
                        bool forceRebind = false) const;
 
+    // The border colour is applied through DWM's frame attributes, which the
+    // accent-policy Acrylic paints over; see applyBorderColor().
+    void applyBorderColor(void *hwnd, BackdropKind backdrop, const QColor &borderColor) const;
+
 private:
     void applyShadow(void *hwnd, bool enabled, bool maximized, bool minimized) const;
     void applyRoundedCorners(void *hwnd, bool enabled, bool maximized, bool minimized) const;
     void applyDarkModeHint(void *hwnd, bool darkMode) const;
-    void applyBorderColor(void *hwnd, const QColor &borderColor) const;
 
     // Per-instance tracking to avoid redundant DWM calls during normal
     // visual refresh (window move, focus change). Force-rebind during
@@ -69,4 +72,7 @@ private:
     mutable bool m_darkMode19Valid = true;
     mutable bool m_systemBackdropAttributeSupported = true;
     mutable bool m_borderColorAttributeValid = true;
+    // Colour currently stored on the window, so a cleared border can be reset
+    // to the system default exactly once instead of re-applying every pass.
+    mutable QColor m_appliedBorderColor;
 };

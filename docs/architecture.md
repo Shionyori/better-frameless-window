@@ -234,6 +234,10 @@ dark hint → backdrop → border) stay inside the class.
 
 ## 8. Failure policy
 
+- The border colour is a frame attribute and is applied *before* the backdrop.
+  It is skipped — and reset to the system default — while the accent-policy
+  Acrylic is active: DWM then paints the whole frame with the border colour,
+  which turns a restored window into a solid rectangle.
 - `setShadowEnabled()` only has a visible effect on an opaque surface: DWM does
   not paint the frame shadow for a layered window, and a translucent surface is
   layered. The library logs that once per state change under diagnostics.
