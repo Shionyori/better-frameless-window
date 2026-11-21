@@ -130,6 +130,9 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
     const QColor accent = m_accentColor.isValid() ? m_accentColor : QColor(0, 120, 215);
     const QColor accentHover = QColor(accent.red(), accent.green(), accent.blue(), dark ? 25 : 15);
     const QColor accentPressed = QColor(accent.red(), accent.green(), accent.blue(), dark ? 40 : 25);
+    // Selected state for checkable buttons (mode pickers, theme pickers).
+    const QColor accentChecked = QColor(accent.red(), accent.green(), accent.blue(), dark ? 70 : 45);
+    const QColor accentCheckedHover = QColor(accent.red(), accent.green(), accent.blue(), dark ? 95 : 65);
 
     const QString windowBackgroundRule = buildWindowBackgroundRule(windowBg,
                                                                    transparentWindowBackground,
@@ -161,6 +164,12 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
         }
         QPushButton:disabled {
             color: %8;
+        }
+        QPushButton:checked {
+            background: %14;
+        }
+        QPushButton:checked:hover {
+            background: %15;
         }
         TitleBar {
             background-color: %2;
@@ -230,5 +239,7 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
                colorToCss(closeHover.darker(115)),
                colorToCss(buttonBg),
                colorToCss(accentHover),
-               colorToCss(accentPressed));
+               colorToCss(accentPressed),
+               colorToCss(accentChecked),
+               colorToCss(accentCheckedHover));
 }

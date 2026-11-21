@@ -179,7 +179,7 @@ Consequences:
 |---|---|
 | `setThemeMode(mode, persist, animated)` | Set Light / Dark theme with optional persistence and animation |
 | `themeMode()` | Get current theme mode |
-| `setAccentColor(color)` | Set accent color (used in titlebar button hover/pressed) |
+| `setAccentColor(color)` | Set accent color (titlebar hover/pressed and the checked state of checkable buttons) |
 | `accentColor()` | Get current accent color |
 | `setFollowSystemTheme(bool)` | Auto-follow Windows dark/light setting |
 | `followsSystemTheme()` | Check if system theme following is enabled |
