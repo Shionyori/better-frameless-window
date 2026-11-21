@@ -189,7 +189,7 @@ QString ThemeManager::buildStyleSheet(bool transparentWindowBackground) const
         #TitleBarMaximizeButton,
         #TitleBarCloseButton {
             border: none;
-            border-radius: 5px;
+            border-radius: 0px;
             background: transparent;
             color: %4;
             font-family: "Segoe MDL2 Assets", "Segoe UI";

@@ -8,7 +8,6 @@ class QLabel;
 class QPushButton;
 class QMouseEvent;
 class QHBoxLayout;
-class QSpacerItem;
 class QGraphicsOpacityEffect;
 class QPropertyAnimation;
 
@@ -85,9 +84,6 @@ private:
     QPushButton *m_minimizeButton;
     QPushButton *m_maximizeButton;
     QPushButton *m_closeButton;
-    QSpacerItem *m_minimizeSpacer = nullptr;
-    QSpacerItem *m_maximizeSpacer = nullptr;
-    QSpacerItem *m_closeSpacer = nullptr;
     bool m_leftPressed;
     bool m_dragInitiated;
     QPoint m_pressPos;

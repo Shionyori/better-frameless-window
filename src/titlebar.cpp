@@ -7,7 +7,6 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
-#include <QSpacerItem>
 #include <QEvent>
 #include <QFont>
 #include <QGraphicsOpacityEffect>
@@ -32,7 +31,9 @@ TitleBar::TitleBar(QWidget *parent)
     setFixedHeight(44);
     setMouseTracking(true);
 
-    m_layout->setContentsMargins(14, 0, 12, 0);
+    // Caption buttons own the right edge, as in native Windows: the layout
+    // keeps a left margin for the icon/title but no right or vertical one.
+    m_layout->setContentsMargins(14, 0, 0, 0);
     m_layout->setSpacing(0);
 
     m_centerContainer->setObjectName("TitleBarCenterContainer");
@@ -69,16 +70,10 @@ TitleBar::TitleBar(QWidget *parent)
     m_layout->addWidget(m_iconContainer);
     m_layout->addWidget(m_titleLabel);
     m_layout->addWidget(m_centerContainer, 0);
-    m_minimizeSpacer = new QSpacerItem(4, 0, QSizePolicy::Fixed, QSizePolicy::Minimum);
-    m_maximizeSpacer = new QSpacerItem(4, 0, QSizePolicy::Fixed, QSizePolicy::Minimum);
-    m_closeSpacer = new QSpacerItem(4, 0, QSizePolicy::Fixed, QSizePolicy::Minimum);
 
     m_layout->addStretch();
-    m_layout->addSpacerItem(m_minimizeSpacer);
     m_layout->addWidget(m_minimizeButton);
-    m_layout->addSpacerItem(m_maximizeSpacer);
     m_layout->addWidget(m_maximizeButton);
-    m_layout->addSpacerItem(m_closeSpacer);
     m_layout->addWidget(m_closeButton);
 
     connect(m_minimizeButton, &QPushButton::clicked, this, &TitleBar::minimizeRequested);
@@ -92,7 +87,10 @@ void TitleBar::initControlButton(QPushButton *button, const char *role)
         return;
     }
 
-    button->setFixedSize(46, 30);
+    // Fixed width, full caption height: the hover fill has to reach the
+    // window edge and the top/bottom of the titlebar like a native button.
+    button->setFixedWidth(46);
+    button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
     button->setFlat(true);
     button->setAutoDefault(false);
     button->setDefault(false);
@@ -459,10 +457,6 @@ void TitleBar::leaveEvent(QEvent *event)
 void TitleBar::setMinimizeButtonVisible(bool visible)
 {
     m_minimizeButton->setVisible(visible);
-    m_minimizeSpacer->changeSize(
-        visible ? 4 : 0, 0,
-        QSizePolicy::Fixed,
-        visible ? QSizePolicy::Minimum : QSizePolicy::Fixed);
     m_layout->invalidate();
 }
 
@@ -474,10 +468,6 @@ bool TitleBar::isMinimizeButtonVisible() const
 void TitleBar::setMaximizeButtonVisible(bool visible)
 {
     m_maximizeButton->setVisible(visible);
-    m_maximizeSpacer->changeSize(
-        visible ? 4 : 0, 0,
-        QSizePolicy::Fixed,
-        visible ? QSizePolicy::Minimum : QSizePolicy::Fixed);
     m_layout->invalidate();
 }
 
@@ -489,10 +479,6 @@ bool TitleBar::isMaximizeButtonVisible() const
 void TitleBar::setCloseButtonVisible(bool visible)
 {
     m_closeButton->setVisible(visible);
-    m_closeSpacer->changeSize(
-        visible ? 4 : 0, 0,
-        QSizePolicy::Fixed,
-        visible ? QSizePolicy::Minimum : QSizePolicy::Fixed);
     m_layout->invalidate();
 }
 
