@@ -21,14 +21,13 @@ WindowEffect::BackdropKind bestSupportedBackdrop(const BackdropCapabilities &cap
 
 SurfacePolicy resolveSurfacePolicy(WindowEffect::BackdropMode requested,
                                    bool minimized,
-                                   bool hasBackgroundImage,
                                    const BackdropCapabilities &capabilities)
 {
     SurfacePolicy policy;
 
-    // States where the theme must own the surface: a minimized window keeps no
-    // backdrop, and a background image is painted by the theme itself.
-    if (minimized || hasBackgroundImage || requested == WindowEffect::BackdropMode::None) {
+    // BackdropMode::None is the application-painted surface, and a minimized
+    // window keeps no backdrop at all.
+    if (minimized || requested == WindowEffect::BackdropMode::None) {
         return policy;
     }
 
@@ -55,15 +54,13 @@ SurfacePolicy resolveSurfacePolicy(WindowEffect::BackdropMode requested,
     return policy;
 }
 
-SurfacePolicy resolveSurfacePolicy(WindowEffect::BackdropMode requested,
-                                   bool minimized,
-                                   bool hasBackgroundImage)
+SurfacePolicy resolveSurfacePolicy(WindowEffect::BackdropMode requested, bool minimized)
 {
     const Utils::WindowsCapabilities caps = Utils::detectWindowsCapabilities();
     BackdropCapabilities capabilities;
     capabilities.mica = caps.supportsMica;
     capabilities.acrylic = caps.supportsAcrylic;
-    return resolveSurfacePolicy(requested, minimized, hasBackgroundImage, capabilities);
+    return resolveSurfacePolicy(requested, minimized, capabilities);
 }
 
 bool usesTranslucentSurface(const SurfacePolicy &policy)
