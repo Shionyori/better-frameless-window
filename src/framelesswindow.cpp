@@ -844,6 +844,13 @@ void FramelessWindow::showEvent(QShowEvent *event)
         m_titleBar->setTitle(windowTitle());
         m_titleBar->setIcon(windowIcon());
     }
+    // A style sheet set before the window was shown can be dropped by the first
+    // polish, leaving the window painted with the initial colours until the
+    // theme changes again. Force one application now that the native window
+    // exists.
+    m_lastAppliedStyleSheet.clear();
+    applyTheme();
+
     ensureNativeResizeStyle();
     scheduleStateVisualRefresh();
 }

@@ -205,6 +205,11 @@ follow-system ──▶ setFollowSystemTheme() reads the OS preference
               └─▶ syncThemeWithSystemIfFollowing() re-reads it on demand
 ```
 
+The style sheet is re-applied once in `showEvent()`: a sheet set before the
+window was shown can be dropped by the first polish, which leaves the window
+painted with whatever theme was current when it was constructed until the next
+theme change.
+
 Persistence lives under the library's own `QSettings` key
 (`better-frameless-window/settings`): theme mode and window geometry. It is per
 library, not per application — that is a known limitation, not an accident.
