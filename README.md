@@ -142,7 +142,7 @@ is painted; the values are kept, so switching back to `None` restores them.
 | `isShadowEnabled()` | Check shadow state |
 | `setBackdropMode(mode)` | Request a backdrop; `None` switches it off |
 | `backdropMode()` | Get the requested backdrop mode |
-| `setRoundedCornersEnabled(bool)` | Enable / disable rounded window corners |
+| `setRoundedCornersEnabled(bool)` | Enable / disable the rounded window frame (`DWMWA_WINDOW_CORNER_PREFERENCE`, on by default). It drives the whole DWM-drawn frame, not just the corners: the border colour and shadow shape follow it |
 | `isRoundedCornersEnabled()` | Check rounded corners state |
 | `setSnapLayoutEnabled(bool)` | Enable / disable Snap Layout overlay |
 | `isSnapLayoutEnabled()` | Check Snap Layout state |

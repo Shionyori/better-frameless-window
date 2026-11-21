@@ -428,13 +428,12 @@ int main(int argc, char *argv[])
             makeSwitch(QStringLiteral("Close"), window.isCloseButtonVisible(),
                        [&window](bool visible) { window.setCloseButtonVisible(visible); })});
 
-    // DWM visual effects and diagnostics. The shadow switch is left out on
-    // purpose: the window surface is translucent by default (Mica), and DWM
-    // draws no frame shadow for a layered window, so the toggle would look
-    // broken. setShadowEnabled() still works for opaque surfaces.
-    addRow(QStringLiteral("Effects"),
-           {makeSwitch(QStringLiteral("Rounded corners"), window.isRoundedCornersEnabled(),
-                       [&window](bool enabled) { window.setRoundedCornersEnabled(enabled); })});
+    // Frame-level effects stay out of the panel on purpose:
+    // - the DWM shadow needs an opaque surface, and a material is layered, so
+    //   the toggle would look broken (setShadowEnabled() still works on None);
+    // - the rounded corner preference is not a cosmetic switch: DWM uses it for
+    //   the whole frame it draws (border colour, shadow shape), so turning it
+    //   off changes more than the corners. It stays on by default.
     addRow(QStringLiteral("Extras"),
            {makeSwitch(QStringLiteral("Snap Layout"), window.isSnapLayoutEnabled(),
                        [&window](bool enabled) { window.setSnapLayoutEnabled(enabled); }),
