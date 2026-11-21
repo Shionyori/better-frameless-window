@@ -3,9 +3,10 @@
 #include "diagnostics.h"
 #include "core/windowgeometry.h"
 #include "core/windowvisualstate.h"
+// Platform-neutral: reports failure instead of doing anything off Windows.
+#include "win32/windowcommand.h"
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
-#include "win32/windowcommand.h"
 #include "win32/systemmenu.h"
 #include "win32/windowhittest.h"
 #include "win32/windowframe.h"
