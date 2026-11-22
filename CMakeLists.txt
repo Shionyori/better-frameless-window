@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 set(TARGET_NAME better-frameless-window)
-project(${TARGET_NAME} VERSION 0.2.0 LANGUAGES CXX)
+project(${TARGET_NAME} VERSION 0.3.0 LANGUAGES CXX)
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
@@ -173,18 +173,19 @@ install(FILES
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${TARGET_NAME}/core
 )
 
-if(WIN32)
-    install(FILES
-        src/platform/win32/nativemessagerouter.h
-        src/platform/win32/systemmenu.h
-        src/platform/win32/windowcommand.h
-        src/platform/win32/windowframe.h
-        src/platform/win32/windowhittest.h
-        src/platform/win32/windoweffect.h
-        src/platform/win32/utils.h
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${TARGET_NAME}/platform/win32
-    )
-endif()
+# framelesswindow.h includes windoweffect.h and windowvisualstate.h includes it
+# as well, so the platform headers have to be installed on every platform or the
+# installed headers do not compile off Windows.
+install(FILES
+    src/platform/win32/nativemessagerouter.h
+    src/platform/win32/systemmenu.h
+    src/platform/win32/windowcommand.h
+    src/platform/win32/windowframe.h
+    src/platform/win32/windowhittest.h
+    src/platform/win32/windoweffect.h
+    src/platform/win32/utils.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${TARGET_NAME}/platform/win32
+)
 
 install(EXPORT ${TARGET_NAME}-targets
     FILE ${TARGET_NAME}-targets.cmake

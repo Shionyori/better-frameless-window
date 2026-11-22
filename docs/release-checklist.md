@@ -22,63 +22,66 @@ the real `windows` platform plugin, so keep `QT_QPA_PLATFORM=windows` on Windows
 ## Window interaction
 
 - [ ] Drag by the title bar; window follows the cursor without lag
-- [ ] Double-click the title bar toggles maximize/restore
-- [ ] Click the maximize button: instant toggle, no blank/flash frame
 - [ ] Drag a **maximized** window by its title bar: it restores and keeps moving
-- [ ] Drag to the top edge: snaps/maximizes; window stays draggable afterwards
 - [ ] Resize from all four edges and four corners; cursor matches what is draggable
 - [ ] Resize at 150% / 200% display scaling: grab area still comfortable
 - [ ] Minimize, restore from the taskbar, re-activate: title bar buttons show no stuck hover state
 - [ ] `showFullScreen()`: title bar hidden, edges not resizable
 - [ ] System menu (right-click title bar): opens, items enabled/disabled correctly, closes when clicking elsewhere
 
+## Caption buttons
+
+- [ ] Buttons sit flush with the top-right corner (46x32, native size)
+- [ ] Close button hover fill reaches the window corner (no rounded gap)
+- [ ] The titlebar strip below the buttons still drags the window
+- [ ] The outer resize border works on top of the buttons (top/right edge)
+- [ ] Hovering a button then leaving the window (through the top edge, the right edge, or straight off the desktop) clears the hover
+- [ ] Buttons can be hidden individually and the layout does not collapse
+- [ ] `addTitleBarWidget()` widget stays clickable and does not start window drags
+
+## Maximize and restore
+
+Every path uses the same 200ms transition; the window state flips at the end.
+
+- [ ] Caption button and double-click animate, with no blank frame and no flash at the end
+- [ ] Win+Up / Win+Down animate
+- [ ] Dragging the window to the top edge (Aero snap) animates to the work area
+- [ ] Dragging a maximized window off the top restores natively, without fighting the drag
+- [ ] Restoring a minimized window from the taskbar still works
+- [ ] Snap to the top by dragging, then restore: the window returns to the position it had before the drag (not to the top edge)
+- [ ] A second click during the animation completes it instead of stacking; dragging the caption or an edge takes over cleanly
+- [ ] A maximized window fills the work area exactly on a scaled display (150%): no desktop strip at the edges
+- [ ] A maximized window never covers the taskbar
+
 ## Snap Layout
 
 - [ ] Hover the maximize button: Snap Layout flyout appears
 - [ ] Pick a zone: window snaps and the title bar still works
-
-## Persistence
-
-- [ ] Move/resize, close, relaunch: same size and position
-- [ ] Maximize, close, relaunch: maximized; restore returns the pre-maximize size
-- [ ] Move the window to a second monitor, close, relaunch with that monitor disconnected: window comes back inside the primary work area
-- [ ] Taskbar is never covered by a maximized window
-- [ ] A maximized window fills the work area exactly on a scaled display (150%): no desktop strip at the edges
-
-## Window chrome
-
-- [ ] Caption buttons sit flush with the top-right corner (46x32, native size)
-- [ ] Close button hover fill reaches the window corner (no rounded gap)
-- [ ] The titlebar strip below the buttons still drags the window
-- [ ] The outer resize border works on top of the caption buttons (top/right edge)
-- [ ] Hovering a caption button then leaving the window (through the top edge, the right edge, or straight off the desktop) clears the hover
-- [ ] Maximize: geometry animates to the work area (~170ms), then the button glyph flips
-- [ ] Snap to the top by dragging, then restore: the window returns to the position it had before the drag (not to the top edge)
-- [ ] Double-clicking the caption uses the same animated transition as the button
-- [ ] Dragging the window to the top edge (Aero snap) animates to the work area
-- [ ] Win+Up / Win+Down animate; dragging a maximized window off the top restores natively without fighting the drag
-- [ ] Restoring a minimized window from the taskbar still works
-- [ ] Restore: geometry animates back to the previous size, no jump or flash
-- [ ] A second click during the animation completes it instead of stacking
-- [ ] Dragging the caption or an edge during the animation takes over cleanly
-- [ ] Closing while maximized, then relaunching: maximized, and restore returns the pre-maximize size
+- [ ] Maximize → restore, then hover the button again: the flyout still appears
 
 ## Theme and backdrop
 
 - [ ] Light ↔ Dark: 300ms transition, title bar, background and backdrop tint all follow
+- [ ] System: follows the Windows setting, including a live change while running
 - [ ] Mica: applied at startup, survives maximize → restore
 - [ ] Acrylic: applied at startup, survives maximize → restore, tint follows the theme
+- [ ] Dark theme + Mica: the window is dark, never flat grey
 - [ ] `setBackdropMode(None)` clears the backdrop and drops the translucent surface
+- [ ] Switching Mica / Acrylic ↔ None: no flash, and the background becomes the solid theme colour / material
 - [ ] Background controls (colour / image / opacity) are disabled while Mica or Acrylic is active and re-enable on `None`
-- [ ] An image set on `None` disappears when switching to Mica and returns when switching back
-- [ ] Dark theme + Mica: window is dark, never flat grey (backdrop dark variant follows the theme)
-- [ ] `setBorderColor()` shows the border on Windows 11
+- [ ] An image set on `None` disappears when switching to a material and returns when switching back
+- [ ] `setBorderColor()` shows the border on Windows 11; `QColor()` restores the system default; the border is suppressed on Acrylic
 - [ ] Shadow: visible with `BackdropMode::None`, absent with Mica/Acrylic (DWM drops it for layered windows)
 
 ## Content
 
 - [ ] Background image in all five modes (Cover / Fit / Stretch / Tile / Center)
-- [ ] `setBackgroundOpacity()` blends toward the theme color
-- [ ] Title bar buttons can be hidden individually and the layout does not collapse
-- [ ] `addTitleBarWidget()` widget stays clickable and does not start window drags
+- [ ] `setBackgroundOpacity()` blends toward the theme colour
+- [ ] Accent colour: titlebar button hover and the selected state of checkable buttons follow it
 - [ ] Embedded QOpenGLWidget / QQuickWidget content still renders after maximize, restore and theme switch
+
+## Persistence
+
+- [ ] Move/resize, close, relaunch: same size and position
+- [ ] Maximize, close, relaunch: maximized; restore returns the pre-maximize size
+- [ ] Move the window to a second monitor, close, relaunch with that monitor disconnected: the window comes back inside the primary work area
