@@ -105,7 +105,10 @@ rebuild the window.
 
 `VisualRefreshCoordinator` coalesces refresh requests and skips the pass when
 the token is unchanged, which is what keeps window moves and focus changes from
-spamming DWM.
+spamming DWM. `Utils::syncNativeWindowStyles()` likewise only calls
+`SetWindowPos(SWP_FRAMECHANGED)` when the native style actually has to change:
+that call makes DWM recompute and repaint the frame, which shows up as a flash
+on a layered window when it runs on every refresh.
 
 ### Theme wash
 
