@@ -123,6 +123,17 @@ protected:
     int resizeBorderThickness() const;
     Qt::Edges edgesForLocalPos(const QPoint &localPos) const;
     void toggleMaximizeRestore();
+    // Animated, idempotent versions used by the native SC_MAXIMIZE/SC_RESTORE
+    // path (Aero snap to the top, Win+Up / Win+Down, system menu).
+    // Return false when the requested state does not apply (already maximized,
+    // not maximized, no usable target) so the caller can fall back to the
+    // native command.
+    bool maximizeWithTransition();
+    bool restoreWithTransition();
+    // Aero snap to the top (and any external maximize) resizes the window to the
+    // work area before the state changes, which leaves nothing to animate. The
+    // rectangle is in native pixels.
+    bool interceptExternalMaximize(const QRect &requestedNativeRect);
     void startSystemMove();
     void showSystemMenu(const QPoint &globalPos);
     void updateMaximizeButtonState();

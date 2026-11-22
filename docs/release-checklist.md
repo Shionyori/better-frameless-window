@@ -53,6 +53,9 @@ the real `windows` platform plugin, so keep `QT_QPA_PLATFORM=windows` on Windows
 - [ ] Hovering a caption button then leaving the window (through the top edge, the right edge, or straight off the desktop) clears the hover
 - [ ] Maximize: geometry animates to the work area (~170ms), then the button glyph flips
 - [ ] Double-clicking the caption uses the same animated transition as the button
+- [ ] Dragging the window to the top edge (Aero snap) animates to the work area
+- [ ] Win+Up / Win+Down animate; dragging a maximized window off the top restores natively without fighting the drag
+- [ ] Restoring a minimized window from the taskbar still works
 - [ ] Restore: geometry animates back to the previous size, no jump or flash
 - [ ] A second click during the animation completes it instead of stacking
 - [ ] Dragging the caption or an edge during the animation takes over cleanly

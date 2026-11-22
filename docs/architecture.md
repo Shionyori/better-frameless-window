@@ -144,7 +144,12 @@ See [`todo.md`](todo.md) for the open items here.
   target rectangle over 170ms (`InOutCubic`) and the window state flips only
   when it arrives (`WindowCommand::setMaximized()` → `ShowWindow`). Windows
   will not animate this window itself: the native transition belongs to the
-  frame, and the frame is ours. `QWidget::showMaximized()` cannot be used for
+  frame, and the frame is ours. `WM_SYSCOMMAND` `SC_MAXIMIZE` / `SC_RESTORE`
+  are intercepted for the same reason, so Aero snap to the top, Win+Up,
+  Win+Down and the system menu use the same transition as the caption button.
+  `SC_RESTORE` is only taken over while the window is maximized and no mouse
+  button is held — restoring a minimized window from the taskbar, and dragging
+  a maximized window off its position, keep the native behaviour. `QWidget::showMaximized()` cannot be used for
   the flip either — once the geometry equals the maximized rectangle, Qt
   thinks the window is already maximized and never tells Windows.
 - While resizing, the visual refresh pass is suppressed: calling

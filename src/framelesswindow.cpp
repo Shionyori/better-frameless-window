@@ -1081,32 +1081,9 @@ void FramelessWindow::toggleMaximizeRestore()
     }
 
     if (isMaximized()) {
-        QRect target = m_restoreGeometry;
-        if (!target.isValid()) {
-            target = normalGeometry();
-        }
-        if (target.isValid()) {
-            startWindowTransition(target, false);
-            return;
-        }
-    } else if (const QScreen *targetScreen = screen()) {
-        // The rectangle to come back to, captured before the animation walks
-        // the geometry up to the work area.
-        m_restoreGeometry = geometry();
-        startWindowTransition(targetScreen->availableGeometry(), true);
-        return;
-    }
-
-    // No usable target (for example a window that was maximized before it was
-    // ever shown): fall back to an instant state change, which is abrupt but
-    // always correct.
-    if (!WindowCommand::setMaximized(reinterpret_cast<void *>(winId()), !isMaximized())) {
-        Diagnostics::logWarning(QStringLiteral("toggleMaximizeRestore: native state change failed, fallback"));
-        if (isMaximized()) {
-            showNormal();
-        } else {
-            showMaximized();
-        }
+        restoreWithTransition();
+    } else {
+        maximizeWithTransition();
     }
 #else
     if (isMaximized()) {
@@ -1114,6 +1091,127 @@ void FramelessWindow::toggleMaximizeRestore()
     } else {
         showMaximized();
     }
+#endif
+}
+
+bool FramelessWindow::interceptExternalMaximize(const QRect &requestedNativeRect)
+{
+#ifdef Q_OS_WIN
+    if (isMaximized() || isMinimized()) {
+        return false;
+    }
+
+    const QScreen *targetScreen = screen();
+    if (targetScreen == nullptr) {
+        return false;
+    }
+
+    const qreal dpr = devicePixelRatioF();
+    if (dpr <= 0.0) {
+        return false;
+    }
+
+    const QRect logical = targetScreen->availableGeometry();
+    const QRect available(qRound(logical.x() * dpr),
+                          qRound(logical.y() * dpr),
+                          qRound(logical.width() * dpr),
+                          qRound(logical.height() * dpr));
+
+    // DPI rounding makes an exact match unreliable.
+    const int tolerance = 4;
+    if (qAbs(requestedNativeRect.x() - available.x()) > tolerance
+        || qAbs(requestedNativeRect.y() - available.y()) > tolerance
+        || qAbs(requestedNativeRect.width() - available.width()) > tolerance
+        || qAbs(requestedNativeRect.height() - available.height()) > tolerance) {
+        return false;
+    }
+
+    if (m_windowTransition != nullptr) {
+        // A transition is already walking the window to the work area; suppress
+        // the system's jump so the two do not fight.
+        return true;
+    }
+
+    // Only a real jump: if the window is already close to the work area the
+    // request is legitimate (and this also stops the interception from firing
+    // again for our own transition).
+    const QSize currentNative = size() * dpr;
+    if (currentNative.width() >= available.width() * 0.9
+        && currentNative.height() >= available.height() * 0.9) {
+        return false;
+    }
+
+    maximizeWithTransition();
+    return true;
+#else
+    Q_UNUSED(requestedNativeRect)
+    return false;
+#endif
+}
+
+bool FramelessWindow::maximizeWithTransition()
+{
+#ifdef Q_OS_WIN
+    if (isMaximized()) {
+        return false;
+    }
+
+    if (m_windowTransition != nullptr) {
+        // Already animating (the snap request and the system command can both
+        // arrive): keep the running transition.
+        return true;
+    }
+
+    if (const QScreen *targetScreen = screen()) {
+        // The rectangle to come back to, captured before the animation walks
+        // the geometry up to the work area.
+        m_restoreGeometry = geometry();
+        startWindowTransition(targetScreen->availableGeometry(), true);
+        return true;
+    }
+
+    // No usable screen (the window was never placed): an instant state change
+    // is abrupt but always correct.
+    if (!WindowCommand::setMaximized(reinterpret_cast<void *>(winId()), true)) {
+        Diagnostics::logWarning(QStringLiteral("maximizeWithTransition: native state change failed, fallback"));
+        showMaximized();
+    }
+    return true;
+#else
+    showMaximized();
+    return true;
+#endif
+}
+
+bool FramelessWindow::restoreWithTransition()
+{
+#ifdef Q_OS_WIN
+    if (!isMaximized()) {
+        return false;
+    }
+
+    if (m_windowTransition != nullptr) {
+        return true;
+    }
+
+    QRect target = m_restoreGeometry;
+    if (!target.isValid()) {
+        target = normalGeometry();
+    }
+
+    if (target.isValid()) {
+        startWindowTransition(target, false);
+        return true;
+    }
+
+    if (!WindowCommand::setMaximized(reinterpret_cast<void *>(winId()), false)) {
+        Diagnostics::logWarning(QStringLiteral("restoreWithTransition: native state change failed, fallback"));
+        showNormal();
+    }
+    return true;
+#else
+    showNormal();
+    return true;
 #endif
 }
 
