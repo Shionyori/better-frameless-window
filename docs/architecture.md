@@ -144,10 +144,13 @@ See [`todo.md`](todo.md) for the open items here.
   `WM_ENTERSIZEMOVE`/`WM_EXITSIZEMOVE`, `WM_GETMINMAXINFO`, `WM_SYSCOMMAND`
   and forwards the ones that change state to `FramelessWindow`.
 - Maximize and restore are animated in the library: the geometry moves to the
-  target rectangle over 170ms (`InOutCubic`) and the window state flips only
-  when it arrives (`WindowCommand::setMaximized()` → `ShowWindow`). Windows
-  will not animate this window itself: the native transition belongs to the
-  frame, and the frame is ours. `WM_SYSCOMMAND` `SC_MAXIMIZE` / `SC_RESTORE`
+  target rectangle over 200ms (`OutCubic`) and the window state flips only when
+  it arrives (`WindowCommand::setMaximized()` → `ShowWindow`). The visual
+  refresh pass is skipped for the duration — re-polishing the theme per frame
+  only makes the animation uneven. Windows will not animate this window itself:
+  the native transition belongs to the frame, and the frame is ours (DWM also
+  skips it for a layered window), which is why this is a real window resize and
+  the content re-lays out while it runs. `WM_SYSCOMMAND` `SC_MAXIMIZE` / `SC_RESTORE`
   are intercepted for the same reason, so Aero snap to the top, Win+Up,
   Win+Down and the system menu use the same transition as the caption button.
   `SC_RESTORE` is only taken over while the window is maximized and no mouse
@@ -158,7 +161,9 @@ See [`todo.md`](todo.md) for the open items here.
   (`WindowFrame::workArea()`). Correcting the maximized rectangle afterwards is
   not an option: Windows re-applies its own the next time it lays the window
   out, and the two rectangles differ by a pixel, so the window flickers back and
-  forth. `QWidget::showMaximized()` cannot be used for
+  forth. `settleMaximizedGeometry()` therefore only corrects a rectangle that
+  fails to *cover* the work area and leaves the equal/overhanging case alone.
+  `QWidget::showMaximized()` cannot be used for
   the flip either — once the geometry equals the maximized rectangle, Qt
   thinks the window is already maximized and never tells Windows.
 - While resizing, the visual refresh pass is suppressed: calling

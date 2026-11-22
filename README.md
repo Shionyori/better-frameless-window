@@ -36,7 +36,7 @@
 - **Snap Layout** — native DWM hit-test forwarding, toggleable via `setSnapLayoutEnabled()`
 - **Theme manager** — Light / Dark with 300ms animated transitions, persistence, and system theme following
 - **Titlebar customization** — visibility toggle, adjustable height, widget extension slot, caption buttons flush with the window edge
-- **Smooth maximize / restore** — the geometry is animated (170ms, InOutCubic) before the window state flips
+- **Smooth maximize / restore** — animated on every path: caption button, double-click, Win+Up / Win+Down, system menu and Aero snap (200ms, `OutCubic`); the window state flips when the rectangle arrives
 - **Fullscreen support** — auto-hides titlebar, disables resize edges
 - **Window geometry persistence** — automatic save/restore with multi-monitor validation
 
@@ -142,6 +142,7 @@ is painted; the values are kept, so switching back to `None` restores them.
 | `isShadowEnabled()` | Check shadow state |
 | `setBackdropMode(mode)` | Request a backdrop; `None` switches it off |
 | `backdropMode()` | Get the requested backdrop mode |
+| `isBackdropActive()` | Whether a material currently owns the surface (use this to enable/disable background controls) |
 | `setRoundedCornersEnabled(bool)` | Enable / disable the rounded window frame (`DWMWA_WINDOW_CORNER_PREFERENCE`, on by default). It drives the whole DWM-drawn frame, not just the corners: the border colour and shadow shape follow it |
 | `isRoundedCornersEnabled()` | Check rounded corners state |
 | `setSnapLayoutEnabled(bool)` | Enable / disable Snap Layout overlay |
@@ -159,8 +160,6 @@ is painted; the values are kept, so switching back to `None` restores them.
 
 `Auto` resolves to the best material the running OS supports
 (Windows 11 22H2+ → Mica → Acrylic), falling back to `None`.
-`isBackdropActive()` tells an application whether a material currently owns the
-surface, which is what UI should use to enable or disable background controls.
 
 ### Rendering rules
 
@@ -198,7 +197,7 @@ Consequences:
 | `setFollowSystemTheme(bool)` | Auto-follow Windows dark/light setting |
 | `followsSystemTheme()` | Check if system theme following is enabled |
 | `syncThemeWithSystemIfFollowing()` | Re-read the Windows theme and apply it unanimated, when following is enabled and the theme changed |
-| `themeTransitionProgress()` | Get current theme transition progress (0.0–1.0 Q_PROPERTY) |
+| `themeTransitionProgress()` / `setThemeTransitionProgress(p)` | Transition progress (0.0–1.0 `Q_PROPERTY`); the animation drives it, and the setter is what a custom animation would write |
 
 ### Theme Enums
 
@@ -208,8 +207,29 @@ Consequences:
 
 | Method | Description |
 |---|---|
-| `setDiagnosticsEnabled(bool)` | Enable debug logging for DWM / visual effect calls |
+| `setDiagnosticsEnabled(bool)` | Log what the native effect paths do — DWM attribute failures, fallbacks, skipped calls. Process-wide, off by default |
 | `isDiagnosticsEnabled()` | Check diagnostics logging state |
+
+## Lower-level API
+
+`framelesswindow.h` is the surface most applications need. The installed headers
+also expose the pieces it is built from; they are plain declarations, so they
+compile everywhere, but their implementations only do something on Windows:
+
+| Header | Contents |
+|---|---|
+| `core/windowvisualstate.h` | `resolveSurfacePolicy()`, the surface/backdrop resolution and the pure helpers the renderer relies on |
+| `core/windowgeometry.h` | Restore-rectangle validation (off-screen clamping, multi-monitor) |
+| `core/visualrefreshcoordinator.h` | Coalesces visual refresh requests |
+| `windoweffect.h` | `WindowEffect` (applies the DWM attributes for an already-resolved backdrop) and the two enums: `BackdropMode` = what the caller asks for (`Auto`/`None`/`Mica`/`Acrylic`), `BackdropKind` = what DWM ends up drawing (`None`/`Mica`/`Acrylic`) |
+| `windowhittest.h` | One hit-test truth for the Qt cursor path and `WM_NCHITTEST` |
+| `windowframe.h` | Native window rectangle, monitor work area, restore geometry |
+| `windowcommand.h` | The state change used at the end of a transition (`ShowWindow`) |
+| `nativemessagerouter.h` | The `WM_*` translator `FramelessWindow::nativeEvent` calls |
+| `systemmenu.h` | The native system menu shown on a titlebar right-click |
+| `utils.h` | `detectWindowsCapabilities()`, `windowsBuildNumber()`, `systemPrefersDarkTheme()`, and the DPI/hit-test helpers |
+| `diagnostics.h` | The `Diagnostics` namespace behind `setDiagnosticsEnabled()` |
+| `titlebar.h` | `TitleBar` itself: the control buttons, hit regions and their signals, if you build your own window frame |
 
 ## Scope
 
@@ -228,6 +248,7 @@ Snap Layout. Porting those is tracked in #7 (Linux) and #8 (macOS).
 | Shadow is not drawn on a backdrop surface | DWM only paints its frame shadow for windows without per-pixel alpha. A Mica/Acrylic surface is layered, so `setShadowEnabled()` has no visible effect there; it applies as soon as the window is opaque (`BackdropMode::None`). The library logs this through `setDiagnosticsEnabled(true)`. |
 | The border is suppressed on Acrylic | `DWMWA_BORDER_COLOR` and the legacy accent-policy Acrylic conflict: DWM paints the whole window as frame, so *any* visible border — a custom colour or the system default — is drawn across the client area and the window becomes a solid rectangle of that colour (white in light mode, dark in dark mode). The border is therefore set to `DWMWA_COLOR_NONE` while `BackdropMode::Acrylic` is active; Mica and `None` keep it. Mapping Acrylic to `DWMSBT_TRANSIENTWINDOW` on Windows 11 would remove the exception. |
 | Acrylic is a flat tint on Windows 11 | The library falls back to `ACCENT_ENABLE_ACRYLICBLURBEHIND`, which no longer blurs on Windows 11; it renders as a solid tint. Mica is the supported material there. |
+| Maximize / restore is a window resize | The transition moves the real window, so the content re-lays out while it animates and the frame rate is whatever a layered `SetWindowPos` can sustain (~30fps). DWM's own transition is a GPU scale of the composited surface and is not available to a layered window. See `docs/todo.md` for the render-backend option |
 | Accent color is not animated | Theme changes animate over 300ms, `setAccentColor()` applies immediately (#12) |
 | Window state is per library, not per app | Window geometry and theme are stored under the library's own settings key, so applications using the library share one record |
 

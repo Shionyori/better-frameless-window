@@ -5,6 +5,15 @@ live in the commit history and in [`architecture.md`](architecture.md).
 
 ## Rendering / materials
 
+- [ ] **A transition that does not resize the window.** Maximize/restore moves
+      the real window per frame, so the content re-lays out and the rate is
+      whatever a layered `SetWindowPos` sustains. The native animation is a DWM
+      GPU scale of the composited surface, which a layered window never gets.
+      Options: animate inside a window already at its target size (tried: the
+      scaled snapshot reads less native than the resize and leaves the window
+      background around it), or move to a backend that composites without
+      `WS_EX_LAYERED` (see the shadow item below).
+
 - [ ] **Add `BackdropMode::MicaAlt` (`DWMSBT_TABBEDWINDOW`).**
       `Auto` stays on plain Mica. Motivation: on a light wallpaper plain Mica
       renders within ~2 RGB levels of the solid background, while the tabbed
@@ -71,8 +80,9 @@ live in the commit history and in [`architecture.md`](architecture.md).
       (`Mica` when `Auto` resolved to Mica) in addition to the requested mode.
 - [ ] `followsSystemTheme()` only applies on demand: nothing in the library
       listens for `QStyleHints::colorSchemeChanged`, so apps have to call
-      `syncThemeWithSystemIfFollowing()` themselves. Either wire it internally
-      or document the requirement more prominently.
+      `syncThemeWithSystemIfFollowing()` themselves (the example wires the
+      signal). Either wire it internally or document the requirement more
+      prominently.
 - [ ] Per-application persistence: window geometry and theme are stored under
       the library's own settings key, so two apps using the library share one
       record.
