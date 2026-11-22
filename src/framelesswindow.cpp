@@ -677,12 +677,9 @@ void FramelessWindow::paintEvent(QPaintEvent *event)
         return;
     }
 
-    if (!m_backgroundColor.isValid() && m_backgroundImage.isNull()) {
-        return;
-    }
-
     // Fill with the custom colour (or the theme colour) so the image blends
-    // toward it as opacity decreases, rather than revealing the desktop.
+    // toward it as opacity decreases, rather than revealing the desktop. This
+    // also makes the surface opaque, which is what BackdropMode::None means.
     painter.fillRect(rect(),
                      m_backgroundColor.isValid() ? m_backgroundColor
                                                  : m_themeManager.windowBackgroundColor());
@@ -843,10 +840,11 @@ void FramelessWindow::applyTheme()
     }
 
     QScopedValueRollback<bool> applyingGuard(m_applyingTheme, true);
-    // Only the style sheet follows the surface: opaque surfaces paint a solid
-    // background, materials get the wash. The window attribute itself never
-    // changes, so switching modes is a repaint instead of a window rebuild.
-    const QString styleSheet = m_themeManager.buildStyleSheet(usesTranslucentSurface());
+    // One style sheet for every surface: the wash is always used, and an opaque
+    // surface paints its solid colour over it in paintEvent(). Re-polishing the
+    // whole widget tree on every backdrop switch is expensive and shows up as a
+    // flash on a layered window.
+    const QString styleSheet = m_themeManager.buildStyleSheet(true);
     if (m_lastAppliedStyleSheet != styleSheet) {
         setStyleSheet(styleSheet);
         m_lastAppliedStyleSheet = styleSheet;

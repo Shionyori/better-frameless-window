@@ -112,12 +112,12 @@ on a layered window when it runs on every refresh.
 
 ### Theme wash
 
-`ThemeManager::buildStyleSheet()` paints `#FramelessWindow` with:
-
-| Surface | Background |
-|---|---|
-| opaque | solid `#F5F5F5` / `#191919` |
-| translucent | `rgba(255,255,255,0.15)` / `rgba(0,0,0,0.35)` |
+`ThemeManager::buildStyleSheet()` always paints `#FramelessWindow` with the
+wash, `rgba(255,255,255,0.15)` in light mode and `rgba(0,0,0,0.35)` in dark
+mode. An opaque surface (`BackdropMode::None`) paints the solid theme colour
+over it in `paintEvent()` instead of swapping the style sheet: re-polishing the
+widget tree for every backdrop switch is expensive and flashes on a layered
+window.
 
 The wash exists for text contrast over the material. It is also the reason
 Mica can be invisible: Mica's own base colour (`#f3f3f3` / `#202020`) is within
