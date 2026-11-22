@@ -414,45 +414,29 @@ void WindowEffect::applyBorderColor(void *hwnd, BackdropKind backdrop, const QCo
         return;
     }
 
-    // The legacy accent-policy Acrylic fills the whole frame, and a border
-    // colour makes DWM paint that frame over the client area: the window turns
-    // into a solid rectangle of the border colour as soon as it is not
-    // maximized. Keep the two apart and reset the attribute instead.
-    const bool borderSupported = backdrop != BackdropKind::Acrylic;
-    const QColor color = borderSupported ? borderColor : QColor();
+    // The legacy accent-policy Acrylic paints the whole window as frame, so a
+    // visible border - a custom colour or the system default - is drawn across
+    // the client area and the window becomes a solid rectangle. Suppress the
+    // border entirely while it owns the surface.
+    const bool acrylicOwnsSurface = backdrop == BackdropKind::Acrylic;
+    const DWORD desired = acrylicOwnsSurface
+                              ? DWMWA_COLOR_NONE
+                              : borderColor.isValid()
+                                    ? RGB(borderColor.red(), borderColor.green(), borderColor.blue())
+                                    : DWMWA_COLOR_DEFAULT;
 
-    if (!color.isValid()) {
-        // Only touch DWM if something was applied earlier; an invalid colour
-        // means "system default", not "skip".
-        if (!m_appliedBorderColor.isValid()) {
-            return;
-        }
-
-        const DWORD reset = DWMWA_COLOR_DEFAULT;
-        const HRESULT hr = DwmSetWindowAttribute(win,
-                                                 DWMWA_BORDER_COLOR,
-                                                 &reset,
-                                                 sizeof(reset));
-        if (SUCCEEDED(hr)) {
-            m_appliedBorderColor = QColor();
-        } else {
-            Diagnostics::logWarning(QStringLiteral("applyBorderColor: resetting DWMWA_BORDER_COLOR failed (hr=0x%1)")
-                                        .arg(QString::number(static_cast<qulonglong>(hr), 16)));
-        }
+    if (m_borderAttributeApplied && m_borderAttributeValue == desired) {
         return;
     }
 
-    if (m_appliedBorderColor == color) {
-        return;
-    }
-
-    const COLORREF colorRef = RGB(color.red(), color.green(), color.blue());
+    DWORD value = desired;
     const HRESULT hr = DwmSetWindowAttribute(win,
                                              DWMWA_BORDER_COLOR,
-                                             &colorRef,
-                                             sizeof(colorRef));
+                                             &value,
+                                             sizeof(value));
     if (SUCCEEDED(hr)) {
-        m_appliedBorderColor = color;
+        m_borderAttributeApplied = true;
+        m_borderAttributeValue = desired;
         return;
     }
 

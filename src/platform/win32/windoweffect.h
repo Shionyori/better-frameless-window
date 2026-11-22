@@ -72,7 +72,9 @@ private:
     mutable bool m_darkMode19Valid = true;
     mutable bool m_systemBackdropAttributeSupported = true;
     mutable bool m_borderColorAttributeValid = true;
-    // Colour currently stored on the window, so a cleared border can be reset
-    // to the system default exactly once instead of re-applying every pass.
-    mutable QColor m_appliedBorderColor;
+    // Raw DWMWA_BORDER_COLOR value currently stored on the window, so the three
+    // states (custom colour / system default / suppressed) only touch DWM when
+    // they change.
+    mutable bool m_borderAttributeApplied = false;
+    mutable quint32 m_borderAttributeValue = 0;
 };
