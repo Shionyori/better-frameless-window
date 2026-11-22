@@ -151,11 +151,11 @@ See [`todo.md`](todo.md) for the open items here.
   button is held — restoring a minimized window from the taskbar, and dragging
   a maximized window off its position, keep the native behaviour.
 - `WM_GETMINMAXINFO` reports the work area in **native** pixels (QScreen speaks
-  device-independent ones), and `settleMaximizedGeometry()` pins the rectangle
-  to the work area after any maximize: Windows computes the maximized client by
-  subtracting the sizing frame, and `WM_NCCALCSIZE` keeps the client equal to
-  the window, so without that the "maximized" window lands a border width inside
-  the work area. `QWidget::showMaximized()` cannot be used for
+  device-independent ones) and takes it from the monitor itself
+  (`WindowFrame::workArea()`). Correcting the maximized rectangle afterwards is
+  not an option: Windows re-applies its own the next time it lays the window
+  out, and the two rectangles differ by a pixel, so the window flickers back and
+  forth. `QWidget::showMaximized()` cannot be used for
   the flip either — once the geometry equals the maximized rectangle, Qt
   thinks the window is already maximized and never tells Windows.
 - While resizing, the visual refresh pass is suppressed: calling

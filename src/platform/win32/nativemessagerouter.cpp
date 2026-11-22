@@ -201,10 +201,6 @@ bool NativeMessageRouter::handle(FramelessWindow &window, void *message, qintptr
             window.beginBackdropTransitionGuard();
             window.scheduleStateVisualRefresh();
         } else if (isMaximizedSize) {
-            // Windows positions the maximized window one sizing border inside
-            // the work area (WM_NCCALCSIZE keeps the client equal to the
-            // window); snap it once the state has settled.
-            QTimer::singleShot(50, &window, [&window]() { window.settleMaximizedGeometry(); });
             window.scheduleStateVisualRefresh();
         } else if (isRestoredSize) {
             window.scheduleStateVisualRefresh();

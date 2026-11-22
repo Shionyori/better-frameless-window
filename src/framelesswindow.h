@@ -135,9 +135,10 @@ protected:
     // rectangle is in native pixels.
     bool interceptExternalMaximize(const QRect &requestedNativeRect);
     // Windows computes the maximized rectangle by subtracting the sizing frame,
-    // and WM_NCCALCSIZE keeps the client equal to the window, so a maximize
-    // lands a border width inside the work area. Snap the rectangle to the work
-    // area, keeping the state.
+    // and WM_NCCALCSIZE keeps the client equal to the window, so a maximize can
+    // land inside the work area. Only correct that case: an equal or larger
+    // rectangle is left alone, otherwise the correction and the window manager
+    // fight over a pixel.
     void settleMaximizedGeometry();
     void startSystemMove();
     void showSystemMenu(const QPoint &globalPos);

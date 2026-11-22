@@ -41,9 +41,9 @@
 
 namespace {
 
-// Windows' own maximize/restore transition is roughly 200ms; 170ms reads as the
-// same gesture without the window lingering in an in-between state.
-constexpr int kWindowTransitionDurationMs = 170;
+// Windows' own maximize/restore transition runs for ~200ms; matching it keeps
+// the two gestures feeling like the same thing.
+constexpr int kWindowTransitionDurationMs = 200;
 
 } // namespace
 
@@ -344,12 +344,19 @@ void FramelessWindow::performVisualRefreshPass()
     const bool surfaceChanged = m_lastAppliedSurfaceKind != policy.kind;
     m_lastAppliedSurfaceKind = policy.kind;
 
+    // Nothing else has to run while the geometry moves: the transition owns
+    // the window until it finishes and schedules a refresh of its own. Running
+    // the pass per frame re-polishes the theme and repaints the titlebar for
+    // nothing, which is what made the animation look uneven.
+    if (m_animatingWindowTransition) {
+        return;
+    }
+
     // Suppress native frame sync and DWM visual effects during an active
-    // system resize (WM_ENTERSIZEMOVE → WM_EXITSIZEMOVE) and while the
-    // maximize/restore transition animates the geometry. Calling
-    // SetWindowPos(SWP_FRAMECHANGED) or DwmSetWindowAttribute mid-transition
-    // fights the moving frame and causes visible jitter.
-    if (!m_resizing && !m_animatingWindowTransition) {
+    // system resize (WM_ENTERSIZEMOVE → WM_EXITSIZEMOVE). Calling
+    // SetWindowPos(SWP_FRAMECHANGED) or DwmSetWindowAttribute mid-resize fights
+    // the system's own resize handling and causes visible jitter.
+    if (!m_resizing) {
         // Surface changes are ordered so the window content never disagrees
         // with the composited backdrop for a frame. Switching to the opaque
         // surface has to paint first, then drop the material; the other
@@ -743,8 +750,6 @@ void FramelessWindow::changeEvent(QEvent *event)
         }
         if (isMaximized()) {
             settleMaximizedGeometry();
-            // Windows may finish positioning after the state event.
-            QTimer::singleShot(0, this, [this]() { settleMaximizedGeometry(); });
         }
         scheduleStateVisualRefresh();
     } else if (event->type() == QEvent::ActivationChange) {
@@ -1113,6 +1118,7 @@ void FramelessWindow::toggleMaximizeRestore()
 #endif
 }
 
+
 void FramelessWindow::settleMaximizedGeometry()
 {
 #ifdef Q_OS_WIN
@@ -1122,7 +1128,14 @@ void FramelessWindow::settleMaximizedGeometry()
     }
 
     const QRect work = WindowFrame::workArea(hwnd);
-    if (!work.isValid() || WindowFrame::windowRect(hwnd) == work) {
+    const QRect current = WindowFrame::windowRect(hwnd);
+    if (!work.isValid() || !current.isValid()) {
+        return;
+    }
+
+    // Covering the work area is enough: an overhanging rectangle is hidden by
+    // the screen anyway, and shrinking it back is what started the flicker.
+    if (current.width() >= work.width() && current.height() >= work.height()) {
         return;
     }
 
@@ -1262,7 +1275,10 @@ void FramelessWindow::startWindowTransition(const QRect &target, bool maximizeAt
 
     auto *animation = new QPropertyAnimation(this, "geometry", this);
     animation->setDuration(kWindowTransitionDurationMs);
-    animation->setEasingCurve(QEasingCurve::InOutCubic);
+    // Windows eases out of the transition rather than in and out: a fast start
+    // with a soft landing reads smoother than an S-curve whose middle jumps the
+    // largest step per frame.
+    animation->setEasingCurve(QEasingCurve::OutCubic);
     animation->setStartValue(from);
     animation->setEndValue(target);
 

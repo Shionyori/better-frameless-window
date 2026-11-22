@@ -41,26 +41,6 @@ void forceDwmRefresh(void *hwnd)
 #endif
 }
 
-void setNativeRect(void *hwnd, const QRect &nativeRect)
-{
-#ifdef Q_OS_WIN
-    const HWND win = static_cast<HWND>(hwnd);
-    if (win == nullptr || !nativeRect.isValid()) {
-        return;
-    }
-
-    SetWindowPos(win,
-                 nullptr,
-                 nativeRect.x(),
-                 nativeRect.y(),
-                 nativeRect.width(),
-                 nativeRect.height(),
-                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
-#else
-    Q_UNUSED(hwnd)
-    Q_UNUSED(nativeRect)
-#endif
-}
 
 QRect workArea(void *hwnd)
 {
@@ -101,6 +81,27 @@ QRect windowRect(void *hwnd)
 #else
     Q_UNUSED(hwnd)
     return QRect();
+#endif
+}
+
+void setNativeRect(void *hwnd, const QRect &nativeRect)
+{
+#ifdef Q_OS_WIN
+    const HWND win = static_cast<HWND>(hwnd);
+    if (win == nullptr || !nativeRect.isValid()) {
+        return;
+    }
+
+    SetWindowPos(win,
+                 nullptr,
+                 nativeRect.x(),
+                 nativeRect.y(),
+                 nativeRect.width(),
+                 nativeRect.height(),
+                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+#else
+    Q_UNUSED(hwnd)
+    Q_UNUSED(nativeRect)
 #endif
 }
 
