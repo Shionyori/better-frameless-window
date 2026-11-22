@@ -53,6 +53,7 @@ the real `windows` platform plugin, so keep `QT_QPA_PLATFORM=windows` on Windows
 - [ ] The outer resize border works on top of the caption buttons (top/right edge)
 - [ ] Hovering a caption button then leaving the window (through the top edge, the right edge, or straight off the desktop) clears the hover
 - [ ] Maximize: geometry animates to the work area (~170ms), then the button glyph flips
+- [ ] Snap to the top by dragging, then restore: the window returns to the position it had before the drag (not to the top edge)
 - [ ] Double-clicking the caption uses the same animated transition as the button
 - [ ] Dragging the window to the top edge (Aero snap) animates to the work area
 - [ ] Win+Up / Win+Down animate; dragging a maximized window off the top restores natively without fighting the drag

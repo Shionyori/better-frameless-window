@@ -237,7 +237,10 @@ clamped, and the restore size is kept even when closing maximized. That
 restore rectangle is tracked by the window itself (`rememberRestoreGeometry()`,
 fed from move/resize while normal); it is preferred over
 `GetWindowPlacement()`, whose "normal" rectangle the maximize animation would
-otherwise overwrite with the work area.
+otherwise overwrite with the work area. A move/size loop (`WM_ENTERSIZEMOVE`)
+captures the rectangle once at its start: during a snap the window follows the
+cursor to the top edge, so the position at the moment of the maximize is not
+the position the window should return to.
 
 ---
 

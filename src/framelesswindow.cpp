@@ -450,6 +450,19 @@ void FramelessWindow::setDiagnosticsEnabled(bool enabled)
 
 void FramelessWindow::setResizing(bool resizing)
 {
+    if (m_resizing == resizing) {
+        return;
+    }
+
+    // A move/size loop is starting. The window still sits at its normal place;
+    // this is the rectangle Windows would restore a snap-maximized window to.
+    // The dragged position must not become the restore target, so capture it
+    // now and leave it alone until the loop ends.
+    if (resizing && !isMaximized() && !isMinimized() && !isFullScreen()
+        && m_windowTransition == nullptr) {
+        m_restoreGeometry = geometry();
+    }
+
     m_resizing = resizing;
 }
 
@@ -1176,9 +1189,13 @@ bool FramelessWindow::maximizeWithTransition()
     }
 
     if (const QScreen *targetScreen = screen()) {
-        // The rectangle to come back to, captured before the animation walks
-        // the geometry up to the work area.
-        m_restoreGeometry = geometry();
+        if (!m_resizing) {
+            // The rectangle to come back to, captured before the animation walks
+            // the geometry up to the work area. During a snap the window has
+            // already been dragged to the top, so keep the rectangle captured
+            // when the move loop started.
+            m_restoreGeometry = geometry();
+        }
         startWindowTransition(targetScreen->availableGeometry(), true);
         return true;
     }
@@ -1312,8 +1329,10 @@ void FramelessWindow::rememberRestoreGeometry()
 {
     // The geometry the window returns to. Tracked continuously so a maximize
     // that did not come from this class (Win+Up, snap) still animates, and
-    // skipped while the transition animates through intermediate sizes.
-    if (m_animatingWindowTransition || isMaximized() || isMinimized() || isFullScreen()) {
+    // skipped while the transition animates through intermediate sizes or a
+    // move/size loop drags the window somewhere else.
+    if (m_animatingWindowTransition || m_resizing || isMaximized() || isMinimized()
+        || isFullScreen()) {
         return;
     }
 
