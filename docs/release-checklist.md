@@ -43,6 +43,7 @@ the real `windows` platform plugin, so keep `QT_QPA_PLATFORM=windows` on Windows
 - [ ] Maximize, close, relaunch: maximized; restore returns the pre-maximize size
 - [ ] Move the window to a second monitor, close, relaunch with that monitor disconnected: window comes back inside the primary work area
 - [ ] Taskbar is never covered by a maximized window
+- [ ] A maximized window fills the work area exactly on a scaled display (150%): no desktop strip at the edges
 
 ## Window chrome
 
@@ -52,7 +53,11 @@ the real `windows` platform plugin, so keep `QT_QPA_PLATFORM=windows` on Windows
 - [ ] The outer resize border works on top of the caption buttons (top/right edge)
 - [ ] Hovering a caption button then leaving the window (through the top edge, the right edge, or straight off the desktop) clears the hover
 - [ ] Maximize: geometry animates to the work area (~170ms), then the button glyph flips
+- [ ] Snap to the top by dragging, then restore: the window returns to the position it had before the drag (not to the top edge)
 - [ ] Double-clicking the caption uses the same animated transition as the button
+- [ ] Dragging the window to the top edge (Aero snap) animates to the work area
+- [ ] Win+Up / Win+Down animate; dragging a maximized window off the top restores natively without fighting the drag
+- [ ] Restoring a minimized window from the taskbar still works
 - [ ] Restore: geometry animates back to the previous size, no jump or flash
 - [ ] A second click during the animation completes it instead of stacking
 - [ ] Dragging the caption or an edge during the animation takes over cleanly

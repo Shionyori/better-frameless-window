@@ -41,6 +41,70 @@ void forceDwmRefresh(void *hwnd)
 #endif
 }
 
+
+QRect workArea(void *hwnd)
+{
+#ifdef Q_OS_WIN
+    const HWND win = static_cast<HWND>(hwnd);
+    if (win == nullptr) {
+        return QRect();
+    }
+
+    MONITORINFO info{};
+    info.cbSize = sizeof(info);
+    if (!GetMonitorInfoW(MonitorFromWindow(win, MONITOR_DEFAULTTONEAREST), &info)) {
+        return QRect();
+    }
+
+    const RECT &work = info.rcWork;
+    return QRect(work.left, work.top, work.right - work.left, work.bottom - work.top);
+#else
+    Q_UNUSED(hwnd)
+    return QRect();
+#endif
+}
+
+QRect windowRect(void *hwnd)
+{
+#ifdef Q_OS_WIN
+    const HWND win = static_cast<HWND>(hwnd);
+    if (win == nullptr) {
+        return QRect();
+    }
+
+    RECT rect{};
+    if (!GetWindowRect(win, &rect)) {
+        return QRect();
+    }
+
+    return QRect(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
+#else
+    Q_UNUSED(hwnd)
+    return QRect();
+#endif
+}
+
+void setNativeRect(void *hwnd, const QRect &nativeRect)
+{
+#ifdef Q_OS_WIN
+    const HWND win = static_cast<HWND>(hwnd);
+    if (win == nullptr || !nativeRect.isValid()) {
+        return;
+    }
+
+    SetWindowPos(win,
+                 nullptr,
+                 nativeRect.x(),
+                 nativeRect.y(),
+                 nativeRect.width(),
+                 nativeRect.height(),
+                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+#else
+    Q_UNUSED(hwnd)
+    Q_UNUSED(nativeRect)
+#endif
+}
+
 bool isMaximized(void *hwnd)
 {
 #ifdef Q_OS_WIN

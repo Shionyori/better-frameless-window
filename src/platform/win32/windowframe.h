@@ -4,6 +4,15 @@
 
 namespace WindowFrame {
 
+// Work area of the window's monitor, in native pixels. Qt reports
+// device-independent geometry; these are what the window manager actually uses.
+QRect workArea(void *hwnd);
+QRect windowRect(void *hwnd);
+
+// Moves and resizes the window to an exact native rectangle without touching
+// its state or z-order.
+void setNativeRect(void *hwnd, const QRect &nativeRect);
+
 // Whether the window is maximized, straight from the window manager. Qt learns
 // the state from WM_SIZE asynchronously, so this is the only synchronous answer
 // available while a native maximize is being processed.

@@ -41,9 +41,9 @@
 
 namespace {
 
-// Windows' own maximize/restore transition is roughly 200ms; 170ms reads as the
-// same gesture without the window lingering in an in-between state.
-constexpr int kWindowTransitionDurationMs = 170;
+// Windows' own maximize/restore transition runs for ~200ms; matching it keeps
+// the two gestures feeling like the same thing.
+constexpr int kWindowTransitionDurationMs = 200;
 
 } // namespace
 
@@ -344,12 +344,19 @@ void FramelessWindow::performVisualRefreshPass()
     const bool surfaceChanged = m_lastAppliedSurfaceKind != policy.kind;
     m_lastAppliedSurfaceKind = policy.kind;
 
+    // Nothing else has to run while the geometry moves: the transition owns
+    // the window until it finishes and schedules a refresh of its own. Running
+    // the pass per frame re-polishes the theme and repaints the titlebar for
+    // nothing, which is what made the animation look uneven.
+    if (m_animatingWindowTransition) {
+        return;
+    }
+
     // Suppress native frame sync and DWM visual effects during an active
-    // system resize (WM_ENTERSIZEMOVE → WM_EXITSIZEMOVE) and while the
-    // maximize/restore transition animates the geometry. Calling
-    // SetWindowPos(SWP_FRAMECHANGED) or DwmSetWindowAttribute mid-transition
-    // fights the moving frame and causes visible jitter.
-    if (!m_resizing && !m_animatingWindowTransition) {
+    // system resize (WM_ENTERSIZEMOVE → WM_EXITSIZEMOVE). Calling
+    // SetWindowPos(SWP_FRAMECHANGED) or DwmSetWindowAttribute mid-resize fights
+    // the system's own resize handling and causes visible jitter.
+    if (!m_resizing) {
         // Surface changes are ordered so the window content never disagrees
         // with the composited backdrop for a frame. Switching to the opaque
         // surface has to paint first, then drop the material; the other
@@ -450,6 +457,19 @@ void FramelessWindow::setDiagnosticsEnabled(bool enabled)
 
 void FramelessWindow::setResizing(bool resizing)
 {
+    if (m_resizing == resizing) {
+        return;
+    }
+
+    // A move/size loop is starting. The window still sits at its normal place;
+    // this is the rectangle Windows would restore a snap-maximized window to.
+    // The dragged position must not become the restore target, so capture it
+    // now and leave it alone until the loop ends.
+    if (resizing && !isMaximized() && !isMinimized() && !isFullScreen()
+        && m_windowTransition == nullptr) {
+        m_restoreGeometry = geometry();
+    }
+
     m_resizing = resizing;
 }
 
@@ -657,12 +677,9 @@ void FramelessWindow::paintEvent(QPaintEvent *event)
         return;
     }
 
-    if (!m_backgroundColor.isValid() && m_backgroundImage.isNull()) {
-        return;
-    }
-
     // Fill with the custom colour (or the theme colour) so the image blends
-    // toward it as opacity decreases, rather than revealing the desktop.
+    // toward it as opacity decreases, rather than revealing the desktop. This
+    // also makes the surface opaque, which is what BackdropMode::None means.
     painter.fillRect(rect(),
                      m_backgroundColor.isValid() ? m_backgroundColor
                                                  : m_themeManager.windowBackgroundColor());
@@ -727,6 +744,9 @@ void FramelessWindow::changeEvent(QEvent *event)
         // before SIZE_RESTORED arrives, which may skip systemBackdrop rebind guard.
         if (m_titleBar != nullptr) {
             m_titleBar->setVisible(!isFullScreen());
+        }
+        if (isMaximized()) {
+            settleMaximizedGeometry();
         }
         scheduleStateVisualRefresh();
     } else if (event->type() == QEvent::ActivationChange) {
@@ -820,10 +840,11 @@ void FramelessWindow::applyTheme()
     }
 
     QScopedValueRollback<bool> applyingGuard(m_applyingTheme, true);
-    // Only the style sheet follows the surface: opaque surfaces paint a solid
-    // background, materials get the wash. The window attribute itself never
-    // changes, so switching modes is a repaint instead of a window rebuild.
-    const QString styleSheet = m_themeManager.buildStyleSheet(usesTranslucentSurface());
+    // One style sheet for every surface: the wash is always used, and an opaque
+    // surface paints its solid colour over it in paintEvent(). Re-polishing the
+    // whole widget tree on every backdrop switch is expensive and shows up as a
+    // flash on a layered window.
+    const QString styleSheet = m_themeManager.buildStyleSheet(true);
     if (m_lastAppliedStyleSheet != styleSheet) {
         setStyleSheet(styleSheet);
         m_lastAppliedStyleSheet = styleSheet;
@@ -939,6 +960,7 @@ void FramelessWindow::restoreWindowGeometry()
 
     if (wasMaximized) {
         showMaximized();
+        settleMaximizedGeometry();
     }
 }
 
@@ -1081,32 +1103,9 @@ void FramelessWindow::toggleMaximizeRestore()
     }
 
     if (isMaximized()) {
-        QRect target = m_restoreGeometry;
-        if (!target.isValid()) {
-            target = normalGeometry();
-        }
-        if (target.isValid()) {
-            startWindowTransition(target, false);
-            return;
-        }
-    } else if (const QScreen *targetScreen = screen()) {
-        // The rectangle to come back to, captured before the animation walks
-        // the geometry up to the work area.
-        m_restoreGeometry = geometry();
-        startWindowTransition(targetScreen->availableGeometry(), true);
-        return;
-    }
-
-    // No usable target (for example a window that was maximized before it was
-    // ever shown): fall back to an instant state change, which is abrupt but
-    // always correct.
-    if (!WindowCommand::setMaximized(reinterpret_cast<void *>(winId()), !isMaximized())) {
-        Diagnostics::logWarning(QStringLiteral("toggleMaximizeRestore: native state change failed, fallback"));
-        if (isMaximized()) {
-            showNormal();
-        } else {
-            showMaximized();
-        }
+        restoreWithTransition();
+    } else {
+        maximizeWithTransition();
     }
 #else
     if (isMaximized()) {
@@ -1114,6 +1113,146 @@ void FramelessWindow::toggleMaximizeRestore()
     } else {
         showMaximized();
     }
+#endif
+}
+
+
+void FramelessWindow::settleMaximizedGeometry()
+{
+#ifdef Q_OS_WIN
+    void *hwnd = reinterpret_cast<void *>(winId());
+    if (hwnd == nullptr || !WindowFrame::isMaximized(hwnd)) {
+        return;
+    }
+
+    const QRect work = WindowFrame::workArea(hwnd);
+    const QRect current = WindowFrame::windowRect(hwnd);
+    if (!work.isValid() || !current.isValid()) {
+        return;
+    }
+
+    // Covering the work area is enough: an overhanging rectangle is hidden by
+    // the screen anyway, and shrinking it back is what started the flicker.
+    if (current.width() >= work.width() && current.height() >= work.height()) {
+        return;
+    }
+
+    WindowFrame::setNativeRect(hwnd, work);
+#else
+#endif
+}
+
+bool FramelessWindow::interceptExternalMaximize(const QRect &requestedNativeRect)
+{
+#ifdef Q_OS_WIN
+    if (isMaximized() || isMinimized()) {
+        return false;
+    }
+
+    const QRect available = WindowFrame::workArea(reinterpret_cast<void *>(winId()));
+    if (!available.isValid()) {
+        return false;
+    }
+
+    // DPI rounding makes an exact match unreliable.
+    const int tolerance = 4;
+    if (qAbs(requestedNativeRect.x() - available.x()) > tolerance
+        || qAbs(requestedNativeRect.y() - available.y()) > tolerance
+        || qAbs(requestedNativeRect.width() - available.width()) > tolerance
+        || qAbs(requestedNativeRect.height() - available.height()) > tolerance) {
+        return false;
+    }
+
+    if (m_windowTransition != nullptr) {
+        // A transition is already walking the window to the work area; suppress
+        // the system's jump so the two do not fight.
+        return true;
+    }
+
+    // Only a real jump: if the window is already close to the work area the
+    // request is legitimate (and this also stops the interception from firing
+    // again for our own transition).
+    const QRect currentNative = WindowFrame::windowRect(reinterpret_cast<void *>(winId()));
+    if (currentNative.width() >= available.width() * 0.9
+        && currentNative.height() >= available.height() * 0.9) {
+        return false;
+    }
+
+    maximizeWithTransition();
+    return true;
+#else
+    Q_UNUSED(requestedNativeRect)
+    return false;
+#endif
+}
+
+bool FramelessWindow::maximizeWithTransition()
+{
+#ifdef Q_OS_WIN
+    if (isMaximized()) {
+        return false;
+    }
+
+    if (m_windowTransition != nullptr) {
+        // Already animating (the snap request and the system command can both
+        // arrive): keep the running transition.
+        return true;
+    }
+
+    if (const QScreen *targetScreen = screen()) {
+        if (!m_resizing) {
+            // The rectangle to come back to, captured before the animation walks
+            // the geometry up to the work area. During a snap the window has
+            // already been dragged to the top, so keep the rectangle captured
+            // when the move loop started.
+            m_restoreGeometry = geometry();
+        }
+        startWindowTransition(targetScreen->availableGeometry(), true);
+        return true;
+    }
+
+    // No usable screen (the window was never placed): an instant state change
+    // is abrupt but always correct.
+    if (!WindowCommand::setMaximized(reinterpret_cast<void *>(winId()), true)) {
+        Diagnostics::logWarning(QStringLiteral("maximizeWithTransition: native state change failed, fallback"));
+        showMaximized();
+    }
+    return true;
+#else
+    showMaximized();
+    return true;
+#endif
+}
+
+bool FramelessWindow::restoreWithTransition()
+{
+#ifdef Q_OS_WIN
+    if (!isMaximized()) {
+        return false;
+    }
+
+    if (m_windowTransition != nullptr) {
+        return true;
+    }
+
+    QRect target = m_restoreGeometry;
+    if (!target.isValid()) {
+        target = normalGeometry();
+    }
+
+    if (target.isValid()) {
+        startWindowTransition(target, false);
+        return true;
+    }
+
+    if (!WindowCommand::setMaximized(reinterpret_cast<void *>(winId()), false)) {
+        Diagnostics::logWarning(QStringLiteral("restoreWithTransition: native state change failed, fallback"));
+        showNormal();
+    }
+    return true;
+#else
+    showNormal();
+    return true;
 #endif
 }
 
@@ -1134,7 +1273,10 @@ void FramelessWindow::startWindowTransition(const QRect &target, bool maximizeAt
 
     auto *animation = new QPropertyAnimation(this, "geometry", this);
     animation->setDuration(kWindowTransitionDurationMs);
-    animation->setEasingCurve(QEasingCurve::InOutCubic);
+    // Windows eases out of the transition rather than in and out: a fast start
+    // with a soft landing reads smoother than an S-curve whose middle jumps the
+    // largest step per frame.
+    animation->setEasingCurve(QEasingCurve::OutCubic);
     animation->setStartValue(from);
     animation->setEndValue(target);
 
@@ -1171,9 +1313,24 @@ void FramelessWindow::completeWindowTransition()
 
     if (m_windowTransitionMaximizes) {
         m_windowTransitionMaximizes = false;
-        // The rectangle already is the maximized one, so this only sets
+#ifdef Q_OS_WIN
+        void *hwnd = reinterpret_cast<void *>(winId());
+        // The rectangle is already the maximized one, so this only sets
         // WS_MAXIMIZE and lets WM_SIZE tell Qt about it.
-        WindowCommand::setMaximized(reinterpret_cast<void *>(winId()), true);
+        WindowCommand::setMaximized(hwnd, true);
+
+        // The platform owns the exact maximized rectangle. If the state did not
+        // take (a snap can leave the window at the snapped size with WS_MAXIMIZE
+        // still off), let Qt finish the job instead of stopping a few pixels
+        // short.
+        if (!WindowFrame::isMaximized(hwnd)) {
+            Diagnostics::logWarning(QStringLiteral("completeWindowTransition: maximize did not apply, falling back"));
+            showMaximized();
+        }
+        settleMaximizedGeometry();
+#else
+        showMaximized();
+#endif
     }
 
     // DWM dropped the backdrop while the geometry was moving; re-apply it now
@@ -1186,8 +1343,10 @@ void FramelessWindow::rememberRestoreGeometry()
 {
     // The geometry the window returns to. Tracked continuously so a maximize
     // that did not come from this class (Win+Up, snap) still animates, and
-    // skipped while the transition animates through intermediate sizes.
-    if (m_animatingWindowTransition || isMaximized() || isMinimized() || isFullScreen()) {
+    // skipped while the transition animates through intermediate sizes or a
+    // move/size loop drags the window somewhere else.
+    if (m_animatingWindowTransition || m_resizing || isMaximized() || isMinimized()
+        || isFullScreen()) {
         return;
     }
 

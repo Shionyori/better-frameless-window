@@ -60,12 +60,13 @@ void syncNativeWindowStyles(void *hwnd, bool includeExStyle)
     }
 
     SetLastError(0);
-    LONG_PTR style = GetWindowLongPtr(win, GWL_STYLE);
-    if (style == 0 && GetLastError() != 0) {
+    const LONG_PTR currentStyle = GetWindowLongPtr(win, GWL_STYLE);
+    if (currentStyle == 0 && GetLastError() != 0) {
         Diagnostics::logWarning(QStringLiteral("syncNativeWindowStyles: GetWindowLongPtr(GWL_STYLE) failed"));
         return;
     }
 
+    LONG_PTR style = currentStyle;
     if (includeExStyle) {
         style &= ~static_cast<LONG_PTR>(WS_POPUP);
     }
@@ -83,28 +84,43 @@ void syncNativeWindowStyles(void *hwnd, bool includeExStyle)
     style &= ~static_cast<LONG_PTR>(WS_CAPTION);
     style |= WS_OVERLAPPED | WS_THICKFRAME | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU;
 
-    SetLastError(0);
-    if (SetWindowLongPtr(win, GWL_STYLE, style) == 0 && GetLastError() != 0) {
-        Diagnostics::logWarning(QStringLiteral("syncNativeWindowStyles: SetWindowLongPtr(GWL_STYLE) failed"));
-        return;
+    bool changed = false;
+    if (style != currentStyle) {
+        SetLastError(0);
+        if (SetWindowLongPtr(win, GWL_STYLE, style) == 0 && GetLastError() != 0) {
+            Diagnostics::logWarning(QStringLiteral("syncNativeWindowStyles: SetWindowLongPtr(GWL_STYLE) failed"));
+            return;
+        }
+        changed = true;
     }
 
     if (includeExStyle) {
         SetLastError(0);
-        LONG_PTR exStyle = GetWindowLongPtr(win, GWL_EXSTYLE);
-        if (exStyle == 0 && GetLastError() != 0) {
+        const LONG_PTR currentExStyle = GetWindowLongPtr(win, GWL_EXSTYLE);
+        if (currentExStyle == 0 && GetLastError() != 0) {
             Diagnostics::logWarning(QStringLiteral("syncNativeWindowStyles: GetWindowLongPtr(GWL_EXSTYLE) failed"));
             return;
         }
 
+        LONG_PTR exStyle = currentExStyle;
         exStyle &= ~static_cast<LONG_PTR>(WS_EX_TOOLWINDOW);
         exStyle |= WS_EX_APPWINDOW;
 
-        SetLastError(0);
-        if (SetWindowLongPtr(win, GWL_EXSTYLE, exStyle) == 0 && GetLastError() != 0) {
-            Diagnostics::logWarning(QStringLiteral("syncNativeWindowStyles: SetWindowLongPtr(GWL_EXSTYLE) failed"));
-            return;
+        if (exStyle != currentExStyle) {
+            SetLastError(0);
+            if (SetWindowLongPtr(win, GWL_EXSTYLE, exStyle) == 0 && GetLastError() != 0) {
+                Diagnostics::logWarning(QStringLiteral("syncNativeWindowStyles: SetWindowLongPtr(GWL_EXSTYLE) failed"));
+                return;
+            }
+            changed = true;
         }
+    }
+
+    // SWP_FRAMECHANGED makes DWM recompute the frame and repaint it, which is
+    // visible as a flash on a layered window. Only do it when the styles
+    // actually changed; this function runs on every visual refresh.
+    if (!changed) {
+        return;
     }
 
     const BOOL updated = SetWindowPos(win, nullptr, 0, 0, 0, 0,

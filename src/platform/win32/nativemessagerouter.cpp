@@ -2,6 +2,7 @@
 
 #include "diagnostics.h"
 #include "framelesswindow.h"
+#include "windowframe.h"
 #include "titlebar.h"
 
 #include <QGuiApplication>
@@ -73,14 +74,21 @@ bool NativeMessageRouter::handleGetMinMaxInfoMessage(FramelessWindow &window,
         return false;
     }
 
-    const QScreen *screen = window.windowHandle() ? window.windowHandle()->screen() : QGuiApplication::primaryScreen();
-    if (screen != nullptr) {
-        const QRect available = screen->availableGeometry();
-        const QRect screenGeometry = screen->geometry();
-        mmi->ptMaxPosition.x = available.x() - screenGeometry.x();
-        mmi->ptMaxPosition.y = available.y() - screenGeometry.y();
-        mmi->ptMaxSize.x = available.width();
-        mmi->ptMaxSize.y = available.height();
+    // WM_GETMINMAXINFO is expressed in native pixels, while QScreen speaks
+    // device-independent ones; ask the monitor directly. ptMaxPosition is
+    // relative to the monitor, hence the subtraction of its origin.
+    const QRect work = WindowFrame::workArea(reinterpret_cast<void *>(window.winId()));
+    if (work.isValid()) {
+        MONITORINFO info{};
+        info.cbSize = sizeof(info);
+        if (GetMonitorInfoW(MonitorFromWindow(reinterpret_cast<HWND>(window.winId()),
+                                              MONITOR_DEFAULTTONEAREST),
+                            &info)) {
+            mmi->ptMaxPosition.x = work.x() - info.rcMonitor.left;
+            mmi->ptMaxPosition.y = work.y() - info.rcMonitor.top;
+            mmi->ptMaxSize.x = work.width();
+            mmi->ptMaxSize.y = work.height();
+        }
     }
 
     *result = 0;
@@ -259,6 +267,53 @@ bool NativeMessageRouter::handle(FramelessWindow &window, void *message, qintptr
                                      static_cast<quintptr>(msg->wParam),
                                      static_cast<qintptr>(msg->lParam),
                                      result);
+    case WM_WINDOWPOSCHANGING:
+    {
+        // Aero snap to the top resizes the window to the work area before the
+        // state changes, which leaves nothing to animate. Take the rectangle
+        // over and keep the window where it is; the transition walks it to the
+        // work area and flips the state at the end.
+        auto *windowPos = reinterpret_cast<WINDOWPOS *>(msg->lParam);
+        if (windowPos != nullptr
+            && (windowPos->flags & SWP_NOSIZE) == 0
+            && (windowPos->flags & SWP_NOMOVE) == 0
+            && window.interceptExternalMaximize(QRect(windowPos->x, windowPos->y,
+                                                      windowPos->cx, windowPos->cy))) {
+            windowPos->flags |= SWP_NOSIZE | SWP_NOMOVE;
+            return true;
+        }
+        return false;
+    }
+    case WM_SYSCOMMAND:
+    {
+        // Aero snap to the top, Win+Up and Win+Down, and the system menu all
+        // arrive here. Windows would maximize instantly - the native animation
+        // belongs to the frame we replaced - so route them through the same
+        // transition the caption buttons use.
+        const WPARAM command = msg->wParam & 0xFFF0;
+        if (command == SC_MAXIMIZE) {
+            if (window.maximizeWithTransition()) {
+                *result = 0;
+                return true;
+            }
+            return false;
+        }
+
+        if (command == SC_RESTORE) {
+            // Only take over when the user did not drag the window off its
+            // maximized position: that drag drives the geometry itself and an
+            // animation would fight it. Anything else (restoring a minimized
+            // window from the taskbar) must fall through to the default
+            // handling.
+            if ((GetKeyState(VK_LBUTTON) & 0x8000) == 0 && window.restoreWithTransition()) {
+                *result = 0;
+                return true;
+            }
+            return false;
+        }
+
+        return false;
+    }
     case WM_SETTINGCHANGE:
         if (msg->lParam != 0) {
             const auto *changed = reinterpret_cast<LPCWSTR>(msg->lParam);

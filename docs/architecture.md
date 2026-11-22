@@ -105,16 +105,19 @@ rebuild the window.
 
 `VisualRefreshCoordinator` coalesces refresh requests and skips the pass when
 the token is unchanged, which is what keeps window moves and focus changes from
-spamming DWM.
+spamming DWM. `Utils::syncNativeWindowStyles()` likewise only calls
+`SetWindowPos(SWP_FRAMECHANGED)` when the native style actually has to change:
+that call makes DWM recompute and repaint the frame, which shows up as a flash
+on a layered window when it runs on every refresh.
 
 ### Theme wash
 
-`ThemeManager::buildStyleSheet()` paints `#FramelessWindow` with:
-
-| Surface | Background |
-|---|---|
-| opaque | solid `#F5F5F5` / `#191919` |
-| translucent | `rgba(255,255,255,0.15)` / `rgba(0,0,0,0.35)` |
+`ThemeManager::buildStyleSheet()` always paints `#FramelessWindow` with the
+wash, `rgba(255,255,255,0.15)` in light mode and `rgba(0,0,0,0.35)` in dark
+mode. An opaque surface (`BackdropMode::None`) paints the solid theme colour
+over it in `paintEvent()` instead of swapping the style sheet: re-polishing the
+widget tree for every backdrop switch is expensive and flashes on a layered
+window.
 
 The wash exists for text contrast over the material. It is also the reason
 Mica can be invisible: Mica's own base colour (`#f3f3f3` / `#202020`) is within
@@ -144,7 +147,18 @@ See [`todo.md`](todo.md) for the open items here.
   target rectangle over 170ms (`InOutCubic`) and the window state flips only
   when it arrives (`WindowCommand::setMaximized()` → `ShowWindow`). Windows
   will not animate this window itself: the native transition belongs to the
-  frame, and the frame is ours. `QWidget::showMaximized()` cannot be used for
+  frame, and the frame is ours. `WM_SYSCOMMAND` `SC_MAXIMIZE` / `SC_RESTORE`
+  are intercepted for the same reason, so Aero snap to the top, Win+Up,
+  Win+Down and the system menu use the same transition as the caption button.
+  `SC_RESTORE` is only taken over while the window is maximized and no mouse
+  button is held — restoring a minimized window from the taskbar, and dragging
+  a maximized window off its position, keep the native behaviour.
+- `WM_GETMINMAXINFO` reports the work area in **native** pixels (QScreen speaks
+  device-independent ones) and takes it from the monitor itself
+  (`WindowFrame::workArea()`). Correcting the maximized rectangle afterwards is
+  not an option: Windows re-applies its own the next time it lays the window
+  out, and the two rectangles differ by a pixel, so the window flickers back and
+  forth. `QWidget::showMaximized()` cannot be used for
   the flip either — once the geometry equals the maximized rectangle, Qt
   thinks the window is already maximized and never tells Windows.
 - While resizing, the visual refresh pass is suppressed: calling
@@ -226,7 +240,10 @@ clamped, and the restore size is kept even when closing maximized. That
 restore rectangle is tracked by the window itself (`rememberRestoreGeometry()`,
 fed from move/resize while normal); it is preferred over
 `GetWindowPlacement()`, whose "normal" rectangle the maximize animation would
-otherwise overwrite with the work area.
+otherwise overwrite with the work area. A move/size loop (`WM_ENTERSIZEMOVE`)
+captures the rectangle once at its start: during a snap the window follows the
+cursor to the top edge, so the position at the moment of the maximize is not
+the position the window should return to.
 
 ---
 
