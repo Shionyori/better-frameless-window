@@ -728,6 +728,11 @@ void FramelessWindow::changeEvent(QEvent *event)
         if (m_titleBar != nullptr) {
             m_titleBar->setVisible(!isFullScreen());
         }
+        if (isMaximized()) {
+            settleMaximizedGeometry();
+            // Windows may finish positioning after the state event.
+            QTimer::singleShot(0, this, [this]() { settleMaximizedGeometry(); });
+        }
         scheduleStateVisualRefresh();
     } else if (event->type() == QEvent::ActivationChange) {
         if (isActiveWindow()) {
@@ -939,6 +944,7 @@ void FramelessWindow::restoreWindowGeometry()
 
     if (wasMaximized) {
         showMaximized();
+        settleMaximizedGeometry();
     }
 }
 
@@ -1094,6 +1100,24 @@ void FramelessWindow::toggleMaximizeRestore()
 #endif
 }
 
+void FramelessWindow::settleMaximizedGeometry()
+{
+#ifdef Q_OS_WIN
+    void *hwnd = reinterpret_cast<void *>(winId());
+    if (hwnd == nullptr || !WindowFrame::isMaximized(hwnd)) {
+        return;
+    }
+
+    const QRect work = WindowFrame::workArea(hwnd);
+    if (!work.isValid() || WindowFrame::windowRect(hwnd) == work) {
+        return;
+    }
+
+    WindowFrame::setNativeRect(hwnd, work);
+#else
+#endif
+}
+
 bool FramelessWindow::interceptExternalMaximize(const QRect &requestedNativeRect)
 {
 #ifdef Q_OS_WIN
@@ -1101,21 +1125,10 @@ bool FramelessWindow::interceptExternalMaximize(const QRect &requestedNativeRect
         return false;
     }
 
-    const QScreen *targetScreen = screen();
-    if (targetScreen == nullptr) {
+    const QRect available = WindowFrame::workArea(reinterpret_cast<void *>(winId()));
+    if (!available.isValid()) {
         return false;
     }
-
-    const qreal dpr = devicePixelRatioF();
-    if (dpr <= 0.0) {
-        return false;
-    }
-
-    const QRect logical = targetScreen->availableGeometry();
-    const QRect available(qRound(logical.x() * dpr),
-                          qRound(logical.y() * dpr),
-                          qRound(logical.width() * dpr),
-                          qRound(logical.height() * dpr));
 
     // DPI rounding makes an exact match unreliable.
     const int tolerance = 4;
@@ -1135,7 +1148,7 @@ bool FramelessWindow::interceptExternalMaximize(const QRect &requestedNativeRect
     // Only a real jump: if the window is already close to the work area the
     // request is legitimate (and this also stops the interception from firing
     // again for our own transition).
-    const QSize currentNative = size() * dpr;
+    const QRect currentNative = WindowFrame::windowRect(reinterpret_cast<void *>(winId()));
     if (currentNative.width() >= available.width() * 0.9
         && currentNative.height() >= available.height() * 0.9) {
         return false;
@@ -1269,9 +1282,24 @@ void FramelessWindow::completeWindowTransition()
 
     if (m_windowTransitionMaximizes) {
         m_windowTransitionMaximizes = false;
-        // The rectangle already is the maximized one, so this only sets
+#ifdef Q_OS_WIN
+        void *hwnd = reinterpret_cast<void *>(winId());
+        // The rectangle is already the maximized one, so this only sets
         // WS_MAXIMIZE and lets WM_SIZE tell Qt about it.
-        WindowCommand::setMaximized(reinterpret_cast<void *>(winId()), true);
+        WindowCommand::setMaximized(hwnd, true);
+
+        // The platform owns the exact maximized rectangle. If the state did not
+        // take (a snap can leave the window at the snapped size with WS_MAXIMIZE
+        // still off), let Qt finish the job instead of stopping a few pixels
+        // short.
+        if (!WindowFrame::isMaximized(hwnd)) {
+            Diagnostics::logWarning(QStringLiteral("completeWindowTransition: maximize did not apply, falling back"));
+            showMaximized();
+        }
+        settleMaximizedGeometry();
+#else
+        showMaximized();
+#endif
     }
 
     // DWM dropped the backdrop while the geometry was moving; re-apply it now

@@ -43,6 +43,7 @@ the real `windows` platform plugin, so keep `QT_QPA_PLATFORM=windows` on Windows
 - [ ] Maximize, close, relaunch: maximized; restore returns the pre-maximize size
 - [ ] Move the window to a second monitor, close, relaunch with that monitor disconnected: window comes back inside the primary work area
 - [ ] Taskbar is never covered by a maximized window
+- [ ] A maximized window fills the work area exactly on a scaled display (150%): no desktop strip at the edges
 
 ## Window chrome
 

@@ -2,6 +2,7 @@
 
 #include "diagnostics.h"
 #include "framelesswindow.h"
+#include "windowframe.h"
 #include "titlebar.h"
 
 #include <QGuiApplication>
@@ -73,14 +74,21 @@ bool NativeMessageRouter::handleGetMinMaxInfoMessage(FramelessWindow &window,
         return false;
     }
 
-    const QScreen *screen = window.windowHandle() ? window.windowHandle()->screen() : QGuiApplication::primaryScreen();
-    if (screen != nullptr) {
-        const QRect available = screen->availableGeometry();
-        const QRect screenGeometry = screen->geometry();
-        mmi->ptMaxPosition.x = available.x() - screenGeometry.x();
-        mmi->ptMaxPosition.y = available.y() - screenGeometry.y();
-        mmi->ptMaxSize.x = available.width();
-        mmi->ptMaxSize.y = available.height();
+    // WM_GETMINMAXINFO is expressed in native pixels, while QScreen speaks
+    // device-independent ones; ask the monitor directly. ptMaxPosition is
+    // relative to the monitor, hence the subtraction of its origin.
+    const QRect work = WindowFrame::workArea(reinterpret_cast<void *>(window.winId()));
+    if (work.isValid()) {
+        MONITORINFO info{};
+        info.cbSize = sizeof(info);
+        if (GetMonitorInfoW(MonitorFromWindow(reinterpret_cast<HWND>(window.winId()),
+                                              MONITOR_DEFAULTTONEAREST),
+                            &info)) {
+            mmi->ptMaxPosition.x = work.x() - info.rcMonitor.left;
+            mmi->ptMaxPosition.y = work.y() - info.rcMonitor.top;
+            mmi->ptMaxSize.x = work.width();
+            mmi->ptMaxSize.y = work.height();
+        }
     }
 
     *result = 0;
@@ -193,6 +201,10 @@ bool NativeMessageRouter::handle(FramelessWindow &window, void *message, qintptr
             window.beginBackdropTransitionGuard();
             window.scheduleStateVisualRefresh();
         } else if (isMaximizedSize) {
+            // Windows positions the maximized window one sizing border inside
+            // the work area (WM_NCCALCSIZE keeps the client equal to the
+            // window); snap it once the state has settled.
+            QTimer::singleShot(50, &window, [&window]() { window.settleMaximizedGeometry(); });
             window.scheduleStateVisualRefresh();
         } else if (isRestoredSize) {
             window.scheduleStateVisualRefresh();

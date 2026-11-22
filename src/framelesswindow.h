@@ -134,6 +134,11 @@ protected:
     // work area before the state changes, which leaves nothing to animate. The
     // rectangle is in native pixels.
     bool interceptExternalMaximize(const QRect &requestedNativeRect);
+    // Windows computes the maximized rectangle by subtracting the sizing frame,
+    // and WM_NCCALCSIZE keeps the client equal to the window, so a maximize
+    // lands a border width inside the work area. Snap the rectangle to the work
+    // area, keeping the state.
+    void settleMaximizedGeometry();
     void startSystemMove();
     void showSystemMenu(const QPoint &globalPos);
     void updateMaximizeButtonState();
@@ -165,6 +170,7 @@ private:
     void attachContentEventFilters(QWidget *widget);
     void detachContentEventFilters(QWidget *widget);
     friend class NativeMessageRouter;
+    friend class TestFramelessWindow;
 
     TitleBar *m_titleBar;
     QWidget *m_contentPanel;

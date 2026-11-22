@@ -149,7 +149,13 @@ See [`todo.md`](todo.md) for the open items here.
   Win+Down and the system menu use the same transition as the caption button.
   `SC_RESTORE` is only taken over while the window is maximized and no mouse
   button is held — restoring a minimized window from the taskbar, and dragging
-  a maximized window off its position, keep the native behaviour. `QWidget::showMaximized()` cannot be used for
+  a maximized window off its position, keep the native behaviour.
+- `WM_GETMINMAXINFO` reports the work area in **native** pixels (QScreen speaks
+  device-independent ones), and `settleMaximizedGeometry()` pins the rectangle
+  to the work area after any maximize: Windows computes the maximized client by
+  subtracting the sizing frame, and `WM_NCCALCSIZE` keeps the client equal to
+  the window, so without that the "maximized" window lands a border width inside
+  the work area. `QWidget::showMaximized()` cannot be used for
   the flip either — once the geometry equals the maximized rectangle, Qt
   thinks the window is already maximized and never tells Windows.
 - While resizing, the visual refresh pass is suppressed: calling
